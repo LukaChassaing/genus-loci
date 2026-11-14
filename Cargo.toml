@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["crates/dendro-core", "crates/dendro-godot"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package.dendro-core]
+opt-level = 3
+
+[profile.release]
+lto = "thin"

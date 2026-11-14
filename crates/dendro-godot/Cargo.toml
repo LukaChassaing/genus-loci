@@ -1,0 +1,11 @@
+[package]
+name = "dendro-godot"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot = { version = "0.5.5", features = ["api-4-7"] }
+dendro-core = { path = "../dendro-core" }

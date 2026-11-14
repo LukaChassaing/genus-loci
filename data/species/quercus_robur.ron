@@ -1,0 +1,115 @@
+// Pedunculate oak, Quercus robur L.
+// Values are literature-plausible orders of magnitude, some calibrated so the
+// emergent tree matches open-grown oak sizes (marked "calibrated").
+(
+    species: "Quercus robur",
+    common_name: "Pedunculate oak",
+    architecture: (
+        // Borchert-Honda lambda. Oak is excurrent when young, strongly
+        // decurrent (broad, forked crown) when mature.
+        apical_dominance_young: 0.6,
+        apical_dominance_mature: 0.5,
+        maturity_age_years: 50.0,
+        // Metamers per unit light (calibrated).
+        vigour_per_light: 6.0,
+        bud_break_threshold: 1.0,
+        // Oak internodes on vigorous shoots ~3-5 cm.
+        internode_length_m: 0.045,
+        // Vigorous oak leaders reach 0.5-0.8 m/yr (first flush only, no lammas).
+        max_shoot_length_m: 0.6,
+        // Oak buds cluster at the shoot tip (3-5 lateral buds around the terminal).
+        lateral_buds_per_shoot: 4,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // Wide-angled, spreading limbs.
+        branching_angle_deg: 52.0,
+        // Quercus has 2/5 phyllotaxis (144 deg).
+        phyllotaxis_deg: 144.0,
+        // Branching order cap. Effectively unlimited: with level-of-detail shoot
+        // units, orders keep increasing over centuries.
+        max_order: 120,
+        // Leader strongly orthotropic; limbs ascending then spreading
+        // (calibrated on crown width ~0.9x height).
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        // Weight of growth towards the brightest sky sector.
+        phototropism: 0.25,
+        // Oak limbs are characteristically sinuous (calibrated, stylised).
+        sinuosity_deg: 16.0,
+        // Oak is light-demanding: interior shaded twigs die fast.
+        shedding_threshold: 0.18,
+        // Collar-to-bud distance (m) where extension stops; calibrated so
+        // open-grown height plateaus around 30-35 m.
+        hydraulic_path_max_m: 38.0,
+    ),
+    leaf: (
+        // Leaves 7-14 cm long, 4-7 lobes per side, very short petiole.
+        length_cm: 10.0,
+        width_cm: 6.0,
+        lobes: 10,
+        deciduous: true,
+        // Young oaks often keep dead brown leaves on lower branches in winter.
+        marcescence: 0.5,
+        marcescence_max_age_years: 30.0,
+        // Informational for now (leaf cards are clusters).
+        leaves_per_shoot: 7.0,
+    ),
+    pigments: (
+        chlorophyll: 1.0,
+        // Autumn oak foliage is yellow-brown, little red.
+        carotenoids: 0.55,
+        anthocyanins: 0.12,
+        tannins: 0.9,
+    ),
+    phenology: (
+        // Oak has a moderate chilling requirement (days with mean 0-7 degC).
+        chilling_requirement_days: 60.0,
+        chill_temp_min_c: 0.0,
+        chill_temp_max_c: 7.0,
+        // Budburst mid/late April in western France (~250 degC.d base 5 from Jan 1).
+        gdd_base_c: 5.0,
+        gdd_budburst: 250.0,
+        leaf_expansion_gdd: 190.0,
+        // Senescence after Delpierre et al. 2009 (photoperiod gate + cold sum):
+        // colouring from early October, full colour early November.
+        senescence_photoperiod_h: 11.6,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        leaf_fall_days: 28.0,
+    ),
+    wood: (
+        // Q. robur basic density ~ 0.55-0.65 g/cm3 (informational for now).
+        density_kg_m3: 640.0,
+        // Oak is the textbook ring-porous wood: large earlywood vessels formed
+        // before budburst from reserves; latewood carries climate variability.
+        ring_porous: true,
+        earlywood_share: 0.35,
+        // Pressler law coefficient (calibrated on DBH targets).
+        growth_coefficient: 0.000013,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+    ),
+    roots: (
+        // Oak forms a strong taproot in the first years, later overtaken by
+        // laterals and sinkers (heart-to-tap root system).
+        taproot_dominance: 0.9,
+        taproot_decline_years: 12.0,
+        max_depth_m: 3.0,
+        // Roots typically spread 1.5-3x the crown radius.
+        lateral_spread: 1.8,
+        lateral_count: 8,
+        lateral_depth_m: 0.5,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.6,
+    ),
+    tolerances: (
+        // Expanding oak leaves are killed by late frosts around -2..-3 degC.
+        frost_c: -2.5,
+        // Q. robur is moderately drought tolerant (less than Q. petraea).
+        drought: 0.45,
+        // Light-demanding pioneer-ish species.
+        shade: 0.3,
+    ),
+)
