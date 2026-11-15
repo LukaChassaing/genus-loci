@@ -4,6 +4,7 @@
 (
     species: "Quercus robur",
     common_name: "Pedunculate oak",
+    common_name_fr: "Chêne pédonculé",
     architecture: (
         // Borchert-Honda lambda of the stem (calibrated by eye). Oak is excurrent when
         // young (strong apical control keeps basal shoots from becoming
@@ -101,6 +102,8 @@
         // inner crown ("growing downwards", Lonsdale 2013).
         retrenchment_onset_years: 200.0,
         retrenchment_rate: 0.08,
+        // Dieback probability ramps up over a century after onset.
+        retrenchment_ramp_years: 100.0,
         retrenchment_reach: 0.72,
         epicormic_rate: 0.04,
         // Collar-to-bud distance (m) where extension stops; calibrated so
@@ -108,12 +111,17 @@
         hydraulic_path_max_m: 36.5,
         // Height growth stays vigorous to mid-life, then plateaus (calibrated).
         hydraulic_exponent: 1.8,
+        // Foliage efficiency declines early and gradually with transport
+        // distance (stylised; drives the age decline of basal area increment).
+        hydraulic_foliage_exponent: 0.65,
     ),
     leaf: (
         // Leaves 7-14 cm long, 4-7 lobes per side, very short petiole.
         length_cm: 10.0,
         width_cm: 6.0,
         lobes: 10,
+        // Lobed but entire (not toothed) margin.
+        serration: 0.0,
         deciduous: true,
         // Young oaks often keep dead brown leaves on lower branches in winter.
         marcescence: 0.5,
@@ -157,6 +165,11 @@
         // before budburst from reserves; latewood carries climate variability.
         ring_porous: true,
         earlywood_share: 0.35,
+        // Renderer: strong ring contrast (wide band of large earlywood pores).
+        ring_contrast: 1.0,
+        // Durable heartwood: dead oak limbs stand for decades (a 10 cm
+        // radius bough ~50 years; stylised).
+        snag_years_per_m: 500.0,
         // Pressler law coefficient (calibrated on DBH targets).
         growth_coefficient: 0.0000180,
         twig_radius_mm: 2.5,
@@ -175,6 +188,17 @@
         root_flare: 0.7,
         root_flare_height_radii: 2.5,
         buttress_lobes: 5,
+    ),
+    // Bark appearance (renderer only): grey-brown, with deep vertical
+    // fissures and ridges from ~20-30 years, no lenticel bands; current-year
+    // shoots olive green-brown; old trunks darker.
+    bark: (
+        color: (0.40, 0.32, 0.28),
+        young_color: (0.40, 0.38, 0.22),
+        old_darkening: (0.10, 0.08, 0.06),
+        lenticels: 0.0,
+        fissures: 0.85,
+        gloss: 0.0,
     ),
     roots: (
         // Oak forms a strong taproot in the first years (often > 1 m by
@@ -201,6 +225,10 @@
         // Q. robur tolerates waterlogging better than Q. petraea (Parelle et
         // al. 2006) but its roots still avoid permanently anoxic soil.
         waterlogging_tolerance: 0.4,
+        // Q. robur roots tolerate hypoxia well (hypertrophied lenticels,
+        // adventitious roots; Colin-Belgrand et al. 1991): treated as fully
+        // tolerant of poorly aerated, non-saturated soil.
+        hypoxia_sensitivity: 0.0,
         // Moderate deepening after dry years (stylised).
         drought_deepening: 0.6,
         hydrotropism: 0.4,
@@ -219,5 +247,38 @@
         drought: 0.45,
         // Light-demanding pioneer-ish species.
         shade: 0.3,
+    ),
+    reproduction: (
+        // Open-grown oak bears acorns from ~30-40 years (later in stands).
+        first_flowering_age_years: 35.0,
+        // Wind-pollinated: green-yellow male catkins and tiny female flowers,
+        // inconspicuous at tree scale; acorns are not drawn either.
+        flower_display: 0.0,
+        fruit_display: 0.0,
+        // Catkins open with the leaves.
+        bloom_gdd: 260.0,
+        bloom_duration_gdd: 120.0,
+        // Flowers on the current-year shoots.
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        fruit_cluster_cm: 3.0,
+        flower_color: (0.65, 0.62, 0.30),
+        fruit_set: 0.3,
+        flower_frost_c: -2.5,
+        // Acorns ripen in late September-October and fall soon after.
+        fruit_ripening_days: 140.0,
+        fruit_persistence_days: 20.0,
+        fruit_color_unripe: (0.35, 0.45, 0.15),
+        fruit_color_ripe: (0.45, 0.32, 0.15),
+    ),
+    // Oak lives for centuries: no programmed decline (veteran crowns
+    // retrench instead, see architecture).
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
     ),
 )

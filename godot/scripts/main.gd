@@ -13,6 +13,12 @@ var env: Environment
 
 var wood_mi: MeshInstance3D
 var leaf_mi: MeshInstance3D
+var flower_mi: MeshInstance3D
+var flower_mat: ShaderMaterial
+var leaf_mat: StandardMaterial3D
+var _tex_cache: Dictionary = {}   # species look key -> {leaf, bark}
+var _oak_bark: Array[ImageTexture] = []
+var _oak_leaf: ImageTexture
 var root_mi: MeshInstance3D
 var fine_root_mi: MeshInstance3D
 var fine_root_mat: ShaderMaterial
@@ -35,11 +41,13 @@ var _vigor_smooth: float = 1.0
 
 var _wood_ver: int = -1
 var _leaf_ver: int = -1
+var _flower_ver: int = -1
+var _bark_fissures: float = 0.85
 var _root_ver: int = -1
 var _rr: int = 0
 var proc_ms_sum: float = 0.0   # own _process() cost (sim + rebuild + HUD), for the bench
 var proc_ms_max: float = 0.0
-var rebuild_counts: Array[int] = [0, 0, 0]  # wood, leaf, root (stats / self-test)
+var rebuild_counts: Array[int] = [0, 0, 0, 0]  # wood, leaf, root, flower (stats / self-test)
 
 var playing: bool = true
 var speed_dps: float = 30.0
@@ -53,9 +61,15 @@ var _last_phase: int = -1
 
 func _ready() -> void:
 	seed_value = randi() % 1000000
+	var seed_env: String = OS.get_environment("DENDRO_SEED")
+	if seed_env != "":
+		seed_value = int(seed_env)
 	var soil_env: String = OS.get_environment("DENDRO_SOIL")
 	if soil_env != "":
 		sim.set_soil(int(soil_env))
+	var species_env: String = OS.get_environment("DENDRO_SPECIES")
+	if species_env != "":
+		sim.set_species(int(species_env))
 	sim.reset(seed_value)
 	_apply_window_overrides()
 	_build_environment()
@@ -72,6 +86,10 @@ func _ready() -> void:
 	hud.set_soil_names(sim.get_soil_names())
 	hud.select_soil(sim.get_soil())
 	hud.soil_selected.connect(_on_soil_selected)
+	hud.set_species_names(sim.get_species_common_names(), sim.get_species_names())
+	hud.select_species(sim.get_species())
+	hud.species_selected.connect(_on_species_selected)
+	_apply_species_look()
 	hud.xray_toggled.connect(_set_xray)
 	hud.guides_toggled.connect(func(on: bool) -> void: guides.set_shown(on))
 	guides.soil = soil
@@ -101,9 +119,45 @@ func _on_soil_selected(index: int) -> void:
 	_apply_seed(seed_value)
 
 
+## Changing the species restarts the same seed with the other tree (same site).
+func _on_species_selected(index: int) -> void:
+	sim.set_species(index)
+	_apply_seed(seed_value)
+
+
+## Bark, leaf and info-panel look of the species now simulated (textures are generated on first use and
+## cached; the oak ones are the startup default).
+func _apply_species_look() -> void:
+	var fis: float = sim.get_bark_fissures()
+	var lent: float = sim.get_bark_lenticels()
+	var lobes: int = sim.get_leaf_lobes()
+	var serr: float = sim.get_leaf_serration()
+	var key: String = "%d|%.2f|%.2f|%.2f|%.3f|%.3f" % [lobes, serr, fis, lent, sim.get_leaf_length_m(), sim.get_leaf_width_m()]
+	if not _tex_cache.has(key):
+		var t0: int = Time.get_ticks_msec()
+		if lobes > 0 and absf(fis - 0.85) < 0.01 and lent < 0.01:
+			_tex_cache[key] = {"leaf": _oak_leaf, "bark": _oak_bark}  # the startup oak textures
+		else:
+			_tex_cache[key] = {
+			"leaf": ProcTextures.make_leaf_cluster_texture(lobes, serr, sim.get_leaf_length_m(), sim.get_leaf_width_m()),
+			"bark": ProcTextures.make_bark_textures(fis, lent),
+			}
+		print("[dendro] species textures generated in %d ms" % (Time.get_ticks_msec() - t0))
+	var entry: Dictionary = _tex_cache[key]
+	leaf_mat.albedo_texture = entry["leaf"]
+	var bt: Array[ImageTexture] = entry["bark"]
+	bark_mat.albedo_texture = bt[0]
+	bark_mat.normal_texture = bt[1]
+	_bark_fissures = fis
+	ProcTextures.set_bark_look(bark_mat, sim.get_bark_gloss(), fis)
+	hud.select_species(sim.get_species())
+	hud.set_bark_color(sim.get_bark_color())
+
+
 func _apply_seed(new_seed: int) -> void:
 	seed_value = new_seed
 	sim.reset(seed_value)
+	_apply_species_look()
 	hud.set_seed_text(seed_value)
 	hud.force_ring_refresh()
 	hud.reset_drought_button()
@@ -116,6 +170,7 @@ func _apply_seed(new_seed: int) -> void:
 	_last_water_q = -1
 	_wood_ver = -1
 	_leaf_ver = -1
+	_flower_ver = -1
 	_root_ver = -1
 	mesh_dirty = true
 
@@ -160,16 +215,24 @@ func _mat(c: Color, rough: float = 0.9) -> StandardMaterial3D:
 func _build_tree_nodes() -> void:
 	# All textures are generated once, here (a few hundred ms at startup).
 	var t0: int = Time.get_ticks_msec()
-	var bark_tex: Array[ImageTexture] = ProcTextures.make_bark_textures()
-	var leaf_tex: ImageTexture = ProcTextures.make_leaf_cluster_texture()
+	var bark_tex: Array[ImageTexture] = ProcTextures.make_bark_textures()   # oak bark: also used for roots
+	var leaf_tex: ImageTexture = ProcTextures.make_leaf_cluster_texture()  # oak leaves
+	_oak_bark = bark_tex
+	_oak_leaf = leaf_tex
 	print("[dendro] procedural textures generated in %d ms" % (Time.get_ticks_msec() - t0))
 	wood_mi = MeshInstance3D.new()
 	bark_mat = ProcTextures.make_bark_material(bark_tex)
 	wood_mi.material_override = bark_mat
 	add_child(wood_mi)
 	leaf_mi = MeshInstance3D.new()
-	leaf_mi.material_override = ProcTextures.make_leaf_material(leaf_tex)
+	leaf_mat = ProcTextures.make_leaf_material(leaf_tex)
+	leaf_mi.material_override = leaf_mat
 	add_child(leaf_mi)
+	flower_mi = MeshInstance3D.new()
+	flower_mat = ProcTextures.make_flower_material(ProcTextures.make_flower_texture(), ProcTextures.make_fruit_texture())
+	flower_mi.material_override = flower_mat
+	flower_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(flower_mi)
 	root_mi = MeshInstance3D.new()
 	root_mat = ProcTextures.make_root_material(bark_tex)
 	root_mi.material_override = root_mat
@@ -228,13 +291,13 @@ func _build_leaf_fall() -> void:
 
 
 ## Rebuilds the meshes whose own version changed (all of them when `force`). Outside `force` at most
-## ONE mesh is rebuilt per call (round-robin, so none starves) and the three rebuilds land on different
+## ONE mesh is rebuilt per call (round-robin, so none starves) and the four rebuilds land on different
 ## frames instead of one big hitch.
 func _rebuild_meshes(force: bool = false) -> void:
-	var vers: Array[int] = [sim.get_wood_version(), sim.get_leaf_version(), sim.get_root_version()]
-	var have: Array[int] = [_wood_ver, _leaf_ver, _root_ver]
-	for step: int in 3:
-		var k: int = (_rr + step) % 3
+	var vers: Array[int] = [sim.get_wood_version(), sim.get_leaf_version(), sim.get_root_version(), sim.get_flower_version()]
+	var have: Array[int] = [_wood_ver, _leaf_ver, _root_ver, _flower_ver]
+	for step: int in 4:
+		var k: int = (_rr + step) % 4
 		if not force and vers[k] == have[k]:
 			continue
 		match k:
@@ -244,13 +307,16 @@ func _rebuild_meshes(force: bool = false) -> void:
 			1:
 				leaf_mi.mesh = sim.build_leaf_mesh()
 				_leaf_ver = vers[1]
-			_:
+			2:
 				root_mi.mesh = sim.build_root_mesh()
 				fine_root_mi.mesh = sim.build_fine_root_mesh()
 				_root_ver = vers[2]
+			_:
+				flower_mi.mesh = sim.build_flower_mesh()
+				_flower_ver = vers[3]
 		rebuild_counts[k] += 1
 		if not force:
-			_rr = (k + 1) % 3
+			_rr = (k + 1) % 4
 			break
 	mesh_dirty = false
 	since_rebuild = 0.0
@@ -352,8 +418,15 @@ func _update_view_state(delta: float) -> void:
 
 	# Bark: darker and rougher with trunk diameter, so an old trunk reads massive rather than pale.
 	var age_t: float = smoothstep(8.0, 90.0, sim.get_trunk_diameter_cm())
-	bark_mat.albedo_color = Color(1.0, 1.0, 1.0).lerp(Color(0.68, 0.64, 0.60), age_t)
-	bark_mat.normal_scale = 1.0 + 1.0 * age_t
+	var rough_k: float = clampf(_bark_fissures / 0.85, 0.0, 1.0)  # smooth bark barely darkens / roughens
+	bark_mat.albedo_color = Color(1.0, 1.0, 1.0).lerp(Color(0.68, 0.64, 0.60), age_t * rough_k)
+	bark_mat.normal_scale = lerpf(0.35, 1.0, rough_k) * (1.0 + 1.0 * age_t * rough_k)
+
+	# Blossom / fruit visibility (per-card hash thresholds in the shader).
+	var bloom: float = sim.get_bloom_progress()
+	var fl_keep: float = clampf(sim.get_flower_density() * 1.6, 0.0, 1.0) * (1.0 - 0.7 * smoothstep(0.6, 1.0, bloom))
+	flower_mat.set_shader_parameter("flower_keep", fl_keep)
+	flower_mat.set_shader_parameter("fruit_keep", clampf(sim.get_fruit_density() * 1.5, 0.0, 1.0))
 
 	_update_soil_layers()
 
@@ -434,9 +507,12 @@ func _simulate() -> void:
 # ---------------------------------------------------------------------------------------------
 # Debug / verification hooks (env vars, never used in normal play)
 #   DENDRO_SHOT=path.png  fast-forward and save a screenshot, then quit
+#   DENDRO_SPECIES=1      species index (0 oak, 1 wild cherry)
 #   DENDRO_YEARS=60       years to fast-forward (default 40)
 #   DENDRO_DOY=300        day of year to stop at (default 200 = mid-July)
-#   DENDRO_CAM=leaves|trunk|low|roots|default   camera preset (roots = root view through the wedge)
+#   DENDRO_CAM=leaves|flowers|trunk|low|roots|default   camera preset (roots = root view through the wedge;
+#                         flowers = blossoms/fruit, also the fallback of leaves when the crown is bare)
+#   DENDRO_SEED=n         fixed random seed (weather and phenology vary a lot between seeds)
 #   DENDRO_YAW / DENDRO_PITCH   camera angles in degrees (override the preset)
 #   DENDRO_XRAY=1         X-ray soil;  DENDRO_GUIDES=1  scale references
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
@@ -499,6 +575,10 @@ func _screenshot_and_quit(path: String) -> void:
 	print("[dendro] view: h=%.1f crown_r=%.1f root_depth=%.1f spread=%.1f plug r=%.1f d=%.1f cam dist=%.1f target=%s" % [
 		sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m(),
 		soil.radius, soil.depth, cam.distance, str(cam.target)])
+	if flower_mi.mesh != null and flower_mi.mesh.get_surface_count() > 0:
+		print("[dendro] flowers: verts=%d density=%.2f bloom=%.2f fruit=%.2f keep=%.2f" % [
+			(flower_mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size(), sim.get_flower_density(),
+			sim.get_bloom_progress(), sim.get_fruit_density(), flower_mat.get_shader_parameter("flower_keep") as float])
 	var rz: String = OS.get_environment("DENDRO_RINGZOOM")
 	if rz != "":
 		var rv: RingView = hud.get_ring_view()
@@ -522,9 +602,41 @@ func _apply_view_env() -> void:
 		hud.guides_button.button_pressed = true
 
 
+## Close-up on an outer cluster of blossoms (or of fruit once the bloom is over), seen from outside the crown.
+func _aim_at_blossoms() -> void:
+	if flower_mi.mesh == null or flower_mi.mesh.get_surface_count() == 0:
+		return
+	var arr: Array = flower_mi.mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var cols: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+	var want_fruit: bool = sim.get_fruit_density() > 0.1 and sim.get_flower_density() < 0.2
+	var best: Vector3 = Vector3.ZERO
+	var best_r: float = -1.0
+	var h: float = sim.get_height_m()
+	for i: int in range(0, verts.size() - 3, 4):
+		if (cols[i].a < 0.75) != want_fruit:
+			continue
+		var c: Vector3 = (verts[i] + verts[i + 2]) * 0.5
+		if c.y < 0.35 * h or c.y > 0.7 * h:
+			continue
+		var r: float = Vector2(c.x, c.z).length()
+		if r > best_r:
+			best_r = r
+			best = c
+	if best_r < 0.0:
+		return
+	cam.use_override = true
+	cam.override_point = best
+	var d: String = OS.get_environment("DENDRO_CAMDIST")
+	cam.override_dist = float(d) if d != "" else 1.2
+	cam.set_angles(atan2(best.x, best.z), 0.1)
+
+
 func _apply_camera_preset() -> void:
 	var preset: String = OS.get_environment("DENDRO_CAM")
-	if preset == "leaves" and leaf_mi.mesh != null:
+	if preset == "flowers" or (preset == "leaves" and leaf_mi.mesh.get_aabb().size.length() < 0.01):
+		_aim_at_blossoms()  # blossoms / fruit (also a leafless cherry in bloom)
+	elif preset == "leaves" and leaf_mi.mesh != null:
 		var bb: AABB = leaf_mi.mesh.get_aabb()
 		cam.use_override = true
 		cam.override_point = Vector3(bb.position.x + bb.size.x * 0.5, bb.position.y + bb.size.y * 0.62,
@@ -742,10 +854,10 @@ func _run_selftest() -> void:
 	_check("rings button hides panel", not hud.is_rings_visible())
 
 	# 6. Mesh rebuild gating: unchanged versions -> no rebuild.
-	for i: int in 3:
+	for i: int in 4:
 		_rebuild_meshes()  # one stale mesh per call
 	var c0: Array[int] = rebuild_counts.duplicate()
-	for i: int in 3:
+	for i: int in 4:
 		_rebuild_meshes()
 	_check("mesh rebuild skipped when versions unchanged", c0 == rebuild_counts, str(rebuild_counts))
 	_run_days_ui(1.0)
@@ -906,6 +1018,36 @@ func _run_selftest() -> void:
 	sim.set_soil(0)
 	_apply_seed(seed_value)
 	_check("soil choice: back to deep loam", sim.get_bedrock_depth_m() < 0.0 and sim.get_age_years() < 0.1)
+
+	# 11. Species: selector populated, cherry blooms (flower mesh), oak never does.
+	_check("species selector has 2 entries", hud.species_option.item_count == 2, str(hud.species_option.item_count))
+	_check("species selector shows French common names", hud.species_option.get_item_text(1) == "Merisier", hud.species_option.get_item_text(1))
+	hud.species_selected.emit(1)  # same path as the OptionButton
+	_check("species switch: cherry simulated", sim.get_species() == 1 and sim.get_age_years() < 0.1 and sim.get_leaf_lobes() == 0)
+	_check("cherry bark look: lenticels, no fissures", sim.get_bark_lenticels() > 0.5 and sim.get_bark_fissures() < 0.5 and bark_mat.roughness < 0.7,
+		"rough %.2f" % bark_mat.roughness)
+	_advance_days_direct(12.0 * 365.0)
+	var bloom_verts: int = 0
+	var bloom_doy: int = -1
+	for d: int in 140:
+		sim.advance_days(1.0)
+		var vc: int = sim.build_flower_mesh().get_surface_count()
+		if vc > 0 and sim.get_flower_density() > 0.3:
+			var arr: Array = sim.build_flower_mesh().surface_get_arrays(0)
+			bloom_verts = (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+			bloom_doy = sim.get_day_of_year()
+			break
+	_check("cherry >= 10 y: flower mesh non-empty at bloom", bloom_verts > 0 and bloom_verts <= 60000, "%d verts, doy %d" % [bloom_verts, bloom_doy])
+	_rebuild_meshes(true)
+	_update_view_state(1.0)
+	_check("flower mesh instance shows the blossoms", flower_mi.mesh != null and flower_mi.mesh.get_surface_count() > 0
+		and (flower_mat.get_shader_parameter("flower_keep") as float) > 0.0)
+	hud.species_selected.emit(0)
+	_check("species switch back: oak simulated", sim.get_species() == 0 and sim.get_leaf_lobes() > 0)
+	_advance_days_direct(12.0 * 365.0 + 102.0)
+	var oak_fl: ArrayMesh = sim.build_flower_mesh()
+	_check("oak: flower mesh empty", oak_fl.get_surface_count() == 0 or (oak_fl.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 0)
+	_check("oak bark look restored", bark_mat.roughness > 0.9 and bark_mat.albedo_texture == _oak_bark[0])
 
 	print("[selftest] %s (%d failure%s)" % ["ALL PASSED" if _failures == 0 else "FAILED", _failures, "" if _failures == 1 else "s"])
 	get_tree().quit(0 if _failures == 0 else 1)

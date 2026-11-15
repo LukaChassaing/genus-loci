@@ -208,11 +208,12 @@ impl Node {
 }
 
 /// Years a piece of standing dead wood of radius `r` (m) persists before it
-/// breaks off: twigs within a few years, boughs in decades (stylised; oak
-/// heartwood is very durable, dead oak limbs stand for decades).
+/// breaks off: twigs within a few years, boughs in decades for durable
+/// heartwood (stylised; `WoodTraits::snag_years_per_m`, 500 for oak, whose
+/// dead limbs stand for decades).
 #[inline]
-fn snag_life_years(r: f32) -> u32 {
-    (2.0 + 500.0 * r) as u32
+fn snag_life_years(r: f32, years_per_m: f32) -> u32 {
+    (2.0 + years_per_m * r) as u32
 }
 
 #[derive(Clone, Debug)]
@@ -309,7 +310,7 @@ impl ShootSystem {
     /// reserves before it dies (branch autonomy, Sprugel et al. 1991;
     /// shaded oak branches are not shed within a single season), so one
     /// dark year or a transient neighbour does not strip the lower crown.
-    fn mark_shed(&mut self, threshold: f32, mean_thr: f32, year: u32, bole: (f32, f32), survival: u8) -> usize {
+    fn mark_shed(&mut self, threshold: f32, mean_thr: f32, year: u32, bole: (f32, f32), survival: u8, snag_k: f32) -> usize {
         let mut count = 0;
         self.nodes[0].dead = false;
         let mut on_stem = vec![false; self.nodes.len()];
@@ -332,7 +333,7 @@ impl ShootSystem {
             let dead = if self.nodes[p].dead {
                 true
             } else if n.is_snag() {
-                year > n.snag_since + snag_life_years(n.radius())
+                year > n.snag_since + snag_life_years(n.radius(), snag_k)
             } else if n.leaf_n <= 0.0 && has_snag[i] && year > n.birth_year + 1 {
                 self.nodes[i].snag_since = year;
                 self.nodes[i].lat_buds = 0;
@@ -436,7 +437,8 @@ impl ShootSystem {
     ///   bough (a branch at least half as thin as its parent, 2-12 cm
     ///   radius, based in the outer crown) whose farthest shoot lies beyond `retrenchment_reach` x
     ///   `hydraulic_path_max_m` from the collar dies with a probability
-    ///   rising from 0 at onset to `retrenchment_rate` 100 years later. It
+    ///   rising from 0 at onset to `retrenchment_rate` after
+    ///   `retrenchment_ramp_years`. It
     ///   becomes standing dead wood (stag-headed top, dead limbs), whose
     ///   thin parts break off first (`snag_life_years`).
     /// * **Reiteration**: live limbs thicker than 5 cm in the lower 65 % of
@@ -459,7 +461,7 @@ impl ShootSystem {
                 reach[p] = reach[p].max(reach[i]);
             }
         }
-        let ramp = ((age - a.retrenchment_onset_years) / 100.0).clamp(0.0, 1.0);
+        let ramp = ((age - a.retrenchment_onset_years) / a.retrenchment_ramp_years.max(1.0)).clamp(0.0, 1.0);
         let p_die = a.retrenchment_rate * ramp;
         let limit = a.retrenchment_reach * a.hydraulic_path_max_m;
         let h = self.height().max(1.0);
@@ -530,7 +532,7 @@ impl ShootSystem {
             let mean_thr = a.shedding_mean_threshold * (1.3 - g.tolerances.shade);
             let bole_h = (a.clear_bole_fraction * self.height()).min(a.clear_bole_max_m);
             let ratio = a.clear_bole_limb_ratio * a.clear_bole_limb_ratio;
-            stats.shed = self.mark_shed(thr, mean_thr, year, (bole_h, ratio), a.shade_survival_years);
+            stats.shed = self.mark_shed(thr, mean_thr, year, (bole_h, ratio), a.shade_survival_years, g.wood.snag_years_per_m);
             let max_seg = 0.3 + 1.2 * self.voxel;
             self.compact(year, max_seg);
             if a.retrenchment_onset_years > 0.0 && age >= a.retrenchment_onset_years {
@@ -971,11 +973,11 @@ impl ShootSystem {
     /// Foliage far from the collar is weighted down (hydraulic limitation of
     /// stomatal conductance in tall trees, Ryan & Yoder 1997), which produces
     /// the age-related decline of basal area increment.
-    pub fn compute_foliage(&mut self, hydraulic_path_max: f32) -> f32 {
+    pub fn compute_foliage(&mut self, hydraulic_path_max: f32, exponent: f32) -> f32 {
         let face = self.voxel * self.voxel;
         for n in self.nodes.iter_mut() {
             n.foliage = if n.leafy {
-                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).powf(0.65)).max(0.08);
+                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).powf(exponent)).max(0.08);
                 n.light * face * eff
             } else {
                 0.0

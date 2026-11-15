@@ -43,6 +43,25 @@ impl TreeSim {
     fn get_soil_names(&self) -> PackedStringArray {
         Backend::soil_names().iter().map(|n| GString::from(n.as_str())).collect()
     }
+    /// Species used from the next `reset` on (index into `get_species_names`).
+    #[func]
+    fn set_species(&mut self, index: i64) {
+        self.backend.set_species(index.max(0) as usize);
+    }
+    #[func]
+    fn get_species(&self) -> i32 {
+        self.backend.species_index() as i32
+    }
+    /// Scientific names of the built-in species.
+    #[func]
+    fn get_species_names(&self) -> PackedStringArray {
+        Backend::species_names().iter().map(|n| GString::from(n.as_str())).collect()
+    }
+    /// French common names of the built-in species.
+    #[func]
+    fn get_species_common_names(&self) -> PackedStringArray {
+        Backend::species_common_names().iter().map(|n| GString::from(n.as_str())).collect()
+    }
     #[func]
     fn get_bedrock_depth_m(&self) -> f64 {
         self.backend.bedrock_depth_m() as f64
@@ -135,6 +154,84 @@ impl TreeSim {
     #[func]
     fn build_root_mesh(&self) -> Gd<ArrayMesh> {
         mesh_data_to_array_mesh(&self.backend.build_root_mesh())
+    }
+    /// Flower and fruit cards (alpha 1.0 = flower, 0.5 = fruit); empty when nothing shows.
+    #[func]
+    fn build_flower_mesh(&self) -> Gd<ArrayMesh> {
+        mesh_data_to_array_mesh(&self.backend.build_flower_mesh())
+    }
+    #[func]
+    fn get_flower_version(&self) -> i64 {
+        self.backend.flower_version()
+    }
+    /// Visible bloom 0..1 (opening, full bloom, petal fall).
+    #[func]
+    fn get_flower_density(&self) -> f64 {
+        self.backend.flower_density()
+    }
+    /// Monotonic bloom progress 0..1 this year (0 before bloom, 1 after petal fall).
+    #[func]
+    fn get_bloom_progress(&self) -> f64 {
+        self.backend.bloom_progress()
+    }
+    /// Visible fruit 0..1.
+    #[func]
+    fn get_fruit_density(&self) -> f64 {
+        self.backend.fruit_density()
+    }
+    #[func]
+    fn get_flower_color(&self) -> Color {
+        let c = self.backend.flower_color();
+        Color::from_rgba(c[0], c[1], c[2], c[3])
+    }
+    /// Fruit colour today (green -> ripe red).
+    #[func]
+    fn get_fruit_color(&self) -> Color {
+        let c = self.backend.fruit_color();
+        Color::from_rgba(c[0], c[1], c[2], c[3])
+    }
+    #[func]
+    fn get_bark_color(&self) -> Color {
+        let c = self.backend.bark_color();
+        Color::from_rgba(c[0], c[1], c[2], c[3])
+    }
+    /// Strength 0..1 of horizontal lenticel bands.
+    #[func]
+    fn get_bark_lenticels(&self) -> f32 {
+        self.backend.bark_lenticels()
+    }
+    /// Strength 0..1 of deep vertical fissures.
+    #[func]
+    fn get_bark_fissures(&self) -> f32 {
+        self.backend.bark_fissures()
+    }
+    /// Bark glossiness 0..1.
+    #[func]
+    fn get_bark_gloss(&self) -> f32 {
+        self.backend.bark_gloss()
+    }
+    #[func]
+    fn get_leaf_length_m(&self) -> f32 {
+        self.backend.leaf_length_m()
+    }
+    #[func]
+    fn get_leaf_width_m(&self) -> f32 {
+        self.backend.leaf_width_m()
+    }
+    /// Number of leaf lobes (both sides; 0 = unlobed).
+    #[func]
+    fn get_leaf_lobes(&self) -> i32 {
+        self.backend.leaf_lobes()
+    }
+    /// Leaf margin serration 0..1.
+    #[func]
+    fn get_leaf_serration(&self) -> f32 {
+        self.backend.leaf_serration()
+    }
+    /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous oak).
+    #[func]
+    fn get_ring_contrast(&self) -> f32 {
+        self.backend.ring_contrast()
     }
     #[func]
     fn get_ring_widths(&self) -> PackedFloat32Array {

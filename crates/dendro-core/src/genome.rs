@@ -11,6 +11,9 @@ use std::fmt;
 /// RON source of the built-in pedunculate oak genome
 /// (`data/species/quercus_robur.ron`).
 pub const QUERCUS_ROBUR_RON: &str = include_str!("../../../data/species/quercus_robur.ron");
+/// RON source of the built-in wild cherry genome
+/// (`data/species/prunus_avium.ron`).
+pub const PRUNUS_AVIUM_RON: &str = include_str!("../../../data/species/prunus_avium.ron");
 
 /// Complete trait set of a species.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -19,13 +22,25 @@ pub struct Genome {
     pub species: String,
     /// English common name.
     pub common_name: String,
+    /// French common name (front-end labels).
+    #[serde(default)]
+    pub common_name_fr: String,
     pub architecture: Architecture,
     pub leaf: LeafTraits,
     pub pigments: Pigments,
     pub phenology: PhenologyTraits,
     pub wood: WoodTraits,
+    /// Bark appearance (renderer only).
+    #[serde(default)]
+    pub bark: BarkTraits,
     pub roots: RootTraits,
     pub tolerances: Tolerances,
+    /// Flowering and fruiting.
+    #[serde(default)]
+    pub reproduction: ReproductionTraits,
+    /// Lifespan: age-related decline of vigour.
+    #[serde(default)]
+    pub longevity: LongevityTraits,
 }
 
 /// Above-ground architecture (bud/shoot model, after Palubicki et al. 2009).
@@ -160,6 +175,10 @@ pub struct Architecture {
     /// after onset (linear ramp from 0).
     #[serde(default)]
     pub retrenchment_rate: f32,
+    /// Years after onset over which the dieback probability ramps up
+    /// linearly from 0 to `retrenchment_rate`.
+    #[serde(default = "hundred_f32")]
+    pub retrenchment_ramp_years: f32,
     /// Boughs whose farthest shoot is beyond this fraction of
     /// `hydraulic_path_max_m` from the collar are eligible for dieback.
     #[serde(default = "one_f32")]
@@ -178,6 +197,25 @@ pub struct Architecture {
     /// larger = vigorous height growth in mid-life, then a sharper plateau).
     #[serde(default = "one_f32")]
     pub hydraulic_exponent: f32,
+    /// Shape of the decline of foliage efficiency (stomatal conductance)
+    /// with the collar-to-leaf distance: efficiency
+    /// `1 - (d / hydraulic_path_max_m)^e` (floor 0.08). Small values = early,
+    /// gradual decline (oak 0.65); large = efficient until close to the
+    /// size limit (fast-growing pioneers).
+    #[serde(default = "foliage_exponent_default")]
+    pub hydraulic_foliage_exponent: f32,
+}
+
+fn foliage_exponent_default() -> f32 {
+    0.65
+}
+
+fn hundred_f32() -> f32 {
+    100.0
+}
+
+fn five_hundred_f32() -> f32 {
+    500.0
 }
 
 fn three_f32() -> f32 {
@@ -205,6 +243,10 @@ pub struct LeafTraits {
     pub width_cm: f32,
     /// Number of lobes, both sides (informational: for the leaf texture).
     pub lobes: u8,
+    /// Margin serration 0..1 (0 = entire or lobed margin, 1 = coarsely,
+    /// doubly serrate). Informational: for the leaf texture.
+    #[serde(default)]
+    pub serration: f32,
     /// Deciduous (true) or evergreen (false).
     pub deciduous: bool,
     /// Fraction (0..1) of dead leaves retained over winter by juvenile trees.
@@ -265,8 +307,19 @@ pub struct WoodTraits {
     pub elasticity_gpa: f32,
     /// Ring-porous wood (earlywood from reserves before leaf-out).
     pub ring_porous: bool,
-    /// Share of annual radial growth formed as earlywood in an average year.
+    /// Share of annual radial growth formed as earlywood in an average year
+    /// (formed at the end of leaf expansion, from last year's reserves).
     pub earlywood_share: f32,
+    /// Renderer: visual contrast 0..1 between earlywood and latewood of a
+    /// ring (1 = ring-porous, large earlywood vessels; ~0.3 = diffuse- to
+    /// semi-ring-porous).
+    #[serde(default = "one_f32")]
+    pub ring_contrast: f32,
+    /// Persistence of standing dead wood: a dead piece of radius `r` (m)
+    /// breaks off after `2 + snag_years_per_m * r` years (durable heartwood
+    /// -> large values).
+    #[serde(default = "five_hundred_f32")]
+    pub snag_years_per_m: f32,
     /// Pressler coefficient: m2 of new sapwood per m2 of light-weighted
     /// foliage above, per year, in an average year.
     pub growth_coefficient: f32,
@@ -330,6 +383,14 @@ pub struct RootTraits {
     /// saturated soil (x 0.4 m), and how much anoxia hurts growth.
     #[serde(default)]
     pub waterlogging_tolerance: f32,
+    /// Sensitivity 0..1 of root function to poor soil aeration (air-filled
+    /// porosity < 10 %, short of saturation): water uptake is reduced by
+    /// `sensitivity x` the root-weighted hypoxia. 0 = tolerant (roots with
+    /// aerenchyma / hypertrophied lenticels), 1 = very sensitive (root
+    /// asphyxia). Independent of `waterlogging_tolerance`, which only sets
+    /// how far roots enter permanently saturated soil.
+    #[serde(default)]
+    pub hypoxia_sensitivity: f32,
     /// Drought-deepening plasticity: relative deepening of laterals and
     /// boost of sinker/taproot growth per unit of last year's water stress.
     #[serde(default)]
@@ -353,6 +414,141 @@ pub struct RootTraits {
     /// rapid taper"): drawn radius x (1 + k exp(-distance / 1 m)).
     #[serde(default)]
     pub rapid_taper: f32,
+}
+
+/// Bark appearance, for the renderer (no effect on the simulation).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BarkTraits {
+    /// Bark colour (RGB 0..1) of established wood (from ~4 years old).
+    pub color: [f32; 3],
+    /// Colour of current-year shoots.
+    pub young_color: [f32; 3],
+    /// Colour subtracted on the thickest wood (radius >= 0.4 m, linear
+    /// from 0): old trunks are darker.
+    pub old_darkening: [f32; 3],
+    /// Strength 0..1 of horizontal lenticel bands (cherry, birch).
+    pub lenticels: f32,
+    /// Strength 0..1 of deep vertical fissures (old oak).
+    pub fissures: f32,
+    /// Glossiness 0..1 (smooth, shiny periderm).
+    pub gloss: f32,
+}
+
+impl Default for BarkTraits {
+    /// Grey-brown, fissured bark (the oak's).
+    fn default() -> Self {
+        BarkTraits {
+            color: [0.40, 0.32, 0.28],
+            young_color: [0.40, 0.38, 0.22],
+            old_darkening: [0.10, 0.08, 0.06],
+            lenticels: 0.0,
+            fissures: 0.8,
+            gloss: 0.0,
+        }
+    }
+}
+
+/// Flowering and fruiting (see `phenology::Reproduction`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReproductionTraits {
+    /// Age (years) of first flowering (end of the juvenile phase); each
+    /// tree varies by +-1 year (seeded).
+    pub first_flowering_age_years: f32,
+    /// Rendering weight 0..1 of the flowers (0 = inconspicuous, e.g. oak
+    /// catkins: no flower cards and `flower_density() == 0`).
+    pub flower_display: f32,
+    /// Rendering weight 0..1 of the fruits.
+    pub fruit_display: f32,
+    /// Forcing (degC.day above `gdd_base_c` since Jan 1) to bloom onset once
+    /// chilling is met (raised like the budburst requirement when chilling
+    /// is incomplete).
+    pub bloom_gdd: f32,
+    /// Forcing from bloom onset to the end of petal fall (degC.day).
+    pub bloom_duration_gdd: f32,
+    /// Flowers are borne on wood at least this old (years; spurs).
+    pub min_wood_age_years: u32,
+    /// ... in parts of the crown at least this well lit (0..1).
+    pub min_light: f32,
+    /// ... on axes thinner than this (mm radius).
+    pub max_wood_radius_mm: f32,
+    /// Flower-cluster card area per flowering shoot unit, in voxel faces
+    /// (bloom density; cf. `LeafTraits::foliage_density`).
+    pub flower_density: f32,
+    /// Size of one flower cluster (umbel / catkin bunch) card (cm).
+    pub flower_cluster_cm: f32,
+    /// Size of one fruit cluster card (cm).
+    pub fruit_cluster_cm: f32,
+    /// Petal colour (RGB 0..1).
+    pub flower_color: [f32; 3],
+    /// Fraction of flower clusters that set fruit in a frost-free year.
+    pub fruit_set: f32,
+    /// Daily minimum (degC) that kills open flowers (late frost).
+    pub flower_frost_c: f32,
+    /// Days from the end of petal fall to ripe fruit.
+    pub fruit_ripening_days: f32,
+    /// Days ripe fruit stays on the tree (eaten, dropped).
+    pub fruit_persistence_days: f32,
+    /// Fruit colour unripe / ripe (RGB 0..1).
+    pub fruit_color_unripe: [f32; 3],
+    pub fruit_color_ripe: [f32; 3],
+}
+
+impl Default for ReproductionTraits {
+    /// Inconspicuous, wind-pollinated flowers (not displayed).
+    fn default() -> Self {
+        ReproductionTraits {
+            first_flowering_age_years: 30.0,
+            flower_display: 0.0,
+            fruit_display: 0.0,
+            bloom_gdd: 250.0,
+            bloom_duration_gdd: 120.0,
+            min_wood_age_years: 0,
+            min_light: 0.3,
+            max_wood_radius_mm: 30.0,
+            flower_density: 1.0,
+            flower_cluster_cm: 5.0,
+            fruit_cluster_cm: 3.0,
+            flower_color: [0.65, 0.62, 0.30],
+            fruit_set: 0.3,
+            flower_frost_c: -2.5,
+            fruit_ripening_days: 120.0,
+            fruit_persistence_days: 20.0,
+            fruit_color_unripe: [0.35, 0.45, 0.15],
+            fruit_color_ripe: [0.45, 0.32, 0.15],
+        }
+    }
+}
+
+/// Lifespan traits: whole-tree, age-related decline of vigour (heart rot,
+/// pathogen load and hydraulic dysfunction of short-lived pioneer trees;
+/// stylised). The crown dieback itself is `Architecture::retrenchment_*`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LongevityTraits {
+    /// Age (years) at which vigour starts to decline (0 = never).
+    pub decline_onset_years: f32,
+    /// Years from onset to the minimum vigour (smooth ramp).
+    pub decline_years: f32,
+    /// Remaining fraction of shoot, cambial and root growth at the end of
+    /// the decline.
+    pub decline_min_vigour: f32,
+}
+
+impl Default for LongevityTraits {
+    fn default() -> Self {
+        LongevityTraits { decline_onset_years: 0.0, decline_years: 50.0, decline_min_vigour: 0.3 }
+    }
+}
+
+impl LongevityTraits {
+    /// Vigour factor (0..1] at `age` years: exactly 1.0 before onset.
+    pub fn vigour(&self, age: f32) -> f32 {
+        if self.decline_onset_years <= 0.0 || age <= self.decline_onset_years {
+            return 1.0;
+        }
+        let t = ((age - self.decline_onset_years) / self.decline_years.max(1.0)).clamp(0.0, 1.0);
+        let s = t * t * (3.0 - 2.0 * t);
+        1.0 - (1.0 - self.decline_min_vigour.clamp(0.0, 1.0)) * s
+    }
 }
 
 /// Environmental tolerances.
@@ -381,6 +577,16 @@ impl Genome {
     /// Built-in pedunculate oak (*Quercus robur*).
     pub fn quercus_robur() -> Genome {
         Genome::from_ron(QUERCUS_ROBUR_RON).expect("built-in Quercus robur genome must parse")
+    }
+
+    /// Built-in wild cherry (*Prunus avium*).
+    pub fn prunus_avium() -> Genome {
+        Genome::from_ron(PRUNUS_AVIUM_RON).expect("built-in Prunus avium genome must parse")
+    }
+
+    /// All built-in species, in a stable order: oak, cherry.
+    pub fn builtin() -> Vec<Genome> {
+        vec![Genome::quercus_robur(), Genome::prunus_avium()]
     }
 
     /// Parse a genome from RON text.

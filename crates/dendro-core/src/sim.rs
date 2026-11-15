@@ -10,14 +10,17 @@
 //! 3. **Senescence onset** -> latewood (from this summer's productivity),
 //!    ring recorded.
 //! 4. **Leaf fall complete** -> dormancy (young oaks keep some dead leaves).
+//!
+//! Flowering and fruiting run alongside (see [`crate::phenology`]); they do
+//! not feed back into growth (no reproductive cost, a simplification).
 
 use crate::climate::{Climate, ClimateParams, Weather};
 use crate::genome::Genome;
 use crate::growth::ShootSystem;
 use crate::mesh::{self, LeafCluster, MeshData, TubeSeg, TubeStyle};
-use crate::phenology::{self, PhenoEvent, Phase, Phenology, Season};
+use crate::phenology::{self, PhenoEvent, Phase, Phenology, ReproStage, Reproduction, Season};
 use crate::rings::{self, Ring};
-use crate::rng::{self, S_LEAF};
+use crate::rng::{self, S_FLOWER, S_LEAF};
 use crate::roots::RootSystem;
 use crate::soil::{SoilColumn, SoilLayerState, SoilProfile};
 
@@ -32,6 +35,9 @@ pub const ROOT_TRI_BUDGET: usize = 55_000;
 pub const FINE_ROOT_TRI_BUDGET: usize = 15_000;
 /// Triangle budget of the leaf mesh.
 pub const LEAF_TRI_BUDGET: usize = 380_000;
+/// Triangle budget of the flower / fruit mesh (cards of 4 vertices and 2
+/// triangles: at most `2 * FLOWER_TRI_BUDGET` = 60k vertices).
+pub const FLOWER_TRI_BUDGET: usize = 30_000;
 
 /// Productivity of an average year (sum of daily index), used to normalise.
 const P_YEAR_REF: f32 = 100.0;
@@ -81,6 +87,11 @@ pub struct Simulation {
     soil: SoilColumn,
     /// Mean water stress of the last completed season (0..1).
     stress_prev: f32,
+    /// Root-weighted soil hypoxia summed since the last budburst, and its
+    /// mean over the previous budburst-to-budburst year (0..1).
+    hyp_sum: f32,
+    hyp_days: f32,
+    hyp_prev: f32,
     /// Root-weighted nutrient availability of the site (0..1).
     fertility: f32,
     phen: Phenology,
@@ -104,12 +115,15 @@ pub struct Simulation {
     wood_version: u64,
     leaf_version: u64,
     root_version: u64,
+    flower_version: u64,
     reported_version: u64,
     leaf_key: u64,
+    flower_key: u64,
+    repro: Reproduction,
 }
 
 impl Simulation {
-    /// New seedling (acorn about to germinate) on Jan 1 of year 0, with the
+    /// New seedling (seed about to germinate) on Jan 1 of year 0, with the
     /// default temperate-oceanic climate.
     pub fn new(genome: Genome, seed: u64) -> Self {
         Self::with_climate(genome, seed, ClimateParams::default())
@@ -124,10 +138,17 @@ impl Simulation {
     pub fn with_site(genome: Genome, seed: u64, climate: ClimateParams, soil: SoilProfile) -> Self {
         let chill = genome.phenology.chilling_requirement_days * 0.5;
         let shoots = ShootSystem::new(&genome);
+        // Individual variation of the juvenile phase: +-1 year.
+        let first_age = genome.reproduction.first_flowering_age_years + 2.0 * (rng::unit(rng::hash(seed, S_FLOWER, 0, 0)) - 0.5);
+        let mut soil = SoilColumn::new(soil);
+        soil.track_hypoxia = genome.roots.hypoxia_sensitivity > 0.0;
         Simulation {
             climate: Climate::new(climate, seed),
-            soil: SoilColumn::new(soil),
+            soil,
             stress_prev: 0.0,
+            hyp_sum: 0.0,
+            hyp_days: 0.0,
+            hyp_prev: 0.0,
             fertility: 0.8,
             phen: Phenology::new().with_initial_chill(chill),
             shoots,
@@ -150,8 +171,11 @@ impl Simulation {
             wood_version: 1,
             leaf_version: 1,
             root_version: 1,
+            flower_version: 1,
             reported_version: 0,
             leaf_key: 0,
+            flower_key: 0,
+            repro: Reproduction::new(first_age),
             genome,
             seed,
         }
@@ -164,7 +188,7 @@ impl Simulation {
         for _ in 0..n {
             self.step_day();
         }
-        let v = self.wood_version + self.leaf_version + self.root_version;
+        let v = self.wood_version + self.leaf_version + self.root_version + self.flower_version;
         let changed = v != self.reported_version;
         self.reported_version = v;
         changed
@@ -203,6 +227,16 @@ impl Simulation {
         // stomatal closure (Kozlowski 1997); tolerant species suffer less.
         let tol = self.genome.roots.waterlogging_tolerance.clamp(0.0, 1.0);
         self.water_factor = (wd.rew / thr).min(1.0) * (1.0 - (1.0 - tol) * wd.anoxic);
+        // Poorly aerated (heavy, wet) soil impairs the roots of sensitive
+        // species even where it is not saturated.
+        let hs = self.genome.roots.hypoxia_sensitivity;
+        if hs > 0.0 {
+            self.water_factor *= 1.0 - hs.min(1.0) * wd.hypoxic;
+            // All year round: sensitive roots die back in waterlogged winter
+            // and spring soil, not only while the leaves transpire.
+            self.hyp_sum += wd.hypoxic;
+            self.hyp_days += 1.0;
+        }
 
         // Phenology and structural events.
         match self.phen.step(&w, doy, &self.genome) {
@@ -212,6 +246,8 @@ impl Simulation {
             PhenoEvent::LeafFallComplete => self.on_leaf_fall(),
             PhenoEvent::None => {}
         }
+        let age = self.day as f32 / DAYS_PER_YEAR as f32;
+        self.repro.step(&w, doy, age, &self.phen, &self.genome);
         // Shoot extension in 5 visible steps.
         let ext_q = (self.phen.shoot_ext * 5.0).floor() / 5.0;
         if ext_q > self.shoots.ext {
@@ -249,6 +285,24 @@ impl Simulation {
             self.leaf_key = key;
             self.leaf_version += 1;
         }
+        // Flower appearance key: constant (0) while nothing is displayed, so
+        // the flower mesh only changes when there is something to draw.
+        let (fl, fr) = (self.flower_density(), self.fruit_density());
+        let fkey = if fl > 0.0 || fr > 0.0 {
+            let r = &self.genome.reproduction;
+            1 | (self.repro.stage as u64) << 1
+                | ((fl * 12.0).round() as u64) << 4
+                | ((fr * 10.0).round() as u64) << 9
+                | ((self.repro.ripeness(r) * 8.0).round() as u64) << 14
+                | ((self.repro.frost_loss * 4.0).round() as u64) << 18
+                | (self.wood_version & 0xFFFF_FFFF) << 24
+        } else {
+            0
+        };
+        if fkey != self.flower_key {
+            self.flower_key = fkey;
+            self.flower_version += 1;
+        }
         self.day += 1;
     }
 
@@ -261,13 +315,34 @@ impl Simulation {
         let rt = &self.genome.roots;
         let rs0 = rt.root_shoot_ratio.clamp(0.0, 0.9);
         let rs = (rs0 * (1.0 + rt.root_shoot_stress_gain * self.stress_prev)).min(0.95);
-        let vigour = vigour * (1.0 - rs) / (1.0 - rs0);
+        let mut vigour = vigour * (1.0 - rs) / (1.0 - rs0);
         let age = self.age_years();
+        if self.genome.roots.hypoxia_sensitivity > 0.0 {
+            self.hyp_prev = if self.hyp_days > 0.0 { self.hyp_sum / self.hyp_days } else { 0.0 };
+            self.hyp_sum = 0.0;
+            self.hyp_days = 0.0;
+        }
+        let decline = self.growth_capacity(age);
+        if decline < 1.0 {
+            vigour *= decline;
+        }
         self.shoots.flush(&self.genome, year, age, vigour, self.seed);
         self.stress_sum = 0.0;
         self.stress_days = 0.0;
         self.drought_in_season = false;
         self.wood_version += 1;
+    }
+
+    /// Whole-tree growth capacity (0..1]: age-related decline (longevity
+    /// traits) x root health after a year in poorly aerated soil
+    /// (`hypoxia_sensitivity`). Exactly 1.0 when neither applies.
+    fn growth_capacity(&self, age: f32) -> f32 {
+        let mut f = self.genome.longevity.vigour(age);
+        let hs = self.genome.roots.hypoxia_sensitivity;
+        if hs > 0.0 && self.hyp_prev > 0.0 {
+            f *= (1.0 - hs.min(1.0) * self.hyp_prev).max(0.3);
+        }
+        f
     }
 
     fn measure_node(&self) -> (usize, f32) {
@@ -282,11 +357,16 @@ impl Simulation {
         self.p_summer = 0.0;
         self.shoots.ext = 1.0;
         self.shoots.compute_light();
-        self.shoots.compute_foliage(self.genome.architecture.hydraulic_path_max_m);
+        let a = &self.genome.architecture;
+        self.shoots.compute_foliage(a.hydraulic_path_max_m, a.hydraulic_foliage_exponent);
         // Earlywood from reserves (last year's productivity).
         let w = &self.genome.wood;
-        let share = if w.ring_porous { w.earlywood_share } else { w.earlywood_share * 0.6 };
-        let factor = share * self.p_prev.clamp(0.4, 1.3);
+        let share = w.earlywood_share;
+        let mut factor = share * self.p_prev.clamp(0.4, 1.3);
+        let decline = self.growth_capacity(self.age_years());
+        if decline < 1.0 {
+            factor *= decline;
+        }
         let (mi, mh) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
         let collar = self.shoots.thicken(w.growth_coefficient, factor, w.max_ring_width_mm * 0.001 * share * 1.5);
@@ -296,7 +376,8 @@ impl Simulation {
         // Root growth.
         let cr = self.shoots.crown_radius();
         let age = self.age_years();
-        self.roots.grow(&self.genome.roots, year, age, cr, self.p_prev, self.stress_prev, &self.soil, self.seed);
+        let prod = if decline < 1.0 { self.p_prev * decline } else { self.p_prev };
+        self.roots.grow(&self.genome.roots, year, age, cr, prod, self.stress_prev, &self.soil, self.seed);
         self.roots.update_layers(&self.genome.roots, &mut self.soil);
         let (mut nsum, mut lsum) = (0.0, 0.0);
         for l in &self.soil.layers {
@@ -313,9 +394,13 @@ impl Simulation {
     fn on_senescence(&mut self, year: u32) {
         self.in_summer = false;
         let w = &self.genome.wood;
-        let share = if w.ring_porous { w.earlywood_share } else { w.earlywood_share * 0.6 };
+        let share = w.earlywood_share;
         let p_summer = (self.p_summer / P_SUMMER_REF).clamp(0.03, 1.5);
-        let factor = (1.0 - share) * p_summer;
+        let mut factor = (1.0 - share) * p_summer;
+        let decline = self.growth_capacity(self.age_years());
+        if decline < 1.0 {
+            factor *= decline;
+        }
         let (mi, _) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
         let collar = self.shoots.thicken(w.growth_coefficient, factor, w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5);
@@ -440,6 +525,69 @@ impl Simulation {
         }
     }
 
+    /// Stage of this year's flowering / fruiting cycle.
+    pub fn repro_stage(&self) -> ReproStage {
+        self.repro.stage
+    }
+
+    /// Visible bloom 0..1: flowers opening, full bloom, petal fall (0 before
+    /// first flowering, and for species whose flowers are not displayed:
+    /// scaled by `ReproductionTraits::flower_display`; a late frost browns
+    /// part of the bloom).
+    pub fn flower_density(&self) -> f32 {
+        let r = &self.genome.reproduction;
+        if r.flower_display <= 0.0 {
+            return 0.0;
+        }
+        self.repro.flower_amount() * r.flower_display.min(1.0)
+    }
+
+    /// Visible fruit 0..1 (fruit set after late frost x swelling x removal
+    /// once ripe), scaled by `ReproductionTraits::fruit_display`.
+    pub fn fruit_density(&self) -> f32 {
+        let r = &self.genome.reproduction;
+        if r.fruit_display <= 0.0 {
+            return 0.0;
+        }
+        self.repro.fruit_amount(r) * (1.0 - self.repro.frost_loss) * r.fruit_display.min(1.0)
+    }
+
+    /// Monotonic bloom progress 0..1 this year (0 before bloom onset, 1 once
+    /// petal fall is complete; tells opening from petal fall, which
+    /// `flower_density` does not).
+    pub fn bloom_progress(&self) -> f32 {
+        match self.repro.stage {
+            ReproStage::Waiting => 0.0,
+            ReproStage::Blooming => self.repro.bloom,
+            ReproStage::Fruiting | ReproStage::Done => 1.0,
+        }
+    }
+
+    /// Fraction 0..1 of this year's flowers killed by late frost.
+    pub fn flower_frost_loss(&self) -> f32 {
+        self.repro.frost_loss
+    }
+
+    /// Fruit ripeness 0..1.
+    pub fn fruit_ripeness(&self) -> f32 {
+        self.repro.ripeness(&self.genome.reproduction)
+    }
+
+    /// Mean petal colour today (RGB 0..1); frost-killed flowers brown.
+    pub fn flower_color(&self) -> [f32; 3] {
+        const FROSTED: [f32; 3] = [0.48, 0.36, 0.24];
+        let c = self.genome.reproduction.flower_color;
+        let f = 0.7 * self.repro.frost_loss;
+        [0, 1, 2].map(|k| c[k] + (FROSTED[k] - c[k]) * f)
+    }
+
+    /// Mean fruit colour today (RGB 0..1), unripe -> ripe.
+    pub fn fruit_color(&self) -> [f32; 3] {
+        let r = &self.genome.reproduction;
+        let t = self.repro.ripeness(r);
+        [0, 1, 2].map(|k| r.fruit_color_unripe[k] + (r.fruit_color_ripe[k] - r.fruit_color_unripe[k]) * t)
+    }
+
     /// Relative extractable soil water 0..1 of the rooted profile (layers
     /// weighted by root presence, see [`crate::soil`]).
     pub fn soil_water(&self) -> f32 {
@@ -491,6 +639,9 @@ impl Simulation {
     }
     pub fn root_version(&self) -> u64 {
         self.root_version
+    }
+    pub fn flower_version(&self) -> u64 {
+        self.flower_version
     }
 
     pub fn stats(&self) -> TreeStats {
@@ -599,6 +750,7 @@ impl Simulation {
         let r_ref = nodes[0].radius().max(1e-6);
         let e = self.genome.wood.pipe_exponent.max(2.0);
         let boost_max = self.genome.wood.limb_draw_boost.max(1.0);
+        let bark = &self.genome.bark;
         let segs: Vec<TubeSeg> = nodes
             .iter()
             .enumerate()
@@ -625,7 +777,8 @@ impl Simulation {
                     // Dead wood: bark sloughs off, silver-grey.
                     [0.56, 0.54, 0.50, 1.0]
                 } else {
-                    [0.40 + 0.0 * t - 0.10 * dark, 0.38 - 0.06 * t - 0.08 * dark, 0.22 + 0.06 * t - 0.06 * dark, 1.0]
+                    let c = |k: usize| (bark.young_color[k] + (bark.color[k] - bark.young_color[k]) * t - bark.old_darkening[k] * dark).clamp(0.0, 1.0);
+                    [c(0), c(1), c(2), 1.0]
                 };
                 TubeSeg {
                     parent: n.parent,
@@ -704,7 +857,6 @@ impl Simulation {
     pub fn fine_root_mesh(&self) -> MeshData {
         use crate::math::Vec3;
         let rt = &self.genome.roots;
-        let tol = rt.waterlogging_tolerance.clamp(0.0, 1.0);
         let cand: Vec<(usize, f32)> = self
             .roots
             .nodes
@@ -713,7 +865,7 @@ impl Simulation {
             .filter(|(_, n)| n.kind != crate::roots::RootKind::Tap && n.radius() < 0.012)
             .filter_map(|(i, n)| {
                 let l = self.soil.layer_at(-n.end().y)?;
-                let w = crate::roots::proliferation(&self.soil.layers[l], tol);
+                let w = crate::roots::proliferation(&self.soil.layers[l], rt);
                 (w > 0.0).then_some((i, w))
             })
             .collect();
@@ -884,6 +1036,104 @@ impl Simulation {
             }
         }
         mesh::build_leaves(&clusters, LEAF_TRI_BUDGET)
+    }
+
+    /// Flowers (bloom) and fruits, drawn as crossed cards like the leaves
+    /// (same conventions as [`Self::leaf_mesh`]); vertex colour alpha is 1.0
+    /// on flower cards and 0.5 on fruit cards so a renderer can texture them
+    /// differently. Empty when there is nothing to show.
+    ///
+    /// Flowers sit on short spurs along living, well-lit branch wood at
+    /// least `min_wood_age_years` old and thinner than
+    /// `max_wood_radius_mm` (never on the stem), scattered within ~0.4 voxel
+    /// of the axis (on old trees a shoot unit lumps several years of twigs).
+    /// The card area per flowering unit scales with the voxel face
+    /// (`flower_density`) and its light, so a crown in full bloom reads as a
+    /// white cloud at any size; clusters open and drop progressively. Fruit
+    /// clusters are the subset of flower clusters that set fruit, hanging.
+    /// At most [`FLOWER_TRI_BUDGET`] triangles.
+    pub fn flower_mesh(&self) -> MeshData {
+        use crate::math::Vec3;
+        let fl_amount = self.flower_density();
+        let fr_amount = self.fruit_density();
+        if fl_amount <= 0.0 && fr_amount <= 0.0 {
+            return MeshData::default();
+        }
+        let r = &self.genome.reproduction;
+        let year = self.year();
+        let ext = self.shoots.ext;
+        let voxel = self.shoots.voxel;
+        let nodes = &self.shoots.nodes;
+        let max_r = r.max_wood_radius_mm * 0.001;
+        // Light of the part of the crown a branch belongs to: the mean light
+        // of the foliage it carries (from the last flush), else its own.
+        let branch_light = |n: &crate::growth::Node| if n.leaf_n > 0.0 { n.leaf_q / n.leaf_n } else { n.light };
+        let cand: Vec<usize> = (1..nodes.len())
+            .filter(|&i| {
+                let n = &nodes[i];
+                if n.is_snag() || n.order == 0 || branch_light(n) < r.min_light || n.radius() > max_r {
+                    return false;
+                }
+                // A lumped (LOD) unit holds wood up to `unit_years` older
+                // than its last extension.
+                let wood_age = year.saturating_sub(n.birth_year) + (n.unit_years as u32).saturating_sub(1);
+                wood_age >= r.min_wood_age_years
+            })
+            .collect();
+        if cand.is_empty() {
+            return MeshData::default();
+        }
+        let mut center = Vec3::ZERO;
+        for &i in &cand {
+            center += nodes[i].end(ext);
+        }
+        center = center * (1.0 / cand.len() as f32);
+        center.x = 0.0;
+        center.z = 0.0;
+        let cards = mesh::CARDS_PER_CLUSTER;
+        let n_max = ((FLOWER_TRI_BUDGET as f32 * 0.95) / (2.0 * cards as f32 * cand.len() as f32)).floor().max(1.0) as usize;
+        let s_pref = r.flower_cluster_cm * 0.01;
+        let s_max = (voxel * 0.8).max(s_pref);
+        let spread = (0.4 * voxel).max(0.05);
+        let fruit_ratio = r.fruit_cluster_cm / r.flower_cluster_cm.max(0.1);
+        let fl_open = self.repro.flower_amount();
+        let remaining = self.repro.fruit_remaining(r);
+        let swell = self.repro.fruit_swell();
+        let set = r.fruit_set * (1.0 - self.repro.frost_loss);
+        let fcol = self.flower_color();
+        let rcol = self.fruit_color();
+        let mut clusters = Vec::new();
+        for &i in &cand {
+            let n = &nodes[i];
+            let lit = branch_light(n).clamp(0.0, 1.0);
+            let area = r.flower_density * voxel * voxel * lit;
+            let count = ((area / (cards as f32 * s_pref * s_pref)).round() as usize).clamp(1, n_max);
+            let size = (area / (cards as f32 * count as f32)).sqrt().clamp(s_pref, s_max);
+            let start = n.start;
+            let len = (n.end(ext) - start).length();
+            for k in 0..count {
+                let ck = rng::hash(self.seed, S_FLOWER, n.id as u64, 1 + k as u64);
+                let u = |s: u64| rng::unit(rng::mix(ck ^ s));
+                let along = start + n.dir * (len * (0.15 + 0.85 * u(1)));
+                let rv = Vec3::new(u(2) - 0.5, u(3) - 0.5, u(4) - 0.5) * 2.0;
+                let pos = along + rv.normalize_or(Vec3::Y) * (spread * u(5).sqrt());
+                let v = 0.9 + 0.15 * u(6);
+                // Flowers open (and drop) cluster by cluster.
+                if fl_amount > 0.0 && u(7) < fl_open {
+                    let dir = (n.dir + Vec3::new(u(8) - 0.5, u(9) - 0.5, u(10) - 0.5)).normalize_or(n.dir);
+                    let col = [(fcol[0] * v).min(1.0), (fcol[1] * v).min(1.0), (fcol[2] * v).min(1.0), 1.0];
+                    clusters.push(LeafCluster { pos, dir, size: size * (0.8 + 0.4 * u(11)), color: col, key: ck, center });
+                }
+                // Fruits: the clusters that set fruit, hanging on pedicels.
+                if fr_amount > 0.0 && u(12) < set && u(13) < remaining {
+                    let dir = (Vec3::new(0.0, -1.0, 0.0) + Vec3::new(u(14) - 0.5, u(15) - 0.5, u(16) - 0.5) * 0.8).normalize_or(-Vec3::Y);
+                    let col = [(rcol[0] * v).min(1.0), (rcol[1] * v).min(1.0), (rcol[2] * v).min(1.0), 0.5];
+                    let s = size * fruit_ratio * (0.4 + 0.6 * swell) * (0.8 + 0.4 * u(17));
+                    clusters.push(LeafCluster { pos, dir, size: s, color: col, key: ck ^ 0xF4E1, center });
+                }
+            }
+        }
+        mesh::build_leaves(&clusters, FLOWER_TRI_BUDGET)
     }
 
 }

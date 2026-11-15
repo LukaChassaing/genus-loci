@@ -8,6 +8,7 @@ signal speed_changed(days_per_second: float)
 signal drought_toggled(active: bool)
 signal new_seed_requested
 signal soil_selected(index: int)
+signal species_selected(index: int)
 signal rings_toggled(shown: bool)
 signal xray_toggled(on: bool)
 signal guides_toggled(on: bool)
@@ -22,6 +23,7 @@ const MAX_SPEED_DAYS: float = 3650.0 # 10 years / s
 var _age: Label
 var _date: Label
 var _phase: Label
+var _name_lbl: RichTextLabel
 var _height: Label
 var _diam: Label
 var _temp: Label
@@ -89,6 +91,7 @@ func _build_info_panel(root: Control) -> void:
 	name_lbl.add_theme_font_size_override("italics_font_size", 20)
 	name_lbl.text = "[b]Chêne pédonculé[/b] — [i]Quercus robur[/i]"
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_lbl = name_lbl
 	v.add_child(name_lbl)
 	_age = _row(v)
 	_date = _row(v)
@@ -194,13 +197,16 @@ func _build_bottom_bar(root: Control) -> void:
 	_bottom_panel = p
 	root.add_child(p)
 	var h: HBoxContainer = HBoxContainer.new()
-	h.add_theme_constant_override("separation", 6)
+	h.add_theme_constant_override("separation", 3)
+	var bar_theme: Theme = Theme.new()
+	bar_theme.default_font_size = 17  # a notch smaller so every control fits at 1280 px
+	p.theme = bar_theme
 	p.add_child(h)
 
 	_play = _no_focus(Button.new()) as Button
 	_play.toggle_mode = true
 	_play.button_pressed = true
-	_play.custom_minimum_size = Vector2(100, 0)
+	_play.custom_minimum_size = Vector2(86, 0)
 	_play.toggled.connect(_on_play_toggled)
 	play_button = _play
 	h.add_child(_play)
@@ -214,13 +220,13 @@ func _build_bottom_bar(root: Control) -> void:
 	_speed_slider.max_value = 1.0
 	_speed_slider.step = 0.001
 	_speed_slider.value = log(30.0) / log(MAX_SPEED_DAYS)
-	_speed_slider.custom_minimum_size = Vector2(70, 0)
+	_speed_slider.custom_minimum_size = Vector2(56, 0)
 	_speed_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_speed_slider.value_changed.connect(_on_speed_changed)
 	speed_slider = _speed_slider
 	h.add_child(_speed_slider)
 	_speed_label = Label.new()
-	_speed_label.custom_minimum_size = Vector2(88, 0)
+	_speed_label.custom_minimum_size = Vector2(80, 0)
 	h.add_child(_speed_label)
 
 	var drought: Button = _no_focus(Button.new()) as Button
@@ -240,8 +246,19 @@ func _build_bottom_bar(root: Control) -> void:
 
 	soil_option = _no_focus(OptionButton.new()) as OptionButton
 	soil_option.tooltip_text = "Type de sol (relance la même graine)"
+	soil_option.clip_text = true
+	soil_option.fit_to_longest_item = false  # keeps the bar within 1280 px
+	soil_option.custom_minimum_size = Vector2(150, 0)
 	soil_option.item_selected.connect(func(i: int) -> void: soil_selected.emit(i))
 	h.add_child(soil_option)
+
+	species_option = _no_focus(OptionButton.new()) as OptionButton
+	species_option.tooltip_text = "Espèce (relance la même graine)"
+	species_option.clip_text = true
+	species_option.fit_to_longest_item = false
+	species_option.custom_minimum_size = Vector2(162, 0)
+	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(i))
+	h.add_child(species_option)
 
 	var spacer: Control = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -366,6 +383,7 @@ func update_from(sim: TreeSim) -> void:
 	_water.value = sim.get_soil_water()
 	if year != _last_ring_year:
 		_last_ring_year = year
+		_ring_view.contrast = sim.get_ring_contrast()
 		_ring_view.set_data(sim.get_ring_widths(), sim.get_ring_stress(),
 				sim.get_ring_earlywood_fraction(), sim.get_ring_forced_drought())
 
@@ -376,6 +394,9 @@ func force_ring_refresh() -> void:
 
 
 var soil_option: OptionButton
+var species_option: OptionButton
+var _species_common: PackedStringArray = PackedStringArray()
+var _species_sci: PackedStringArray = PackedStringArray()
 
 const SOIL_LABELS: Array[String] = ["Limon profond", "Mince sur calcaire", "Argile engorgée", "Sable sec"]
 
@@ -390,3 +411,26 @@ func set_soil_names(names: PackedStringArray) -> void:
 func select_soil(index: int) -> void:
 	if index >= 0 and index < soil_option.item_count:
 		soil_option.select(index)
+
+
+## Fills the species selector with the French common names (scientific names go to the info panel).
+func set_species_names(common: PackedStringArray, scientific: PackedStringArray) -> void:
+	_species_common = common
+	_species_sci = scientific
+	species_option.clear()
+	for i: int in common.size():
+		species_option.add_item(common[i])
+
+
+## Selects the entry and shows the species in the info panel (common name bold, scientific italic).
+func select_species(index: int) -> void:
+	if index < 0 or index >= _species_common.size():
+		return
+	species_option.select(index)
+	var sci: String = _species_sci[index] if index < _species_sci.size() else ""
+	_name_lbl.text = "[b]%s[/b] — [i]%s[/i]" % [_species_common[index], sci]
+
+
+## Bark colour of the simulated species, used for the bark ring of the cross-section.
+func set_bark_color(c: Color) -> void:
+	_ring_view.set_bark_color(c)

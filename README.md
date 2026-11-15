@@ -1,4 +1,4 @@
-# Dendrologia
+# Genus Loci: Seed Master
 
 Simulateur d'arbres éducatif : un arbre pousse selon ses gènes (traits), son milieu et la météo,
 au-dessus et au-dessous du sol. Prototype en cours : le chêne pédonculé (*Quercus robur*).

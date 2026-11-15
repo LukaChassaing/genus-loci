@@ -30,8 +30,9 @@ pub(crate) const NONE: u32 = u32::MAX;
 
 /// Fine-root proliferation factor of a soil layer (stylised): nutrients
 /// (sqrt), last season's moisture, and avoidance of saturated soil.
-pub(crate) fn proliferation(l: &Layer, waterlog_tol: f32) -> f32 {
-    l.nutrient.max(0.0).sqrt() * (0.4 + 0.6 * l.season_rew) * (1.0 - (1.0 - waterlog_tol) * l.season_wet)
+pub(crate) fn proliferation(l: &Layer, rt: &RootTraits) -> f32 {
+    let tol = rt.waterlogging_tolerance.clamp(0.0, 1.0);
+    l.nutrient.max(0.0).sqrt() * (0.4 + 0.6 * l.season_rew) * (1.0 - (1.0 - tol) * l.season_wet)
 }
 /// Soft cap on explicit root nodes (side roots stop being added above it).
 const ROOT_NODE_CAP: usize = 9_000;
@@ -397,9 +398,8 @@ impl RootSystem {
                 soil.layers[i].struct_len += n.length;
             }
         }
-        let tol = rt.waterlogging_tolerance.clamp(0.0, 1.0);
         for l in soil.layers.iter_mut() {
-            l.root_len = l.struct_len * (1.0 + rt.fine_root_per_m * proliferation(l, tol));
+            l.root_len = l.struct_len * (1.0 + rt.fine_root_per_m * proliferation(l, rt));
         }
         soil.root_zone_m2 = PI * self.spread().max(0.5).powi(2);
         soil.refresh_states();

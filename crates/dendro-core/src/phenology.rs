@@ -7,9 +7,13 @@
 //! * Senescence: photoperiod-gated cold-degree-day sum (after Delpierre et al.
 //!   2009, simplified).
 //! * Late frost on expanding leaves reduces leaf area, recovered by re-flushing.
+//! * Flowering and fruiting ([`Reproduction`]): bloom by its own forcing
+//!   sum (same chilling penalty as budburst), so a species may flower
+//!   before, with or after leaf-out; late frost on open flowers reduces the
+//!   year's fruit set; fruits develop, ripen and are gone after a few weeks.
 
 use crate::climate::Weather;
-use crate::genome::{Genome, Pigments};
+use crate::genome::{Genome, Pigments, ReproductionTraits};
 
 /// Phenological phase of the foliage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -63,7 +67,8 @@ pub(crate) enum PhenoEvent {
 pub(crate) struct Phenology {
     pub phase: Phase,
     chill: f32,
-    gdd: f32,
+    /// Forcing (degC.day) since Jan 1.
+    pub gdd: f32,
     gdd_since_bb: f32,
     /// Leaf expansion 0..1.
     pub expansion: f32,
@@ -107,6 +112,12 @@ impl Phenology {
     pub fn with_initial_chill(mut self, chill: f32) -> Self {
         self.chill = chill;
         self
+    }
+
+    /// Relative chilling deficit 0..1 (0 = requirement met). Meaningful
+    /// while dormant; chilling restarts at budburst.
+    pub fn chill_lack(&self, g: &Genome) -> f32 {
+        1.0 - (self.chill / g.phenology.chilling_requirement_days).min(1.0)
     }
 
     /// Live (photosynthetic) leaf area fraction 0..1.
@@ -198,6 +209,146 @@ impl Phenology {
             }
         }
         ev
+    }
+}
+
+/// Stage of the yearly flowering / fruiting cycle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ReproStage {
+    /// Before bloom (or a juvenile tree that does not flower this year).
+    Waiting,
+    /// Flowers opening, open, petals falling.
+    Blooming,
+    /// Fruits developing, ripe, then taken by birds / dropped.
+    Fruiting,
+    /// Cycle over for this year.
+    Done,
+}
+
+/// Yearly flowering and fruiting state (stylised).
+///
+/// Bloom onset follows the forcing sum since Jan 1 (`bloom_gdd`, raised by
+/// the same chilling deficit as budburst, which is captured before the
+/// leaves break so that a species flowering after leaf-out is not
+/// penalised). Bloom then progresses with forcing over `bloom_duration_gdd`
+/// (opening, full bloom, petal fall). A daily minimum below
+/// `flower_frost_c` while flowers are open kills a share of them (late
+/// frost; flower buds and open flowers of Prunus are killed around -2 degC,
+/// e.g. Rodrigo 2000), which reduces that year's fruit set. Fruits swell
+/// and ripen over `fruit_ripening_days`, then disappear over
+/// `fruit_persistence_days`.
+#[derive(Clone, Debug)]
+pub(crate) struct Reproduction {
+    pub stage: ReproStage,
+    /// The tree flowers this year (past its juvenile phase).
+    pub mature: bool,
+    /// Chilling deficit captured while dormant.
+    lack: f32,
+    gdd_onset: f32,
+    /// Bloom progress 0..1 (1 = petal fall complete).
+    pub bloom: f32,
+    /// Days since the end of petal fall.
+    pub fruit_days: f32,
+    /// Fraction of this year's flowers killed by frost 0..1.
+    pub frost_loss: f32,
+    /// Age (years) of first flowering of this individual.
+    first_age: f32,
+}
+
+impl Reproduction {
+    pub fn new(first_age: f32) -> Self {
+        Reproduction {
+            stage: ReproStage::Waiting,
+            mature: false,
+            lack: 0.0,
+            gdd_onset: 0.0,
+            bloom: 0.0,
+            fruit_days: 0.0,
+            frost_loss: 0.0,
+            first_age,
+        }
+    }
+
+    /// Daily update, after the leaf phenology step of the same day.
+    pub fn step(&mut self, w: &Weather, doy: u32, age: f32, phen: &Phenology, g: &Genome) {
+        let r = &g.reproduction;
+        if doy == 0 {
+            self.stage = ReproStage::Waiting;
+            self.mature = age + 0.5 >= self.first_age;
+            self.bloom = 0.0;
+            self.fruit_days = 0.0;
+            self.frost_loss = 0.0;
+        }
+        if phen.phase == Phase::Dormant {
+            self.lack = phen.chill_lack(g);
+        }
+        match self.stage {
+            ReproStage::Waiting => {
+                let req = r.bloom_gdd * (1.0 + 1.2 * self.lack);
+                if self.mature && (((40..200).contains(&doy) && phen.gdd >= req) || doy == 170) {
+                    self.stage = ReproStage::Blooming;
+                    self.gdd_onset = phen.gdd;
+                    self.bloom = 0.0;
+                }
+            }
+            ReproStage::Blooming => {
+                self.bloom = ((phen.gdd - self.gdd_onset) / r.bloom_duration_gdd.max(1.0)).min(1.0);
+                // Open flowers (before petal fall) are killed by late frost.
+                let tmin = w.temp_c - 5.0;
+                if self.bloom > 0.05 && self.bloom < 0.8 && tmin < r.flower_frost_c {
+                    let dmg = (0.4 + 0.25 * (r.flower_frost_c - tmin)).min(0.95);
+                    self.frost_loss = self.frost_loss.max(dmg);
+                }
+                if self.bloom >= 1.0 {
+                    self.stage = ReproStage::Fruiting;
+                    self.fruit_days = 0.0;
+                }
+            }
+            ReproStage::Fruiting => {
+                self.fruit_days += 1.0;
+                if self.fruit_days > r.fruit_ripening_days + r.fruit_persistence_days {
+                    self.stage = ReproStage::Done;
+                }
+            }
+            ReproStage::Done => {}
+        }
+    }
+
+    /// Open-flower density 0..1 (opening, full bloom, petal fall), before
+    /// the display weight.
+    pub fn flower_amount(&self) -> f32 {
+        if self.stage != ReproStage::Blooming {
+            return 0.0;
+        }
+        let b = self.bloom;
+        smoothstep(b / 0.3) * (1.0 - smoothstep((b - 0.55) / 0.45))
+    }
+
+    /// Fruit presence 0..1 (swelling, then removal), before frost loss and
+    /// the display weight.
+    pub fn fruit_amount(&self, r: &ReproductionTraits) -> f32 {
+        if self.stage != ReproStage::Fruiting {
+            return 0.0;
+        }
+        self.fruit_swell() * self.fruit_remaining(r)
+    }
+
+    /// Fruit size 0..1 (young fruits swell over ~12 days after petal fall).
+    pub fn fruit_swell(&self) -> f32 {
+        smoothstep(self.fruit_days / 12.0)
+    }
+
+    /// Share 0..1 of the fruits still on the tree (taken once ripe).
+    pub fn fruit_remaining(&self, r: &ReproductionTraits) -> f32 {
+        1.0 - smoothstep((self.fruit_days - r.fruit_ripening_days) / r.fruit_persistence_days.max(1.0))
+    }
+
+    /// Fruit ripeness 0..1 (colour turns in the last ~45 % of ripening).
+    pub fn ripeness(&self, r: &ReproductionTraits) -> f32 {
+        if self.stage != ReproStage::Fruiting {
+            return 0.0;
+        }
+        smoothstep((self.fruit_days / r.fruit_ripening_days.max(1.0) - 0.55) / 0.45)
     }
 }
 

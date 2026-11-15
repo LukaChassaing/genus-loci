@@ -1,0 +1,250 @@
+// Wild cherry, Prunus avium (L.) L.
+// Same trait set as the oak (data/species/quercus_robur.ron); the cherry
+// differs only by these numbers. Values are literature-plausible orders of
+// magnitude; those marked "calibrated" were tuned so the emergent tree
+// matches open-grown wild cherry (fast youth, ~20-25 m, short life).
+// Main sources: Savill 2013 "The Silviculture of Trees used in British
+// Forestry"; Russell 2003 (EUFORGEN Technical Guidelines, Prunus avium);
+// Welk et al. 2016 (European Atlas of Forest Tree Species).
+(
+    species: "Prunus avium",
+    common_name: "Wild cherry",
+    common_name_fr: "Merisier",
+    architecture: (
+        // Strong, lasting apical control (calibrated): an excurrent tree whose
+        // single straight stem stays readable high into the crown; the crown
+        // becomes ovoid / rounded with age, but the leader never dissolves into
+        // co-dominant limbs as in the oak (lambda stays above 0.5).
+        apical_dominance_young: 0.70,
+        apical_dominance_mature: 0.58,
+        maturity_age_years: 70.0,
+        juvenile_phase_years: 25.0,
+        apical_dominance_branches: 0.52,
+        // Weak competition between sibling branches: tiers of many similar,
+        // light branches rather than a few massive scaffold limbs.
+        lateral_competition: 1.6,
+        // Metamers per unit light (calibrated): vigorous pioneer.
+        vigour_per_light: 7.0,
+        bud_break_threshold: 1.0,
+        // Long shoots: internodes 3-6 cm, leaders 0.8-1.2 m/yr in youth
+        // (cherry is one of the fastest-growing European broadleaves).
+        internode_length_m: 0.05,
+        max_shoot_length_m: 0.72,
+        // Buds crowded at the end of the annual shoot: branches in
+        // pseudo-whorls (tiers), the textbook cherry habit (Savill 2013).
+        lateral_buds_per_shoot: 5,
+        lateral_buds_per_metamer: 0.35,
+        bud_lifetime_years: 3,
+        // Narrow, ascending insertion angle.
+        branching_angle_deg: 42.0,
+        // Prunus: 2/5 phyllotaxis.
+        phyllotaxis_deg: 144.0,
+        max_order: 120,
+        // Strongly orthotropic leader; ascending limbs (calibrated by eye):
+        // lower tiers at ~55 deg from vertical, upper ones ~25 deg.
+        gravitropism: 0.6,
+        lateral_gravitropism: 0.35,
+        limb_setpoint_low_deg: 55.0,
+        limb_setpoint_high_deg: 25.0,
+        twig_setpoint_deg: 55.0,
+        // Open-grown cherry crowns are narrow-conical, later ovoid: width
+        // ~0.5-0.7 x height (much narrower than the oak's ~1).
+        crown_spread_ratio: 0.65,
+        phototropism: 0.10,
+        // Straight stem and limbs: little random deviation, rare loss of
+        // the terminal bud (no oak "elbows").
+        sinuosity_deg: 4.0,
+        leader_loss_probability: 0.04,
+        leader_loss_angle_deg: 15.0,
+        // Light limbs: little sag (same stylised model as the oak).
+        sag_coefficient: 2.5,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 6.0,
+        sag_max_droop_deg: 5.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 6.0,
+        straightening_min_radius_mm: 15.0,
+        // Strongly light-demanding (shade-intolerant pioneer): shaded
+        // branches die within a couple of years, so the lower crown is
+        // shed quickly and a natural clear bole forms (calibrated).
+        shedding_threshold: 0.10,
+        shade_survival_years: 2,
+        shedding_mean_threshold: 0.0,
+        clear_bole_fraction: 0.25,
+        clear_bole_max_m: 6.0,
+        clear_bole_limb_ratio: 0.5,
+        // Short-lived tree: crown dieback from ~80 y (heart rot, bacterial
+        // canker and silver leaf disease attack old cherries; few live
+        // beyond ~100-150 y, Russell 2003). Fast ramp, little reiteration.
+        retrenchment_onset_years: 80.0,
+        retrenchment_rate: 0.12,
+        retrenchment_ramp_years: 30.0,
+        retrenchment_reach: 0.6,
+        epicormic_rate: 0.01,
+        // Collar-to-bud distance where extension stops (calibrated on a
+        // 20-28 m plateau), with an early plateau.
+        hydraulic_path_max_m: 24.5,
+        hydraulic_exponent: 2.5,
+        // Pioneer: foliage stays efficient until the tree nears its size
+        // limit (calibrated), then declines steeply.
+        hydraulic_foliage_exponent: 1.5,
+    ),
+    leaf: (
+        // Obovate-oblong, acuminate leaves 6-15 cm x 3-7 cm, unlobed,
+        // coarsely and doubly serrate, petiole with red glands.
+        length_cm: 10.0,
+        width_cm: 5.0,
+        lobes: 0,
+        serration: 0.8,
+        deciduous: true,
+        // No marcescence.
+        marcescence: 0.0,
+        marcescence_max_age_years: 1.0,
+        leaves_per_shoot: 8.0,
+        // Rendering: lighter, less dense crown than the oak's.
+        cluster_size_leaves: 3.0,
+        foliage_density: 4.0,
+    ),
+    pigments: (
+        chlorophyll: 1.0,
+        // Brilliant orange-red autumn colour: strong anthocyanin synthesis
+        // over carotenoid yellow, little brown.
+        carotenoids: 0.6,
+        anthocyanins: 0.8,
+        tannins: 0.3,
+    ),
+    phenology: (
+        // Prunus avium has a high chilling requirement (~1000 chill hours,
+        // i.e. ~60-80 days with a daily mean of 0-7 degC; Alburquerque et
+        // al. 2008 for sweet cherry cultivars).
+        chilling_requirement_days: 70.0,
+        chill_temp_min_c: 0.0,
+        chill_temp_max_c: 7.0,
+        // Leaf-out mid-April, about a week before the oak, just after the
+        // flowers open (calibrated).
+        gdd_base_c: 5.0,
+        gdd_budburst: 220.0,
+        leaf_expansion_gdd: 170.0,
+        // Early senescence: colouring from mid-September, leaves gone by
+        // late October / early November (earlier than the oak).
+        senescence_photoperiod_h: 12.4,
+        senescence_temp_base_c: 18.0,
+        senescence_cdd: 150.0,
+        leaf_fall_days: 20.0,
+    ),
+    wood: (
+        // Basic density ~0.5-0.6 g/cm3; green MOE ~7-9 GPa.
+        density_kg_m3: 560.0,
+        elasticity_gpa: 8.0,
+        // Diffuse- to semi-ring-porous: earlywood vessels only slightly
+        // larger than latewood ones, so the ring contrast is weak.
+        ring_porous: false,
+        earlywood_share: 0.4,
+        ring_contrast: 0.3,
+        // Pressler coefficient (calibrated on DBH targets); wide juvenile
+        // rings (up to ~1 cm on vigorous young trees).
+        growth_coefficient: 0.0000310,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 12.0,
+        // Mesh: slender limbs, round stem, a modest root collar flare.
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.3,
+        bark_irregularity: 0.02,
+        collar_flare: 0.2,
+        root_flare: 0.35,
+        root_flare_height_radii: 1.5,
+        buttress_lobes: 0,
+        // Non-durable wood: dead cherry limbs rot and fall within a few
+        // years to a couple of decades.
+        snag_years_per_m: 150.0,
+    ),
+    // Bark (renderer): smooth, glossy, red-brown to purplish-brown periderm
+    // with conspicuous horizontal bands of lenticels, peeling in horizontal
+    // strips; old trunks become darker and fissured only near the base.
+    bark: (
+        color: (0.42, 0.21, 0.18),
+        young_color: (0.45, 0.30, 0.22),
+        old_darkening: (0.14, 0.06, 0.05),
+        lenticels: 0.9,
+        fissures: 0.15,
+        gloss: 0.6,
+    ),
+    roots: (
+        // Superficial, wide-spreading "tracing" root system: a short-lived
+        // taproot, strong horizontal laterals in the top ~30 cm that root
+        // suckers arise from, few sinkers (Kutschera & Lichtenegger 2002;
+        // Savill 2013).
+        taproot_dominance: 0.35,
+        taproot_decline_years: 5.0,
+        max_depth_m: 1.8,
+        lateral_spread: 2.6,
+        lateral_count: 10,
+        lateral_depth_m: 0.3,
+        sinker_tendency: 0.12,
+        branching_probability: 0.35,
+        max_order: 3,
+        annual_extension_m: 1.1,
+        max_penetration_mpa: 2.6,
+        // Very intolerant of waterlogging and heavy, poorly drained clays
+        // (root asphyxia, Phytophthora): roots do not enter saturated soil.
+        waterlogging_tolerance: 0.05,
+        // ... and its roots suffer from poor aeration of heavy, wet clays
+        // even short of saturation (root asphyxia; Prunus rootstocks are
+        // among the most flooding-sensitive fruit trees, Schaffer et al.
+        // 1992). Stylised strength (calibrated).
+        hypoxia_sensitivity: 1.0,
+        drought_deepening: 0.3,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.6,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.0,
+    ),
+    tolerances: (
+        // Young leaves are about as frost-sensitive as the oak's.
+        frost_c: -2.0,
+        // Fairly drought tolerant on deep, well-drained soils.
+        drought: 0.45,
+        // Strongly light-demanding.
+        shade: 0.25,
+    ),
+    reproduction: (
+        // Seedlings flower from ~4-7 years when open-grown.
+        first_flowering_age_years: 5.5,
+        // Showy white flowers, red-black cherries.
+        flower_display: 1.0,
+        fruit_display: 1.0,
+        // Bloom in April, just before / as the leaves break (calibrated).
+        bloom_gdd: 212.0,
+        bloom_duration_gdd: 110.0,
+        // Umbels of 2-6 flowers on short spurs of 2-year and older wood, in
+        // the well-lit outer crown.
+        min_wood_age_years: 2,
+        min_light: 0.35,
+        max_wood_radius_mm: 25.0,
+        flower_density: 2.5,
+        flower_cluster_cm: 6.0,
+        fruit_cluster_cm: 4.0,
+        flower_color: (0.97, 0.96, 0.92),
+        // Self-incompatible, insect-pollinated: a third of the umbels set
+        // fruit in a good year.
+        fruit_set: 0.35,
+        // Open flowers are killed around -2 degC (Rodrigo 2000).
+        flower_frost_c: -2.2,
+        // Fruits ripen ~9 weeks after bloom (June - early July), then are
+        // taken by birds within a few weeks.
+        fruit_ripening_days: 60.0,
+        fruit_persistence_days: 18.0,
+        fruit_color_unripe: (0.45, 0.62, 0.22),
+        fruit_color_ripe: (0.50, 0.04, 0.07),
+    ),
+    // Short-lived pioneer: vigour declines from ~85 years (heart rot,
+    // cankers), the tree is senescent by ~120-130 years.
+    longevity: (
+        decline_onset_years: 85.0,
+        decline_years: 40.0,
+        decline_min_vigour: 0.3,
+    ),
+)

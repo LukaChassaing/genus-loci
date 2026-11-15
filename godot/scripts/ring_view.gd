@@ -16,6 +16,10 @@ const MIN_BAND_PX: float = 3.0
 const TEXT_H: float = 46.0
 const MAX_ZOOM: float = 60.0
 
+## Earlywood / latewood contrast 0..1 (1 = ring-porous oak): scales the tone difference inside a ring
+## and the earlywood vessels (drawn only for strongly ring-porous wood).
+var contrast: float = 1.0
+var _bark_col: Color = BARK
 var _widths: PackedFloat32Array = PackedFloat32Array()
 var _stress: PackedFloat32Array = PackedFloat32Array()
 var _early_frac: PackedFloat32Array = PackedFloat32Array()
@@ -57,6 +61,7 @@ func set_data(widths: PackedFloat32Array, stress: PackedFloat32Array,
 		var st: float = _stress[i] if i < _stress.size() else 0.0
 		var ec: Color = EARLY_SAP.lerp(EARLY_HEART, heart).lerp(STRESS_TINT, st * 0.5)
 		var lc: Color = LATE_SAP.lerp(LATE_HEART, heart).lerp(STRESS_TINT.darkened(0.3), st * 0.45)
+		lc = ec.lerp(lc, 0.35 + 0.65 * contrast)  # diffuse-porous wood: latewood only slightly darker
 		_early_col.append(ec)
 		_late_col.append(lc)
 		_avg_col.append(ec.lerp(lc, 1.0 - _ef(i)))
@@ -68,6 +73,12 @@ func reset_view() -> void:
 	_zoom = 1.0
 	_pan = Vector2.ZERO
 	_hover = -1
+	queue_redraw()
+
+
+## Outer bark ring colour of diffuse-porous species (the oak keeps BARK).
+func set_bark_color(c: Color) -> void:
+	_bark_col = c.darkened(0.45)
 	queue_redraw()
 
 
@@ -195,7 +206,7 @@ func _draw() -> void:
 	var total: float = g["total"]
 	var n: int = _radii.size()
 	# Bark, then rings from the outside in.
-	draw_circle(c, (total + (g["bark"] as float)) * s, BARK)
+	draw_circle(c, (total + (g["bark"] as float)) * s, BARK if contrast > 0.9 else _bark_col)
 	var i: int = n - 1
 	var vessels: Array[int] = []
 	while i >= 0:
@@ -204,7 +215,7 @@ func _draw() -> void:
 			var late_w: float = _widths[i] * (1.0 - _ef(i)) * s
 			draw_circle(c, _radii[i] * s, _late_col[i])
 			draw_circle(c, _radii[i] * s - late_w, _early_col[i])
-			if wpx >= 9.0:
+			if wpx >= 9.0 and contrast > 0.6:
 				vessels.append(i)
 			i -= 1
 		else:

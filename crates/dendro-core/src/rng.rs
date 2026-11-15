@@ -55,3 +55,4 @@ pub(crate) const S_BUD: u64 = 11;
 pub(crate) const S_RETRENCH: u64 = 12;
 pub(crate) const S_ROOT: u64 = 20;
 pub(crate) const S_LEAF: u64 = 30;
+pub(crate) const S_FLOWER: u64 = 31;

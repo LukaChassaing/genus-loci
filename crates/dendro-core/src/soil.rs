@@ -294,6 +294,13 @@ impl Layer {
     pub fn thick(&self) -> f32 {
         self.bottom - self.top
     }
+    /// Oxygen shortage of the layer 0..1 from its air-filled porosity
+    /// (volume fraction): 0 at >= 10 %, 1 when no air is left.
+    #[inline]
+    pub fn hypoxia(&self) -> f32 {
+        let afp = (self.sat - self.water).max(0.0) / (self.thick() * 1000.0).max(1e-3);
+        (1.0 - afp / 0.10).clamp(0.0, 1.0)
+    }
 }
 
 /// Daily outputs of the water balance.
@@ -303,6 +310,9 @@ pub(crate) struct WaterDay {
     pub rew: f32,
     /// Root-weighted fraction of the root system in saturated layers.
     pub anoxic: f32,
+    /// Root-weighted hypoxia 0..1 (saturated layers count fully, others by
+    /// their air-filled porosity, see `Layer::hypoxia`).
+    pub hypoxic: f32,
 }
 
 /// The simulated soil column.
@@ -315,6 +325,8 @@ pub(crate) struct SoilColumn {
     pub last: WaterDay,
     /// Ground area (m2) occupied by the root system (for densities).
     pub root_zone_m2: f32,
+    /// Compute root hypoxia (only species sensitive to it need it).
+    pub track_hypoxia: bool,
     states: Vec<SoilLayerState>,
 }
 
@@ -381,8 +393,9 @@ impl SoilColumn {
             bedrock: profile.bedrock_depth_m,
             profile,
             layers,
-            last: WaterDay { rew: 1.0, anoxic: 0.0 },
+            last: WaterDay { rew: 1.0, anoxic: 0.0, hypoxic: 0.0 },
             root_zone_m2: 1.0,
+            track_hypoxia: false,
             states: Vec::new(),
         };
         c.refresh_states();
@@ -482,12 +495,29 @@ impl SoilColumn {
                 l.water -= share.min((l.water - l.wp).max(0.0));
             }
         }
-        // Rooted fraction in saturated layers (anoxia).
+        // Rooted fraction in saturated layers (anoxia), and root-weighted
+        // hypoxia: air-filled porosity below ~10 % (Grable & Siemer 1968)
+        // starves roots of oxygen even short of saturation (heavy clays).
         let total_root: f32 = self.layers.iter().map(|l| l.root_len).sum();
-        let anoxic = if total_root > 0.0 {
-            self.layers.iter().filter(|l| l.saturated()).map(|l| l.root_len).sum::<f32>() / total_root
+        let (anoxic, hypoxic) = if total_root > 0.0 && !self.track_hypoxia {
+            (self.layers.iter().filter(|l| l.saturated()).map(|l| l.root_len).sum::<f32>() / total_root, 0.0)
+        } else if total_root > 0.0 {
+            let mut an = 0.0;
+            let mut hy = 0.0;
+            for l in &self.layers {
+                if l.root_len <= 0.0 {
+                    continue;
+                }
+                if l.saturated() {
+                    an += l.root_len;
+                    hy += l.root_len;
+                } else {
+                    hy += l.root_len * l.hypoxia();
+                }
+            }
+            (an / total_root, hy / total_root)
         } else {
-            0.0
+            (0.0, 0.0)
         };
         if season {
             for l in self.layers.iter_mut() {
@@ -496,7 +526,7 @@ impl SoilColumn {
                 l.wet_sum += l.saturated() as u8 as f32;
             }
         }
-        self.last = WaterDay { rew: self.rooted_rew(), anoxic };
+        self.last = WaterDay { rew: self.rooted_rew(), anoxic, hypoxic };
         self.refresh_states();
         self.last
     }

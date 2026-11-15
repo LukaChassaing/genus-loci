@@ -38,10 +38,14 @@ pub mod soil;
 
 pub use climate::{ClimateParams, Weather};
 pub use genome::{
-    Architecture, Genome, GenomeError, LeafTraits, PhenologyTraits, Pigments, RootTraits, Tolerances, WoodTraits,
+    Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
+    Tolerances, WoodTraits,
 };
 pub use mesh::MeshData;
-pub use phenology::{Phase, Season};
+pub use phenology::{Phase, ReproStage, Season};
 pub use rings::Ring;
 pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
-pub use sim::{ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
+pub use sim::{
+    ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, FLOWER_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET,
+    WOOD_TRI_BUDGET,
+};

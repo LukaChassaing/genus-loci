@@ -50,24 +50,30 @@ pub struct Backend {
     drought: bool,
     /// Index of the soil preset used at the next reset.
     soil: usize,
+    /// Index of the species (`Genome::builtin()`) used at the next reset.
+    species: usize,
 }
 
 impl Backend {
     pub fn new(seed: u64) -> Self {
-        Self::with_soil(seed, 0)
+        Self::with_site(seed, 0, 0)
     }
 
-    /// `soil` indexes `SoilProfile::presets()`; out-of-range falls back to the first preset.
-    pub fn with_soil(seed: u64, soil: usize) -> Self {
+    /// `soil` indexes `SoilProfile::presets()`, `species` indexes `Genome::builtin()`;
+    /// out-of-range values fall back to the first entry.
+    pub fn with_site(seed: u64, soil: usize, species: usize) -> Self {
         let mut presets = SoilProfile::presets();
         let soil = if soil < presets.len() { soil } else { 0 };
         let profile = presets.swap_remove(soil);
-        let sim = Simulation::with_site(Genome::quercus_robur(), seed, ClimateParams::default(), profile);
-        Self { sim, carry_days: 0.0, drought: false, soil }
+        let mut genomes = Genome::builtin();
+        let species = if species < genomes.len() { species } else { 0 };
+        let genome = genomes.swap_remove(species);
+        let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
+        Self { sim, carry_days: 0.0, drought: false, soil, species }
     }
 
     pub fn reset(&mut self, seed: u64) {
-        *self = Self::with_soil(seed, self.soil);
+        *self = Self::with_site(seed, self.soil, self.species);
     }
 
     pub fn set_soil(&mut self, soil: usize) {
@@ -76,6 +82,26 @@ impl Backend {
 
     pub fn soil_index(&self) -> usize {
         self.soil
+    }
+
+    /// Species used from the next reset on (like the soil).
+    pub fn set_species(&mut self, species: usize) {
+        self.species = species;
+    }
+
+    /// Index of the species selected for the next reset.
+    pub fn species_index(&self) -> usize {
+        self.species
+    }
+
+    /// Scientific names of the built-in species, in index order.
+    pub fn species_names() -> Vec<String> {
+        Genome::builtin().into_iter().map(|g| g.species).collect()
+    }
+
+    /// French common names of the built-in species, in index order.
+    pub fn species_common_names() -> Vec<String> {
+        Genome::builtin().into_iter().map(|g| g.common_name_fr).collect()
     }
 
     pub fn soil_names() -> Vec<String> {
@@ -217,6 +243,76 @@ impl Backend {
 
     pub fn build_root_mesh(&self) -> MeshData {
         self.sim.root_mesh()
+    }
+
+    pub fn build_flower_mesh(&self) -> MeshData {
+        self.sim.flower_mesh()
+    }
+
+    pub fn flower_version(&self) -> i64 {
+        self.sim.flower_version() as i64
+    }
+
+    pub fn flower_density(&self) -> f64 {
+        self.sim.flower_density() as f64
+    }
+
+    pub fn bloom_progress(&self) -> f64 {
+        self.sim.bloom_progress() as f64
+    }
+
+    pub fn fruit_density(&self) -> f64 {
+        self.sim.fruit_density() as f64
+    }
+
+    pub fn flower_color(&self) -> [f32; 4] {
+        let c = self.sim.flower_color();
+        [c[0], c[1], c[2], 1.0]
+    }
+
+    pub fn fruit_color(&self) -> [f32; 4] {
+        let c = self.sim.fruit_color();
+        [c[0], c[1], c[2], 1.0]
+    }
+
+    /// Bark traits of the species being simulated (renderer only).
+    pub fn bark_color(&self) -> [f32; 4] {
+        let c = self.sim.genome().bark.color;
+        [c[0], c[1], c[2], 1.0]
+    }
+
+    pub fn bark_lenticels(&self) -> f32 {
+        self.sim.genome().bark.lenticels
+    }
+
+    pub fn bark_fissures(&self) -> f32 {
+        self.sim.genome().bark.fissures
+    }
+
+    pub fn bark_gloss(&self) -> f32 {
+        self.sim.genome().bark.gloss
+    }
+
+    /// Leaf shape of the species being simulated (for the leaf texture).
+    pub fn leaf_length_m(&self) -> f32 {
+        self.sim.genome().leaf.length_cm * 0.01
+    }
+
+    pub fn leaf_width_m(&self) -> f32 {
+        self.sim.genome().leaf.width_cm * 0.01
+    }
+
+    pub fn leaf_lobes(&self) -> i32 {
+        self.sim.genome().leaf.lobes as i32
+    }
+
+    pub fn leaf_serration(&self) -> f32 {
+        self.sim.genome().leaf.serration
+    }
+
+    /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous).
+    pub fn ring_contrast(&self) -> f32 {
+        self.sim.genome().wood.ring_contrast
     }
 
     pub fn ring_widths_mm(&self) -> Vec<f32> {
