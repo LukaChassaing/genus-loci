@@ -272,6 +272,22 @@ pub struct Pigments {
     pub anthocyanins: f32,
     /// Tannins / oxidised phenolics (brown of dead leaves).
     pub tannins: f32,
+    /// Share (0..1) of the mid-senescence anthocyanin peak still present
+    /// in fully coloured leaves. 0 = transient red (it fades as the leaf
+    /// dies, e.g. oak); high = leaves that stay red until they fall
+    /// (anthocyanins keep being made in senescing leaves of Prunus, Acer,
+    /// Hoch et al. 2001).
+    #[serde(default)]
+    pub anthocyanin_persistence: f32,
+    /// Colour (RGB 0..1) of the anthocyanin-rich leaf. The hue of the
+    /// anthocyanin red varies between species with vacuolar pH and
+    /// co-pigments, from dull brick-red to scarlet.
+    #[serde(default = "anthocyanin_color_default")]
+    pub anthocyanin_color: [f32; 3],
+}
+
+fn anthocyanin_color_default() -> [f32; 3] {
+    [0.58, 0.12, 0.07]
 }
 
 /// Phenology parameters.

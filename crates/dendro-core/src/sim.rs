@@ -672,6 +672,42 @@ impl Simulation {
         }
     }
 
+    /// Diagnostics: per first-order limb on the stem, `(base height m,
+    /// base radius m, farthest horizontal reach m, leafy tips, mean tip light,
+    /// limb age y)`.
+    #[doc(hidden)]
+    pub fn debug_limbs(&self) -> Vec<(f32, f32, f32, u32, f32, u32)> {
+        let nodes = &self.shoots.nodes;
+        let n = nodes.len();
+        let mut limb = vec![usize::MAX; n];
+        let mut out: Vec<(f32, f32, f32, u32, f32, u32)> = Vec::new();
+        let year = self.year();
+        for i in 1..n {
+            let nd = &nodes[i];
+            let p = nd.parent as usize;
+            if nd.order == 1 && nodes[p].order == 0 {
+                limb[i] = out.len();
+                out.push((nd.start.y, nd.radius(), 0.0, 0, 0.0, year.saturating_sub(nd.birth_year)));
+            } else if nd.order >= 1 {
+                limb[i] = limb[p];
+            }
+            if limb[i] != usize::MAX {
+                let l = &mut out[limb[i]];
+                l.2 = l.2.max(nd.end(1.0).horizontal_len());
+                if nd.leafy {
+                    l.3 += 1;
+                    l.4 += nd.light;
+                }
+            }
+        }
+        for l in out.iter_mut() {
+            if l.3 > 0 {
+                l.4 /= l.3 as f32;
+            }
+        }
+        out
+    }
+
     /// Diagnostics: along the thickest first-order limb (followed through
     /// its thickest child), `(distance along the axis m, simulated radius m,
     /// order of the node, number of children)` per node.

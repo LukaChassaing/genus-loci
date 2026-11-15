@@ -11,18 +11,23 @@
     common_name: "Wild cherry",
     common_name_fr: "Merisier",
     architecture: (
-        // Strong, lasting apical control (calibrated): an excurrent tree whose
-        // single straight stem stays readable high into the crown; the crown
-        // becomes ovoid / rounded with age, but the leader never dissolves into
-        // co-dominant limbs as in the oak (lambda stays above 0.5).
+        // Apical control of the stem (calibrated): strong in the conical
+        // sapling (single leader, regular tiers), then easing from ~18 y so
+        // that the scaffold limbs get enough vigour to build a broad ovoid
+        // crown. It stays just above 0.5, so the straight stem remains
+        // readable high into the crown and never dissolves into co-dominant
+        // limbs as in the oak (0.42). With lambda ~0.6-0.7 kept for life the
+        // stem took most of the vigour and the limbs stayed short whips
+        // (a 21 m spire with W/H ~0.35 at 40 y).
         apical_dominance_young: 0.70,
-        apical_dominance_mature: 0.58,
-        maturity_age_years: 70.0,
-        juvenile_phase_years: 25.0,
+        apical_dominance_mature: 0.51,
+        maturity_age_years: 45.0,
+        juvenile_phase_years: 18.0,
         apical_dominance_branches: 0.52,
-        // Weak competition between sibling branches: tiers of many similar,
-        // light branches rather than a few massive scaffold limbs.
-        lateral_competition: 1.6,
+        // Moderate competition between sibling branches: in each tier a few
+        // well-lit scaffold limbs take the lead (fewer than the oak's) and
+        // ramify, instead of many similar starved branches.
+        lateral_competition: 2.0,
         // Metamers per unit light (calibrated): vigorous pioneer.
         vigour_per_light: 7.0,
         bud_break_threshold: 1.0,
@@ -47,9 +52,11 @@
         limb_setpoint_low_deg: 55.0,
         limb_setpoint_high_deg: 25.0,
         twig_setpoint_deg: 55.0,
-        // Open-grown cherry crowns are narrow-conical, later ovoid: width
-        // ~0.5-0.7 x height (much narrower than the oak's ~1).
-        crown_spread_ratio: 0.65,
+        // Open-grown cherry crowns are conical, then ovoid (width ~0.45-0.6 x
+        // height at 40 y), rounded-ovoid when old (~0.7; the oak's exceed 1).
+        // Calibrated; with the steep limb set-points above the tips turn up
+        // before the limbs reach this spread.
+        crown_spread_ratio: 1.0,
         phototropism: 0.10,
         // Straight stem and limbs: little random deviation, rare loss of
         // the terminal bud (no oak "elbows").
@@ -72,8 +79,8 @@
         shedding_threshold: 0.10,
         shade_survival_years: 2,
         shedding_mean_threshold: 0.0,
-        clear_bole_fraction: 0.25,
-        clear_bole_max_m: 6.0,
+        clear_bole_fraction: 0.2,
+        clear_bole_max_m: 4.5,
         clear_bole_limb_ratio: 0.5,
         // Short-lived tree: crown dieback from ~80 y (heart rot, bacterial
         // canker and silver leaf disease attack old cherries; few live
@@ -84,9 +91,11 @@
         retrenchment_reach: 0.6,
         epicormic_rate: 0.01,
         // Collar-to-bud distance where extension stops (calibrated on a
-        // 20-28 m plateau), with an early plateau.
-        hydraulic_path_max_m: 24.5,
-        hydraulic_exponent: 2.5,
+        // 20-28 m plateau). Low exponent: height growth slows steadily from
+        // youth (17-19 m at 40 y, 20-22 m at 60 y) instead of racing to the
+        // plateau as a spire.
+        hydraulic_path_max_m: 25.0,
+        hydraulic_exponent: 1.3,
         // Pioneer: foliage stays efficient until the tree nears its size
         // limit (calibrated), then declines steeply.
         hydraulic_foliage_exponent: 1.5,
@@ -110,10 +119,14 @@
     pigments: (
         chlorophyll: 1.0,
         // Brilliant orange-red autumn colour: strong anthocyanin synthesis
-        // over carotenoid yellow, little brown.
-        carotenoids: 0.6,
-        anthocyanins: 0.8,
-        tannins: 0.3,
+        // over carotenoid yellow, little brown; the red persists until the
+        // leaves fall.
+        carotenoids: 0.5,
+        anthocyanins: 1.6,
+        tannins: 0.2,
+        anthocyanin_persistence: 0.9,
+        // Scarlet rather than the brick-red default.
+        anthocyanin_color: (0.78, 0.14, 0.06),
     ),
     phenology: (
         // Prunus avium has a high chilling requirement (~1000 chill hours,
@@ -122,17 +135,17 @@
         chilling_requirement_days: 70.0,
         chill_temp_min_c: 0.0,
         chill_temp_max_c: 7.0,
-        // Leaf-out mid-April, about a week before the oak, just after the
-        // flowers open (calibrated).
+        // Leaf-out early-mid April, 1-2 weeks before the oak, together with
+        // the flowers (calibrated).
         gdd_base_c: 5.0,
-        gdd_budburst: 220.0,
+        gdd_budburst: 194.0,
         leaf_expansion_gdd: 170.0,
         // Early senescence: colouring from mid-September, leaves gone by
-        // late October / early November (earlier than the oak).
+        // late October (a month before the oak).
         senescence_photoperiod_h: 12.4,
         senescence_temp_base_c: 18.0,
-        senescence_cdd: 150.0,
-        leaf_fall_days: 20.0,
+        senescence_cdd: 115.0,
+        leaf_fall_days: 14.0,
     ),
     wood: (
         // Basic density ~0.5-0.6 g/cm3; green MOE ~7-9 GPa.
@@ -217,14 +230,15 @@
         flower_display: 1.0,
         fruit_display: 1.0,
         // Bloom in April, just before / as the leaves break (calibrated).
-        bloom_gdd: 212.0,
+        bloom_gdd: 196.0,
         bloom_duration_gdd: 110.0,
-        // Umbels of 2-6 flowers on short spurs of 2-year and older wood, in
-        // the well-lit outer crown.
+        // Umbels of 2-6 flowers on short spurs of 2-year and older wood,
+        // throughout the outer crown (bloom reads as a white cloud; only the
+        // deep-shaded interior is bare).
         min_wood_age_years: 2,
-        min_light: 0.35,
+        min_light: 0.2,
         max_wood_radius_mm: 25.0,
-        flower_density: 2.5,
+        flower_density: 3.5,
         flower_cluster_cm: 6.0,
         fruit_cluster_cm: 4.0,
         flower_color: (0.97, 0.96, 0.92),

@@ -361,17 +361,22 @@ pub fn leaf_colour(p: &Pigments, expansion: f32, colouring: f32) -> [f32; 3] {
     const GREEN: [f32; 3] = [0.16, 0.33, 0.08];
     const YOUNG: [f32; 3] = [0.55, 0.62, 0.22];
     const YELLOW: [f32; 3] = [0.80, 0.62, 0.14];
-    const RED: [f32; 3] = [0.58, 0.12, 0.07];
     const BROWN: [f32; 3] = [0.40, 0.26, 0.12];
     let c = colouring.clamp(0.0, 1.0);
     let e = expansion.clamp(0.0, 1.0);
     let chl = p.chlorophyll * (1.0 - c).powi(2) * (0.3 + 0.7 * e);
     let young = (1.0 - e) * 0.8;
     let car = p.carotenoids * (0.08 + 1.4 * c * (1.0 - c) + 0.3 * c);
-    let anth = p.anthocyanins * (3.0 * c * (1.0 - c) + 0.6 * (1.0 - e));
+    // Senescence anthocyanins peak at c = 0.5; past the peak a share
+    // `anthocyanin_persistence` of it is kept until the leaf falls.
+    let mut sen = 3.0 * c * (1.0 - c);
+    if p.anthocyanin_persistence > 0.0 && c > 0.5 {
+        sen += p.anthocyanin_persistence.min(1.0) * (0.75 - sen);
+    }
+    let anth = p.anthocyanins * (sen + 0.6 * (1.0 - e));
     let brown = p.tannins * c.powf(2.5) * 1.6;
     let w = [chl * 2.0, young, car, anth * 1.5, brown];
-    let cols = [GREEN, YOUNG, YELLOW, RED, BROWN];
+    let cols = [GREEN, YOUNG, YELLOW, p.anthocyanin_color, BROWN];
     let total: f32 = w.iter().sum::<f32>().max(1e-6);
     let mut out = [0.0; 3];
     for (wi, col) in w.iter().zip(cols.iter()) {

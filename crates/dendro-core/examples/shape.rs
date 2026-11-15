@@ -32,7 +32,7 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
-    let marks = [5u32, 15, 25, 40, 60, 80, 100, 150, 200, 250, 300];
+    let marks = [5u32, 15, 25, 40, 60, 70, 80, 100, 150, 200, 250, 300];
     for seed in seeds {
         println!("seed {seed}");
         println!(

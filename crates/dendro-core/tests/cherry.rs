@@ -24,7 +24,8 @@ struct YearPheno {
 struct Run {
     /// Stats on Jan 1 of each year (index = age).
     yearly: Vec<TreeStats>,
-    shape: [(u32, ShapeMetrics); 3],
+    /// Shape metrics and height at 40, 60, 70 and 100 y.
+    shape: [(u32, ShapeMetrics, f32); 4],
     ring_widths: Vec<f32>,
     pheno: Vec<YearPheno>,
     first_flowering_year: Option<u32>,
@@ -67,8 +68,8 @@ fn grow(genome: Genome, seed: u64, years: u32) -> Run {
         }
         let age = y + 1;
         yearly.push(sim.stats());
-        if [40, 60, 100].contains(&age) {
-            shape.push((age, sim.shape_metrics()));
+        if [40, 60, 70, 100].contains(&age) {
+            shape.push((age, sim.shape_metrics(), sim.height_m()));
         }
         if age == 60 {
             at_60 = Some(sim.clone());
@@ -76,7 +77,7 @@ fn grow(genome: Genome, seed: u64, years: u32) -> Run {
     }
     Run {
         yearly,
-        shape: [shape[0], shape[1], shape[2]],
+        shape: [shape[0], shape[1], shape[2], shape[3]],
         ring_widths: sim.rings().iter().map(|r| r.width_mm).collect(),
         pheno,
         first_flowering_year: first,
@@ -153,28 +154,45 @@ fn calibration_open_grown_cherry() {
 }
 
 /// Excurrent habit: one straight dominant stem (no co-dominant limbs), a
-/// natural clear bole, a narrow crown (narrower than the oak's at 40 y).
+/// natural clear bole, a conical then ovoid crown that broadens with age but
+/// stays well short of the oak's spreading dome.
 #[test]
 fn cherry_architecture() {
     for (i, seed) in SEEDS.iter().enumerate() {
         let (c, o) = (cherry(i), oak(i));
         let (c40, o40) = (c.shape[0].1, o.shape[0].1);
-        assert_eq!((c.shape[0].0, o.shape[0].0), (40, 40));
+        assert_eq!((c.shape[0].0, o.shape[0].0, c.shape[2].0, c.shape[3].0), (40, 40, 70, 100));
+        let wh = |k: usize| c.shape[k].1.crown_width_to_height;
+        // Open-grown cherry at 40 y: broadly ovoid (W/H ~0.45-0.6), at 70 y
+        // rounded-ovoid (~0.6-0.75).
+        assert!((0.42..0.6).contains(&wh(0)), "seed {seed}: crown W/H at 40 y {c40:?}");
+        assert!((0.58..0.78).contains(&wh(2)), "seed {seed}: crown W/H at 70 y {:?}", c.shape[2].1);
+        // Crown base at ~20-25 % of the height (the lower crown is shed
+        // early, but the crown is not a tuft on a pole).
+        let base = c40.clear_bole_m / c.shape[0].2;
+        assert!((0.15..0.3).contains(&base), "seed {seed}: crown base at 40 y {:.2} m = {base:.2} H", c40.clear_bole_m);
+        // Narrower than the oak. At 40 y both crowns are ovoid and the
+        // difference is in the habit (straight stem through the crown,
+        // ascending limbs) more than in the width; the oak's limbs then
+        // spread into a dome as wide as tall while the cherry stays ovoid.
         assert!(
-            c40.crown_width_to_height < o40.crown_width_to_height - 0.08,
+            c40.crown_width_to_height < o40.crown_width_to_height - 0.02,
             "seed {seed}: crown W/H at 40 y: cherry {c40:?} vs oak {o40:?}"
         );
+        let (c100, o100) = (c.shape[3].1, o.shape[3].1);
         assert!(
-            c.yearly[40].crown_radius_m < o.yearly[40].crown_radius_m,
-            "seed {seed}: crown radius at 40 y: cherry {} vs oak {}",
-            c.yearly[40].crown_radius_m,
-            o.yearly[40].crown_radius_m
+            c100.crown_width_to_height < o100.crown_width_to_height - 0.2,
+            "seed {seed}: crown W/H at 100 y: cherry {c100:?} vs oak {o100:?}"
         );
-        // Conical/narrow when young, broader (ovoid) later.
-        let c100 = c.shape[2].1;
-        assert!((0.25..0.45).contains(&c40.crown_width_to_height), "seed {seed}: {c40:?}");
+        assert!(
+            c.yearly[60].crown_radius_m < o.yearly[60].crown_radius_m,
+            "seed {seed}: crown radius at 60 y: cherry {} vs oak {}",
+            c.yearly[60].crown_radius_m,
+            o.yearly[60].crown_radius_m
+        );
+        // Conical/ovoid when young, broader (rounded) later.
         assert!(c100.crown_width_to_height > c40.crown_width_to_height + 0.1, "seed {seed}: {c100:?}");
-        for (age, s) in &c.shape {
+        for (age, s, _) in &c.shape {
             // The stem stays dominant: no limb approaches its diameter.
             assert!(s.max_limb_ratio < 0.6, "seed {seed}, {age} y: co-dominant limb {s:?}");
             // Shade-intolerant: the lower branches are shed early.
@@ -220,7 +238,8 @@ fn cherry_rings() {
 }
 
 /// Bloom in April, just before or with its own leaf-out and before the
-/// oak's budburst; leaf-out earlier and leaf fall earlier than the oak.
+/// oak's budburst; leaf-out 1-2 weeks before the oak, leaf fall a month
+/// earlier.
 #[test]
 fn cherry_phenology() {
     for (i, seed) in SEEDS.iter().enumerate() {
@@ -241,8 +260,11 @@ fn cherry_phenology() {
         }
         let mb = mean(&bloom);
         assert!((95.0..125.0).contains(&mb), "seed {seed}: mean bloom day {mb:.1}");
-        assert!(mean(&c_bb) < mean(&o_bb) - 2.0, "seed {seed}: leaf-out cherry {:.1} vs oak {:.1}", mean(&c_bb), mean(&o_bb));
+        // Leaf-out 1-2 weeks before the oak; leaves gone by late October.
+        let (cb, ob) = (mean(&c_bb), mean(&o_bb));
+        assert!(cb < ob - 6.0 && cb > ob - 16.0, "seed {seed}: leaf-out cherry {cb:.1} vs oak {ob:.1}");
         assert!(mean(&c_fall) < mean(&o_fall) - 10.0, "seed {seed}: leaf fall cherry {:.1} vs oak {:.1}", mean(&c_fall), mean(&o_fall));
+        assert!(mean(&c_fall) < 306.0, "seed {seed}: leaf fall ends on day {:.1}", mean(&c_fall));
         // First flowering at 4-7 years.
         let first = cherry(i).first_flowering_year.expect("cherry never flowered");
         assert!((4..=7).contains(&first), "seed {seed}: first flowering in year {first}");
@@ -295,7 +317,8 @@ fn flowering_and_fruiting_cycle() {
 #[test]
 fn autumn_colours() {
     let (c, o) = (Genome::prunus_avium(), Genome::quercus_robur());
-    for col in [0.4f32, 0.6] {
+    // Red through to leaf fall (persistent anthocyanins), not only mid-way.
+    for col in [0.4f32, 0.6, 0.9, 1.0] {
         let cc = leaf_colour(&c.pigments, 1.0, col);
         let oc = leaf_colour(&o.pigments, 1.0, col);
         assert!(cc[0] > 1.5 * cc[1], "cherry at colouring {col}: {cc:?}");

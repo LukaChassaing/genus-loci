@@ -237,7 +237,7 @@ func _build_bottom_bar(root: Control) -> void:
 	h.add_child(drought)
 
 	var seed_btn: Button = _no_focus(Button.new()) as Button
-	seed_btn.text = "Nouvelle graine"
+	seed_btn.text = "Graine"
 	seed_button = seed_btn
 	seed_btn.pressed.connect(func() -> void: new_seed_requested.emit())
 	h.add_child(seed_btn)
@@ -248,7 +248,7 @@ func _build_bottom_bar(root: Control) -> void:
 	soil_option.tooltip_text = "Type de sol (relance la même graine)"
 	soil_option.clip_text = true
 	soil_option.fit_to_longest_item = false  # keeps the bar within 1280 px
-	soil_option.custom_minimum_size = Vector2(150, 0)
+	soil_option.custom_minimum_size = Vector2(190, 0)
 	soil_option.item_selected.connect(func(i: int) -> void: soil_selected.emit(i))
 	h.add_child(soil_option)
 
@@ -256,7 +256,7 @@ func _build_bottom_bar(root: Control) -> void:
 	species_option.tooltip_text = "Espèce (relance la même graine)"
 	species_option.clip_text = true
 	species_option.fit_to_longest_item = false
-	species_option.custom_minimum_size = Vector2(162, 0)
+	species_option.custom_minimum_size = Vector2(190, 0)
 	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(i))
 	h.add_child(species_option)
 
