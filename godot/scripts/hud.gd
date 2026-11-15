@@ -30,6 +30,14 @@ var _seed_label: Label
 var _ring_panel: PanelContainer
 var _ring_view: RingView
 var _last_ring_year: int = -1
+var _info_panel: PanelContainer
+var _bottom_panel: PanelContainer
+## Controls exposed so the self-test can drive the very same signal paths as a user click.
+var drought_button: Button
+var seed_button: Button
+var rings_button: Button
+var play_button: Button
+var speed_slider: HSlider
 
 
 func _ready() -> void:
@@ -52,6 +60,7 @@ func _no_focus(c: Control) -> Control:
 
 func _build_info_panel(root: Control) -> void:
 	var p: PanelContainer = PanelContainer.new()
+	_info_panel = p
 	p.position = Vector2(14, 14)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(p)
@@ -121,6 +130,7 @@ func _build_bottom_bar(root: Control) -> void:
 	p.offset_left = 14
 	p.offset_right = -14
 	p.offset_bottom = -14
+	_bottom_panel = p
 	root.add_child(p)
 	var h: HBoxContainer = HBoxContainer.new()
 	h.add_theme_constant_override("separation", 12)
@@ -131,6 +141,7 @@ func _build_bottom_bar(root: Control) -> void:
 	_play.button_pressed = true
 	_play.custom_minimum_size = Vector2(100, 0)
 	_play.toggled.connect(_on_play_toggled)
+	play_button = _play
 	h.add_child(_play)
 	_on_play_toggled(true)
 
@@ -145,6 +156,7 @@ func _build_bottom_bar(root: Control) -> void:
 	_speed_slider.custom_minimum_size = Vector2(240, 0)
 	_speed_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_speed_slider.value_changed.connect(_on_speed_changed)
+	speed_slider = _speed_slider
 	h.add_child(_speed_slider)
 	_speed_label = Label.new()
 	_speed_label.custom_minimum_size = Vector2(110, 0)
@@ -153,11 +165,13 @@ func _build_bottom_bar(root: Control) -> void:
 	var drought: Button = _no_focus(Button.new()) as Button
 	drought.text = "Sécheresse"
 	drought.toggle_mode = true
+	drought_button = drought
 	drought.toggled.connect(func(on: bool) -> void: drought_toggled.emit(on))
 	h.add_child(drought)
 
 	var seed_btn: Button = _no_focus(Button.new()) as Button
 	seed_btn.text = "Nouvelle graine"
+	seed_button = seed_btn
 	seed_btn.pressed.connect(func() -> void: new_seed_requested.emit())
 	h.add_child(seed_btn)
 	_seed_label = Label.new()
@@ -170,6 +184,7 @@ func _build_bottom_bar(root: Control) -> void:
 	var rings: Button = _no_focus(Button.new()) as Button
 	rings.text = "Cernes"
 	rings.toggle_mode = true
+	rings_button = rings
 	rings.toggled.connect(func(on: bool) -> void:
 		_ring_panel.visible = on
 		rings_toggled.emit(on))
@@ -178,7 +193,32 @@ func _build_bottom_bar(root: Control) -> void:
 
 
 func set_rings_visible(on: bool) -> void:
-	_ring_panel.visible = on
+	rings_button.button_pressed = on  # fires the same toggled handler as a click
+
+
+func is_rings_visible() -> bool:
+	return _ring_panel.visible
+
+
+func get_ring_view() -> RingView:
+	return _ring_view
+
+
+## Part of the viewport (canvas units) not covered by HUD panels: between the info panel and the
+## ring panel (when shown), above the control bar. The 3D camera frames the tree inside it.
+func free_rect(view: Vector2) -> Rect2:
+	var left: float = _info_panel.position.x + _info_panel.size.x + 12.0
+	var right: float = view.x - 14.0
+	if _ring_panel.visible:
+		right = _ring_panel.global_position.x - 12.0
+	var top: float = 14.0
+	var bottom: float = _bottom_panel.global_position.y - 10.0
+	return Rect2(left, top, maxf(right - left, 200.0), maxf(bottom - top, 200.0))
+
+
+func reset_drought_button() -> void:
+	if drought_button.button_pressed:
+		drought_button.button_pressed = false
 
 
 func set_playing(on: bool) -> void:
@@ -242,8 +282,10 @@ func update_from(sim: TreeSim) -> void:
 	_water.value = sim.get_soil_water()
 	if year != _last_ring_year:
 		_last_ring_year = year
-		_ring_view.set_data(sim.get_ring_widths(), sim.get_ring_stress())
+		_ring_view.set_data(sim.get_ring_widths(), sim.get_ring_stress(),
+				sim.get_ring_earlywood_fraction(), sim.get_ring_forced_drought())
 
 
 func force_ring_refresh() -> void:
 	_last_ring_year = -1
+	_ring_view.reset_view()

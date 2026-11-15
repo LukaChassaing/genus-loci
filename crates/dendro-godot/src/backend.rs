@@ -146,4 +146,32 @@ impl Backend {
     pub fn ring_stress(&self) -> Vec<f32> {
         self.sim.rings().iter().map(|r| r.water_stress).collect()
     }
+
+    pub fn ring_earlywood_fraction(&self) -> Vec<f32> {
+        self.sim.rings().iter().map(|r| r.earlywood_fraction).collect()
+    }
+
+    pub fn ring_forced_drought(&self) -> Vec<u8> {
+        self.sim.rings().iter().map(|r| r.forced_drought as u8).collect()
+    }
+
+    pub fn root_spread_m(&self) -> f64 {
+        self.sim.root_spread_m() as f64
+    }
+
+    pub fn leaf_density(&self) -> f64 {
+        self.sim.leaf_density() as f64
+    }
+
+    pub fn wood_version(&self) -> i64 {
+        self.sim.wood_version() as i64
+    }
+
+    pub fn leaf_version(&self) -> i64 {
+        self.sim.leaf_version() as i64
+    }
+
+    pub fn root_version(&self) -> i64 {
+        self.sim.root_version() as i64
+    }
 }

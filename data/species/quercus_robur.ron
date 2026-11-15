@@ -5,11 +5,26 @@
     species: "Quercus robur",
     common_name: "Pedunculate oak",
     architecture: (
-        // Borchert-Honda lambda. Oak is excurrent when young, strongly
-        // decurrent (broad, forked crown) when mature.
-        apical_dominance_young: 0.6,
-        apical_dominance_mature: 0.5,
+        // Borchert-Honda lambda of the stem (calibrated by eye). Oak is excurrent when
+        // young (strong apical control keeps basal shoots from becoming
+        // co-dominant stems), strongly decurrent when mature: below 0.5 the
+        // laterals out-compete the leader and the stem dissolves into a few
+        // large ascending limbs (broad, rounded dome).
+        apical_dominance_young: 0.75,
+        apical_dominance_mature: 0.42,
         maturity_age_years: 50.0,
+        // Limbs keep a moderate apical control (they extend as axes with
+        // side branches, rather than dissolving into fans).
+        apical_dominance_branches: 0.52,
+        // Young oaks keep a dominant leader for their first ~15 years
+        // (excurrent juvenile phase), then lambda declines smoothly until
+        // maturity_age_years.
+        juvenile_phase_years: 15.0,
+        // Branch-to-branch competition for vigour (stylised, calibrated by
+        // eye): the best-lit limbs take more than their proportional share,
+        // so the crown is carried by ~5-9 massive scaffold limbs instead of
+        // many similar stems.
+        lateral_competition: 3.0,
         // Metamers per unit light (calibrated).
         vigour_per_light: 6.0,
         bud_break_threshold: 1.0,
@@ -28,19 +43,51 @@
         // Branching order cap. Effectively unlimited: with level-of-detail shoot
         // units, orders keep increasing over centuries.
         max_order: 120,
-        // Leader strongly orthotropic; limbs ascending then spreading
-        // (calibrated on crown width ~0.9x height).
+        // Leader orthotropic; laterals corrected towards their set-points.
         gravitropism: 0.35,
         lateral_gravitropism: 0.3,
-        // Weight of growth towards the brightest sky sector.
-        phototropism: 0.25,
-        // Oak limbs are characteristically sinuous (calibrated, stylised).
-        sinuosity_deg: 16.0,
+        // Gravitropic set-points (concept: Digby & Firn 1995; values
+        // calibrated by eye): lower limbs of open-grown oak run out at
+        // 60-70 deg from vertical, upper ones ascend; twigs spread outward.
+        limb_setpoint_low_deg: 60.0,
+        limb_setpoint_high_deg: 30.0,
+        twig_setpoint_deg: 65.0,
+        // Open-grown oak crowns are about as wide as tall (0.8-1.2): limb
+        // tips turn up beyond ~0.6 x the corresponding crown radius
+        // (stylised cap on spread).
+        crown_spread_ratio: 1.3,
+        // Weight of growth towards the brightest sky sector (kept low: the
+        // set-points, not the sky, set the limb angles).
+        phototropism: 0.12,
+        // Small random deviation per annual shoot (stylised).
+        sinuosity_deg: 8.0,
+        // Oak's zigzag, "elbowed" limbs: frequent loss of the terminal bud
+        // with relay by a subterminal bud (stylised rate and angle).
+        leader_loss_probability: 0.25,
+        leader_loss_angle_deg: 22.0,
+        // Branch sag under load (stylised, calibrated by eye): only limbs
+        // thicker than ~8 cm, at most 8 deg in total along any path from the
+        // stem and never more than 10 deg below horizontal, so old lower
+        // limbs run out flat and their young tips turn up.
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
         // Oak is light-demanding: interior shaded twigs die fast.
         shedding_threshold: 0.18,
+        // Mean-light shedding disabled for oak (it collapses the open crown
+        // with this light model); kept for other species.
+        shedding_mean_threshold: 0.0,
+        // Open-grown oak: clear bole ~10-20 % of height, rarely above 4-5 m
+        // (stylised natural pruning, see genome.rs).
+        clear_bole_fraction: 0.15,
+        clear_bole_max_m: 4.0,
+        clear_bole_limb_ratio: 0.5,
         // Collar-to-bud distance (m) where extension stops; calibrated so
-        // open-grown height plateaus around 30-35 m.
-        hydraulic_path_max_m: 38.0,
+        // open-grown height reaches ~30 m at 200 years.
+        hydraulic_path_max_m: 35.0,
     ),
     leaf: (
         // Leaves 7-14 cm long, 4-7 lobes per side, very short petiole.
@@ -53,6 +100,10 @@
         marcescence_max_age_years: 30.0,
         // Informational for now (leaf cards are clusters).
         leaves_per_shoot: 7.0,
+        // Rendering: oak leaves bunch at shoot tips into dense tufts of
+        // ~10-20 leaves (cards ~4 leaf lengths); dense, heavy crown.
+        cluster_size_leaves: 3.0,
+        foliage_density: 5.0,
     ),
     pigments: (
         chlorophyll: 1.0,
@@ -78,16 +129,28 @@
         leaf_fall_days: 28.0,
     ),
     wood: (
-        // Q. robur basic density ~ 0.55-0.65 g/cm3 (informational for now).
+        // Q. robur basic density ~ 0.55-0.65 g/cm3 (load of the sag model).
         density_kg_m3: 640.0,
+        // Green oak MOE ~ 8-10 GPa.
+        elasticity_gpa: 9.0,
         // Oak is the textbook ring-porous wood: large earlywood vessels formed
         // before budburst from reserves; latewood carries climate variability.
         ring_porous: true,
         earlywood_share: 0.35,
         // Pressler law coefficient (calibrated on DBH targets).
-        growth_coefficient: 0.000013,
+        growth_coefficient: 0.0000115,
         twig_radius_mm: 2.5,
         max_ring_width_mm: 9.0,
+        // Mesh-only stylisation (not measured): visible branch collars, and
+        // the strong root flare of old oaks with a few buttress lobes over
+        // the main lateral roots.
+        collar_flare: 0.25,
+        // Branching exponent for drawn radii (measured da Vinci exponents
+        // ~1.8-2.8; oak's massive limbs suggest > 2).
+        pipe_exponent: 2.3,
+        root_flare: 0.7,
+        root_flare_height_radii: 2.5,
+        buttress_lobes: 5,
     ),
     roots: (
         // Oak forms a strong taproot in the first years, later overtaken by

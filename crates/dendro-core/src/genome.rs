@@ -36,8 +36,21 @@ pub struct Architecture {
     pub apical_dominance_young: f32,
     /// Apical control lambda reached at maturity (decurrent crowns -> lower).
     pub apical_dominance_mature: f32,
-    /// Age (years) over which lambda moves from young to mature value.
+    /// Apical control lambda of branch axes (order >= 1), constant with
+    /// age. The young/mature schedule above applies to the stem only.
+    pub apical_dominance_branches: f32,
+    /// Age (years) at which lambda reaches its mature value.
     pub maturity_age_years: f32,
+    /// Age (years) until which lambda keeps its juvenile value (juvenile
+    /// excurrent phase); it then declines smoothly to the mature value at
+    /// `maturity_age_years`.
+    pub juvenile_phase_years: f32,
+    /// Sharpness of the vigour split among sibling laterals: each lateral
+    /// (or dormant bud) receives a share proportional to `Q^k` of its light
+    /// `Q`. 1 = Borchert-Honda (proportional); >1 = the best-lit branches
+    /// take more than their share (strong competition between branches,
+    /// few dominant scaffold limbs); <1 = even, many similar branches.
+    pub lateral_competition: f32,
     /// Vigour (metamers) produced per unit of bud light exposure (alpha).
     pub vigour_per_light: f32,
     /// Minimum vigour (metamers) for a bud to break.
@@ -62,14 +75,69 @@ pub struct Architecture {
     pub max_order: u8,
     /// Upward tendency of the main axis (weight added to growth direction).
     pub gravitropism: f32,
-    /// Upward tendency of lateral axes (small = plagiotropic, spreading).
+    /// Strength of the gravitropic correction of lateral axes towards their
+    /// set-point angle (weight per annual shoot).
     pub lateral_gravitropism: f32,
+    /// Gravitropic set-point angle (deg from vertical) of first-order limbs
+    /// inserted at the bottom / top of the crown (interpolated on relative
+    /// insertion height). Plagiotropic limbs grow towards this angle rather
+    /// than towards the vertical (Digby & Firn 1995). 0 = orthotropic.
+    pub limb_setpoint_low_deg: f32,
+    pub limb_setpoint_high_deg: f32,
+    /// Set-point angle (deg from vertical) of higher-order branches/twigs.
+    pub twig_setpoint_deg: f32,
+    /// Typical open-grown crown width / height. Lateral shoots reaching
+    /// beyond ~60 % of the corresponding crown radius progressively turn
+    /// upward (their set-point goes to the vertical at 120 %). Stylised
+    /// stand-in for the costs of long horizontal limbs; 0 disables.
+    pub crown_spread_ratio: f32,
     /// Tendency to grow towards less shaded space (weight).
     pub phototropism: f32,
     /// Random deviation of each annual shoot (deg) -> sinuous limbs.
     pub sinuosity_deg: f32,
+    /// Yearly probability that an axis loses its terminal bud and is
+    /// continued by a subterminal lateral (sympodial-looking "elbow"; oak
+    /// terminal buds are frequently lost to frost, insects or lammas
+    /// growth).
+    pub leader_loss_probability: f32,
+    /// Direction change (deg) of the axis at such a relay.
+    pub leader_loss_angle_deg: f32,
+    /// Stylised sag: a branch segment is deflected downward (and the
+    /// deflection locked in by new wood) by `sag_coefficient * kappa * L`
+    /// rad, `kappa = M / (E I)` being its elastic curvature under the load
+    /// beyond it and `L` its length. The coefficient lumps creep (x2-3 of
+    /// the elastic deflection) and the lumping of shoot units.
+    pub sag_coefficient: f32,
+    /// Segments thinner than this radius (mm) keep their posture (active
+    /// gravitropic correction by reaction wood is efficient in thin axes,
+    /// Almeras & Fournier 2009) and do not sag.
+    pub sag_min_radius_mm: f32,
+    /// Maximum increase of the sag of one segment per year (deg).
+    pub sag_max_deg_per_year: f32,
+    /// Maximum cumulative sag of one segment relative to its parent (deg).
+    pub sag_max_total_deg: f32,
+    /// Sag never bends a segment further down than this angle below the
+    /// horizontal (deg).
+    pub sag_max_droop_deg: f32,
+    /// Only segments inclined at least this much from the vertical (deg)
+    /// sag; ascending limbs carry their load mostly axially.
+    pub sag_min_inclination_deg: f32,
     /// Branches whose foliage mean light exposure (0..1) is below this are shed.
     pub shedding_threshold: f32,
+    /// Branches whose foliage *mean* light exposure (0..1) is below this are
+    /// shed too, even if some of their shoots are well lit: a branch that is
+    /// mostly shaded is a net carbon sink (branch autonomy, Sprugel et al.
+    /// 1991). Drives the rise of the crown base (clear bole).
+    pub shedding_mean_threshold: f32,
+    /// Natural pruning of the stem (stylised): laterals inserted on the stem
+    /// below `clear_bole_fraction` x tree height (and below
+    /// `clear_bole_max_m`) are shed while their base diameter is less than
+    /// `clear_bole_limb_ratio` x the stem diameter. Stands for the death of
+    /// the lowest, suppressed branches of the juvenile crown, which the
+    /// coarse light model does not shade enough. Thick limbs are kept.
+    pub clear_bole_fraction: f32,
+    pub clear_bole_max_m: f32,
+    pub clear_bole_limb_ratio: f32,
     /// Transport distance (m, straight line collar -> bud) at which shoot
     /// extension stops; foliage photosynthetic efficiency also declines with
     /// it. Models the size limitation of water transport (Ryan & Yoder 1997)
@@ -94,6 +162,11 @@ pub struct LeafTraits {
     pub marcescence_max_age_years: f32,
     /// Leaves borne by one annual shoot (informational for now).
     pub leaves_per_shoot: f32,
+    /// Rendering: size of one leaf-cluster card, in leaf lengths.
+    pub cluster_size_leaves: f32,
+    /// Rendering: leaf-card area per lit shoot unit, in voxel faces (crown
+    /// density; ~1 sparse, ~3 dense).
+    pub foliage_density: f32,
 }
 
 /// Relative leaf pigment contents (0..1), driving seasonal colour.
@@ -135,8 +208,10 @@ pub struct PhenologyTraits {
 /// Wood / secondary growth traits.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WoodTraits {
-    /// Basic wood density (kg/m3). Informational for now.
+    /// Basic wood density (kg/m3) (branch load for the sag model).
     pub density_kg_m3: f32,
+    /// Modulus of elasticity of green wood (GPa) (branch sag).
+    pub elasticity_gpa: f32,
     /// Ring-porous wood (earlywood from reserves before leaf-out).
     pub ring_porous: bool,
     /// Share of annual radial growth formed as earlywood in an average year.
@@ -148,6 +223,22 @@ pub struct WoodTraits {
     pub twig_radius_mm: f32,
     /// Physiological maximum ring width (mm).
     pub max_ring_width_mm: f32,
+    /// Branching (da Vinci / pipe-model) exponent used to draw branch radii
+    /// relative to the stem: `r_parent^e = sum r_child^e`. 2 = area
+    /// preserving (what the simulated Pressler areas give); larger = thicker
+    /// limbs. Mesh only.
+    pub pipe_exponent: f32,
+    /// Mesh stylisation: widening of a branch base ring where it leaves its
+    /// parent (branch collar), as a fraction of the branch radius.
+    pub collar_flare: f32,
+    /// Mesh stylisation: relative widening of the stem at ground level
+    /// (root flare / buttressing). DBH and rings are measured on the
+    /// simulated stem, not on this flare.
+    pub root_flare: f32,
+    /// Height of the flared zone, in collar radii.
+    pub root_flare_height_radii: f32,
+    /// Number of buttress lobes of the flare (0 = round).
+    pub buttress_lobes: u8,
 }
 
 /// Root system traits (largely a stylisation, see `roots.rs`).

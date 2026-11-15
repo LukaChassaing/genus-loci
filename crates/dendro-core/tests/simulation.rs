@@ -1,6 +1,6 @@
 //! Integration tests for dendro-core.
 
-use dendro_core::{Genome, MeshData, Phase, Simulation, TreeStats, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
+use dendro_core::{Genome, MeshData, Phase, ShapeMetrics, Simulation, TreeStats, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
 use std::sync::OnceLock;
 
 const SEED: u64 = 42;
@@ -12,6 +12,10 @@ fn oak(seed: u64) -> Simulation {
 /// One shared 200-year run (yearly stats on Jan 1 + a mid-summer clone).
 struct LongRun {
     yearly: Vec<TreeStats>,
+    shape_15: ShapeMetrics,
+    shape_80: ShapeMetrics,
+    shape_100: ShapeMetrics,
+    shape_200: ShapeMetrics,
     summer_200: Simulation,
     winter_10: Simulation,
 }
@@ -22,9 +26,13 @@ fn long_run() -> &'static LongRun {
         let mut sim = oak(SEED);
         let mut yearly = vec![sim.stats()];
         let mut winter_10 = None;
+        let mut shapes = Vec::new();
         for y in 1..=200 {
             sim.advance_years(1);
             yearly.push(sim.stats());
+            if y == 15 || y == 80 || y == 100 {
+                shapes.push(sim.shape_metrics());
+            }
             if y == 10 {
                 let mut w = sim.clone();
                 w.advance_days(20); // Jan 21, year 10
@@ -33,7 +41,15 @@ fn long_run() -> &'static LongRun {
         }
         let mut summer = sim.clone();
         summer.advance_days(200);
-        LongRun { yearly, summer_200: summer, winter_10: winter_10.unwrap() }
+        LongRun {
+            yearly,
+            shape_15: shapes[0],
+            shape_80: shapes[1],
+            shape_100: shapes[2],
+            shape_200: sim.shape_metrics(),
+            summer_200: summer,
+            winter_10: winter_10.unwrap(),
+        }
     })
 }
 
@@ -117,8 +133,13 @@ fn growth_is_monotonic() {
     for w in run.yearly.windows(2) {
         let (p, n) = (&w[0], &w[1]);
         assert!(n.dbh_cm >= p.dbh_cm, "DBH decreased at {}: {} -> {}", n.age_years, p.dbh_cm, n.dbh_cm);
-        // Height can only drop by the loss of a top shoot; allow a few cm.
-        assert!(n.height_m >= p.height_m - 0.1, "height decreased at {}: {} -> {}", n.age_years, p.height_m, n.height_m);
+        // Height can only drop by the loss of a top shoot or, in the old
+        // decurrent crown (no leader), of a shaded-out top branch: allow a
+        // small yearly drop, but no lasting decline.
+        assert!(n.height_m >= p.height_m - 0.5, "height decreased at {}: {} -> {}", n.age_years, p.height_m, n.height_m);
+    }
+    for w in run.yearly.windows(11) {
+        assert!(w[10].height_m >= w[0].height_m - 0.2, "height declined over a decade at {}", w[10].age_years);
     }
     let first = &run.yearly[1];
     let last = &run.yearly[200];
@@ -149,6 +170,30 @@ fn calibration_open_grown_oak() {
     assert!(y[200].root_nodes < 15_000, "{} root nodes", y[200].root_nodes);
 }
 
+/// Open-grown oak architecture: clear bole, a few massive scaffold limbs,
+/// broad crown.
+#[test]
+fn oak_architecture() {
+    let run = long_run();
+    let (s80, s100, s200) = (run.shape_80, run.shape_100, run.shape_200);
+    // Clear bole ~10-20 % of height, 2-4(5) m on a mature tree.
+    assert!((2.0..5.0).contains(&s80.clear_bole_m), "clear bole at 80 y: {s80:?}");
+    assert!((2.0..5.0).contains(&s200.clear_bole_m), "clear bole at 200 y: {s200:?}");
+    // About 5-9 scaffold limbs (>= 20 % of DBH) leave the stem.
+    for s in [s80, s100, s200] {
+        assert!((3..=10).contains(&s.scaffold_limbs), "scaffold limbs: {s:?}");
+        // First-order limbs 25-50 % of the stem diameter (and some a bit more).
+        assert!(s.max_limb_ratio >= 0.35 && s.max_limb_ratio <= 0.9, "limb/stem ratio: {s:?}");
+        assert!(s.mean_limb_ratio >= 0.25, "limb/stem ratio: {s:?}");
+    }
+    // Broad crown about as wide as tall at maturity.
+    assert!((0.8..1.3).contains(&s100.crown_width_to_height), "crown W/H at 100 y: {s100:?}");
+    assert!((0.8..1.3).contains(&s200.crown_width_to_height), "crown W/H at 200 y: {s200:?}");
+    // A young tree has a single dominant stem: no basal co-dominant fork.
+    let s15 = run.shape_15;
+    assert!(s15.max_limb_ratio < 0.75, "juvenile stem not dominant: {s15:?}");
+}
+
 #[test]
 fn other_seeds_do_not_collapse() {
     for seed in [1u64, 1234] {
@@ -167,6 +212,11 @@ fn other_seeds_do_not_collapse() {
             }
             if y == 100 {
                 assert!((17.0..28.0).contains(&s.height_m), "seed {seed}: H100 {}", s.height_m);
+                // Distinct individuals, same species architecture.
+                let m = sim.shape_metrics();
+                assert!((2.0..5.0).contains(&m.clear_bole_m), "seed {seed}: {m:?}");
+                assert!((3..=10).contains(&m.scaffold_limbs), "seed {seed}: {m:?}");
+                assert!((0.8..1.35).contains(&m.crown_width_to_height), "seed {seed}: {m:?}");
             }
         }
     }
@@ -281,6 +331,36 @@ fn check_mesh(m: &MeshData, name: &str, budget: usize, check_winding: bool) {
         assert!(total > 0);
         assert!(cw as f32 / total as f32 > 0.99, "{name}: only {cw}/{total} triangles clockwise");
     }
+}
+
+/// No degenerate or oversized wood triangles (e.g. a branch collar or root
+/// flare ring blown up into a sheet): every triangle is a thin slab of a
+/// tube, so its longest edge is bounded by the longest simplified segment
+/// and its width (2 x area / longest edge) by a fraction of the collar radius.
+fn check_wood_triangles(sim: &Simulation, name: &str) {
+    let m = sim.wood_mesh();
+    let collar_r = sim.collar_diameter_cm() * 0.005;
+    let d = |a: [f32; 3], b: [f32; 3]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+    for t in m.indices.as_chunks::<3>().0 {
+        let [a, b, c] = [t[0], t[1], t[2]].map(|i| m.positions[i as usize]);
+        let e = d(a, b).max(d(b, c)).max(d(a, c));
+        assert!(e <= 1.75, "{name}: wood triangle edge {e} m at {a:?}");
+        let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        let x = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        let area = 0.5 * (x[0] * x[0] + x[1] * x[1] + x[2] * x[2]).sqrt();
+        let width = 2.0 * area / e.max(1e-6);
+        assert!(width <= 0.5 * collar_r + 0.02, "{name}: wood triangle {width} m wide at {a:?} (collar r {collar_r})");
+    }
+}
+
+#[test]
+fn wood_triangles_bounded() {
+    check_wood_triangles(&long_run().summer_200, "200 y");
+    check_wood_triangles(&long_run().winter_10, "10 y");
+    let mut sim = oak(1);
+    sim.advance_days(365 * 60 + 200);
+    check_wood_triangles(&sim, "seed 1, 60 y");
 }
 
 #[test]

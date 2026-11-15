@@ -2,6 +2,7 @@
 //! tree to a PNG, without any graphics dependency. For eyeballing the model.
 //!
 //! cargo run -p dendro-core --release --example snapshot -- --years 60 --doy 200 --out tree.png
+//!     [--seed N] [--no-leaves] [--no-roots] [--side] [--genome FILE.ron]
 
 use dendro_core::{Genome, MeshData, Simulation};
 
@@ -10,6 +11,10 @@ fn main() {
     let mut seed = 42u64;
     let mut doy = 200u32;
     let mut out = String::from("tree.png");
+    let mut leaves_on = true;
+    let mut roots_on = true;
+    let mut side_only = false;
+    let mut genome = Genome::quercus_robur();
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -17,10 +22,17 @@ fn main() {
             "--seed" => seed = args.next().unwrap().parse().unwrap(),
             "--doy" => doy = args.next().unwrap().parse().unwrap(),
             "--out" => out = args.next().unwrap(),
+            "--no-leaves" => leaves_on = false,
+            "--no-roots" => roots_on = false,
+            "--side" => side_only = true,
+            "--genome" => {
+                let path = args.next().unwrap();
+                genome = Genome::from_ron(&std::fs::read_to_string(&path).expect("read genome")).expect("parse genome");
+            }
             other => panic!("unknown argument {other}"),
         }
     }
-    let mut sim = Simulation::new(Genome::quercus_robur(), seed);
+    let mut sim = Simulation::new(genome.clone(), seed);
     sim.advance_days(years * 365 + doy);
     let wood = sim.wood_mesh();
     let leaves = sim.leaf_mesh();
@@ -37,10 +49,15 @@ fn main() {
     );
     let mut all = MeshData::default();
     all.append(&wood);
-    all.append(&leaves);
-    all.append(&roots);
+    if leaves_on {
+        all.append(&leaves);
+    }
+    if roots_on {
+        all.append(&roots);
+    }
 
-    let (w, h) = (1400usize, 800usize);
+    // Two panels (side + top), or one large side view with --side.
+    let (w, h) = if side_only { (3200usize, 1600usize) } else { (1400usize, 800usize) };
     let mut img = vec![[235u8, 240, 245]; w * h];
     let mut zbuf = vec![f32::MAX; w * h];
     // Extents.
@@ -52,18 +69,19 @@ fn main() {
         maxy = maxy.max(p[1]);
     }
     let span = (maxx - minx).max(maxy - miny).max(0.5) * 1.05;
-    let scale = (h as f32) / span;
+    let panel = if side_only { w } else { w / 2 };
+    let scale = (h.min(panel) as f32) / span;
     let cx = (minx + maxx) * 0.5;
     let cy = (miny + maxy) * 0.5;
     let light = norm([0.4, 0.8, 0.45]);
     // Ground line (side view).
     let gy = (h as f32 * 0.5 - (0.0 - cy) * scale) as usize;
     if gy < h {
-        for x in 0..w / 2 {
+        for x in 0..panel {
             img[gy * w + x] = [120, 100, 80];
         }
     }
-    for view in 0..2 {
+    for view in 0..if side_only { 1 } else { 2 } {
         let x_off = if view == 0 { 0.0 } else { (w / 2) as f32 };
         for t in all.indices.as_chunks::<3>().0 {
             let mut pts = [[0.0f32; 3]; 3];
@@ -71,10 +89,10 @@ fn main() {
                 let p = all.positions[t[k] as usize];
                 pts[k] = if view == 0 {
                     // side: x right, y up, depth z
-                    [x_off + (w / 4) as f32 + (p[0] - cx) * scale, h as f32 * 0.5 - (p[1] - cy) * scale, p[2]]
+                    [x_off + (panel / 2) as f32 + (p[0] - cx) * scale, h as f32 * 0.5 - (p[1] - cy) * scale, p[2]]
                 } else {
                     // top: x right, z down, depth -y
-                    [x_off + (w / 4) as f32 + (p[0] - cx) * scale, h as f32 * 0.5 + (p[2]) * scale, -p[1]]
+                    [x_off + (panel / 2) as f32 + (p[0] - cx) * scale, h as f32 * 0.5 + (p[2]) * scale, -p[1]]
                 };
             }
             let n = all.normals[t[0] as usize];
@@ -85,7 +103,7 @@ fn main() {
                 (c[1] * lam * 255.0).min(255.0) as u8,
                 (c[2] * lam * 255.0).min(255.0) as u8,
             ];
-            raster(&mut img, &mut zbuf, w, h, &pts, col, view, x_off);
+            raster(&mut img, &mut zbuf, w, h, &pts, col, panel, x_off);
         }
     }
     write_png(&out, w, h, &img);
@@ -98,9 +116,9 @@ fn norm(v: [f32; 3]) -> [f32; 3] {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn raster(img: &mut [[u8; 3]], zb: &mut [f32], w: usize, h: usize, p: &[[f32; 3]; 3], col: [u8; 3], view: usize, x_off: f32) {
+fn raster(img: &mut [[u8; 3]], zb: &mut [f32], w: usize, h: usize, p: &[[f32; 3]; 3], col: [u8; 3], panel: usize, x_off: f32) {
     let x_lo = x_off.max(0.0);
-    let x_hi = (x_off + (w / 2) as f32).min(w as f32) - 1.0;
+    let x_hi = (x_off + panel as f32).min(w as f32) - 1.0;
     let minx = p.iter().map(|q| q[0]).fold(f32::MAX, f32::min).floor().max(x_lo) as i32;
     let maxx = p.iter().map(|q| q[0]).fold(f32::MIN, f32::max).ceil().min(x_hi) as i32;
     let miny = p.iter().map(|q| q[1]).fold(f32::MAX, f32::min).floor().max(0.0) as i32;
@@ -118,7 +136,6 @@ fn raster(img: &mut [[u8; 3]], zb: &mut [f32], w: usize, h: usize, p: &[[f32; 3]
         }
         return;
     }
-    let _ = view;
     for y in miny..=maxy {
         for x in minx..=maxx {
             let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);

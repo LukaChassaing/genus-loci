@@ -103,4 +103,32 @@ impl TreeSim {
     fn get_ring_stress(&self) -> PackedFloat32Array {
         PackedFloat32Array::from(self.backend.ring_stress().as_slice())
     }
+    #[func]
+    fn get_ring_earlywood_fraction(&self) -> PackedFloat32Array {
+        PackedFloat32Array::from(self.backend.ring_earlywood_fraction().as_slice())
+    }
+    #[func]
+    fn get_ring_forced_drought(&self) -> PackedByteArray {
+        PackedByteArray::from(self.backend.ring_forced_drought().as_slice())
+    }
+    #[func]
+    fn get_root_spread_m(&self) -> f64 {
+        self.backend.root_spread_m()
+    }
+    #[func]
+    fn get_leaf_density(&self) -> f64 {
+        self.backend.leaf_density()
+    }
+    #[func]
+    fn get_wood_version(&self) -> i64 {
+        self.backend.wood_version()
+    }
+    #[func]
+    fn get_leaf_version(&self) -> i64 {
+        self.backend.leaf_version()
+    }
+    #[func]
+    fn get_root_version(&self) -> i64 {
+        self.backend.root_version()
+    }
 }

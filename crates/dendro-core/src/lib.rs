@@ -40,4 +40,4 @@ pub use genome::{
 pub use mesh::MeshData;
 pub use phenology::{Phase, Season};
 pub use rings::Ring;
-pub use sim::{Simulation, TreeStats, DAYS_PER_YEAR, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
+pub use sim::{ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};

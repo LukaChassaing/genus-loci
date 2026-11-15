@@ -14,7 +14,7 @@
 use crate::climate::{Climate, ClimateParams, SoilWater, Weather};
 use crate::genome::Genome;
 use crate::growth::ShootSystem;
-use crate::mesh::{self, LeafCluster, MeshData, TubeSeg};
+use crate::mesh::{self, LeafCluster, MeshData, TubeSeg, TubeStyle};
 use crate::phenology::{self, PhenoEvent, Phase, Phenology, Season};
 use crate::rings::{self, Ring};
 use crate::rng::{self, S_LEAF};
@@ -48,6 +48,23 @@ pub struct TreeStats {
     pub shoot_nodes: usize,
     pub leafy_shoots: usize,
     pub root_nodes: usize,
+}
+
+/// Crown architecture metrics (diagnostics and tests).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShapeMetrics {
+    /// Height (m) of the lowest living branch whose base diameter is at least
+    /// 10 % of the stem diameter where it leaves the stem (clear bole).
+    pub clear_bole_m: f32,
+    /// First-order limbs (leaving the stem, followed along its thickest
+    /// child) with a base diameter of at least 20 % of DBH.
+    pub scaffold_limbs: u32,
+    /// Largest limb/stem diameter ratio among those limbs (local stem).
+    pub max_limb_ratio: f32,
+    /// Mean limb/stem diameter ratio among those limbs.
+    pub mean_limb_ratio: f32,
+    /// Crown width (2 x mean sector radius) over height.
+    pub crown_width_to_height: f32,
 }
 
 /// A growing tree in its environment.
@@ -269,6 +286,7 @@ impl Simulation {
         let collar = self.shoots.thicken(w.growth_coefficient, factor, w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5);
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
+        self.shoots.sag(&self.genome);
         let early = self.pending_early_mm;
         let total = early + late;
         self.rings.push(Ring {
@@ -430,6 +448,19 @@ impl Simulation {
         }
     }
 
+    /// Crown architecture metrics.
+    pub fn shape_metrics(&self) -> ShapeMetrics {
+        let (clear_bole_m, scaffold_limbs, max_limb_ratio, mean_limb_ratio) =
+            self.shoots.shape_metrics(self.dbh_cm() * 0.01);
+        ShapeMetrics {
+            clear_bole_m,
+            scaffold_limbs,
+            max_limb_ratio,
+            mean_limb_ratio,
+            crown_width_to_height: 2.0 * self.crown_radius_m() / self.height_m().max(0.01),
+        }
+    }
+
     // ------------------------------------------------------------------
     // Meshes
     // ------------------------------------------------------------------
@@ -438,13 +469,46 @@ impl Simulation {
     pub fn wood_mesh(&self) -> MeshData {
         let year = self.year();
         let ext = self.shoots.ext;
-        let segs: Vec<TubeSeg> = self
-            .shoots
-            .nodes
+        let nodes = &self.shoots.nodes;
+        // The mesh axis follows the terminal child, unless a lateral has
+        // clearly overtaken it (a fork or a relay), in which case it follows
+        // the thickest child so radii never drop abruptly along a tube.
+        // (Following the thickest child blindly would hop between near-equal
+        // siblings and draw zigzags.)
+        let mut thickest = vec![u32::MAX; nodes.len()];
+        let mut term = vec![u32::MAX; nodes.len()];
+        for (i, n) in nodes.iter().enumerate().skip(1) {
+            let p = n.parent as usize;
+            let t = thickest[p];
+            if t == u32::MAX || n.area > nodes[t as usize].area {
+                thickest[p] = i as u32;
+            }
+            if n.terminal {
+                term[p] = i as u32;
+            }
+        }
+        for p in 0..nodes.len() {
+            let (t, k) = (term[p], thickest[p]);
+            if t != u32::MAX && k != u32::MAX && nodes[k as usize].area < 1.5 * nodes[t as usize].area {
+                thickest[p] = t;
+            }
+        }
+        let a_ref = nodes[0].area.max(1e-12);
+        let r_ref = nodes[0].radius();
+        let inv_e = 1.0 / self.genome.wood.pipe_exponent.max(1.0);
+        let segs: Vec<TubeSeg> = nodes
             .iter()
-            .map(|n| {
+            .enumerate()
+            .map(|(i, n)| {
                 let age = year.saturating_sub(n.birth_year) as f32;
-                let r = n.radius();
+                // Rendered radius: da Vinci / pipe rule with the species
+                // exponent, anchored at the collar. The simulated areas follow
+                // Pressler's law, i.e. an exponent of exactly 2; measured
+                // branching exponents are ~2-3 (e.g. Eloy 2011), so with
+                // e > 2 the limbs and branches are drawn proportionally
+                // thicker relative to the stem. Mesh only: DBH and rings
+                // use the simulated areas.
+                let r = r_ref * (n.area / a_ref).max(0.0).powf(inv_e);
                 // Young shoots green-brown, then grey-brown bark, darker on old trunks.
                 let t = (age / 4.0).min(1.0);
                 let dark = (r / 0.4).min(1.0);
@@ -459,13 +523,20 @@ impl Simulation {
                     start: n.start,
                     end: n.end(ext),
                     radius: r,
-                    continues: n.terminal,
+                    continues: i > 0 && thickest[n.parent as usize] == i as u32,
                     color: col,
                     tip_taper: 0.5,
                 }
             })
             .collect();
-        mesh::build_tubes(&segs, WOOD_TRI_BUDGET, 0.0008)
+        let w = &self.genome.wood;
+        let style = TubeStyle {
+            collar_flare: w.collar_flare,
+            root_flare: w.root_flare,
+            root_flare_height: w.root_flare_height_radii * nodes[0].radius(),
+            buttress_lobes: w.buttress_lobes as u32,
+        };
+        mesh::build_tubes(&segs, WOOD_TRI_BUDGET, 0.0008, style)
     }
 
     /// Root system (below y = 0).
@@ -488,11 +559,19 @@ impl Simulation {
                 tip_taper: 0.3,
             })
             .collect();
-        mesh::build_tubes(&segs, ROOT_TRI_BUDGET, 0.0008)
+        mesh::build_tubes(&segs, ROOT_TRI_BUDGET, 0.0008, TubeStyle::default())
     }
 
     /// Leaf clusters with seasonal colour; empty in winter except for
     /// marcescent (dead, retained) leaves on young trees.
+    ///
+    /// Each leafy shoot unit carries several leaf-cluster "tufts", more of
+    /// them on well-lit (outer) shoots, scattered within about half a voxel
+    /// of the shoot tip with an outward bias, so foliage concentrates on the
+    /// crown shell and the shaded interior stays sparse. The card area per
+    /// shoot unit scales with the voxel face (`foliage_density`), so the
+    /// canopy reads as continuous at any tree size; the count is limited so
+    /// the whole canopy fits in `LEAF_TRI_BUDGET`.
     pub fn leaf_mesh(&self) -> MeshData {
         let phase = self.phen.phase;
         let dormant = phase == Phase::Dormant;
@@ -502,15 +581,32 @@ impl Simulation {
         let g = &self.genome;
         let ext = self.shoots.ext;
         let height = self.shoots.height().max(0.1);
+        let voxel = self.shoots.voxel;
         let leaf_len = g.leaf.length_cm * 0.01;
-        let base_size = (leaf_len * 2.2).max(self.shoots.voxel * 1.05);
         let size_factor = if dormant {
             0.8
         } else {
             (0.2 + 0.8 * self.phen.expansion) * (1.0 - 0.5 * self.phen.frost_damage)
         };
+        let leafy: Vec<&crate::growth::Node> = self.shoots.nodes.iter().filter(|n| n.leafy).collect();
+        if leafy.is_empty() {
+            return MeshData::default();
+        }
+        let mut center = crate::math::Vec3::ZERO;
+        for n in &leafy {
+            center += n.end(ext);
+        }
+        center = center * (1.0 / leafy.len() as f32);
+        center.x = 0.0;
+        center.z = 0.0;
+        let cards = mesh::CARDS_PER_CLUSTER;
+        let n_max = ((LEAF_TRI_BUDGET as f32 * 0.95) / (2.0 * cards as f32 * leafy.len() as f32)).floor().max(1.0) as usize;
+        let s_pref = leaf_len * g.leaf.cluster_size_leaves;
+        let s_min = leaf_len * 2.5;
+        let s_max = (voxel * 1.2).max(s_min);
+        let spread = (0.5 * voxel).max(leaf_len);
         let mut clusters = Vec::new();
-        for n in self.shoots.nodes.iter().filter(|n| n.leafy) {
+        for n in leafy {
             let key = rng::hash(self.seed, S_LEAF, n.id as u64, 0);
             let h1 = rng::unit(key);
             let h2 = rng::unit(rng::mix(key ^ 1));
@@ -527,32 +623,49 @@ impl Simulation {
                 if h1 < self.phen.fallen {
                     continue;
                 }
-                // Shaded leaves colour later; per-cluster variation.
+                // Shaded leaves colour later; per-shoot variation.
                 let c = (self.phen.colouring + 0.3 * (h2 - 0.5) + 0.15 * (n.light - 0.5)).clamp(0.0, 1.0);
                 let c = if self.phen.colouring > 0.0 { c } else { 0.0 };
-                let mut col = phenology::leaf_colour(&g.pigments, self.phen.expansion, c);
-                let v = 0.88 + 0.24 * h2 * (0.6 + 0.4 * n.light);
-                for x in col.iter_mut() {
-                    *x = (*x * v).min(1.0);
-                }
-                col
+                phenology::leaf_colour(&g.pigments, self.phen.expansion, c)
             };
-            let size = base_size * size_factor * (0.85 + 0.3 * h2);
-            clusters.push(LeafCluster { pos: end, dir: n.dir, size, color: [color[0], color[1], color[2], 1.0], key });
-            // Long shoots get a second cluster half-way.
+            // Card area of this shoot unit: more (and more clusters) where lit.
+            let lit = n.light.clamp(0.0, 1.0);
+            let area = g.leaf.foliage_density * voxel * voxel * (0.3 + 0.7 * lit);
+            let mut count = ((area / (cards as f32 * s_pref * s_pref)).round() as usize).clamp(1, n_max);
+            if dormant {
+                count = count.div_ceil(3);
+            }
+            let size = (area / (cards as f32 * count as f32)).sqrt().clamp(s_min, s_max) * size_factor;
+            let outward = (end - center).normalize_or(crate::math::Vec3::Y);
             let len = n.length * ext;
-            if len > 2.0 * size {
-                let mid = n.start + n.dir * (len * 0.5);
-                clusters.push(LeafCluster {
-                    pos: mid,
-                    dir: n.dir,
-                    size: size * 0.8,
-                    color: [color[0], color[1], color[2], 1.0],
-                    key: rng::mix(key ^ 7),
-                });
+            for k in 0..count {
+                let ck = rng::hash(self.seed, S_LEAF, n.id as u64, 1 + k as u64);
+                let u = |s: u64| rng::unit(rng::mix(ck ^ s));
+                let pos = if k == 0 {
+                    end
+                } else {
+                    // Tufts towards the tip of the unit and outward.
+                    let along = n.start + n.dir * (len * (1.0 - 0.6 * u(1) * u(1)));
+                    let rv = crate::math::Vec3::new(u(2) - 0.5, u(3) - 0.5, u(4) - 0.5) * 2.0;
+                    let off = (rv + outward * 0.7).normalize_or(outward) * (spread * u(5).sqrt());
+                    along + off
+                };
+                // Per-cluster brightness and slight hue variation; shaded
+                // clusters darker.
+                let v = (0.78 + 0.3 * u(6)) * (0.8 + 0.2 * lit);
+                let col = [
+                    (color[0] * v * (0.94 + 0.12 * u(7))).min(1.0),
+                    (color[1] * v).min(1.0),
+                    (color[2] * v * (0.85 + 0.3 * u(8))).min(1.0),
+                    1.0,
+                ];
+                let dir = (n.dir + outward * 0.6 + crate::math::Vec3::new(u(9) - 0.5, u(10) - 0.5, u(11) - 0.5))
+                    .normalize_or(n.dir);
+                clusters.push(LeafCluster { pos, dir, size: size * (0.8 + 0.4 * u(12)), color: col, key: ck });
             }
         }
         mesh::build_leaves(&clusters, LEAF_TRI_BUDGET)
     }
 
 }
+
