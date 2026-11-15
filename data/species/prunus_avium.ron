@@ -115,6 +115,18 @@
         // Rendering: lighter, less dense crown than the oak's.
         cluster_size_leaves: 3.0,
         foliage_density: 4.0,
+        // Leaves spaced along the shoot on long (2-5 cm) petioles, the
+        // blades hanging.
+        tip_bunching: 0.1,
+        petiole_ratio: 0.3,
+        leaf_droop: 0.7,
+        // Leaf rosettes on spurs (short shoots) along 2+ year wood fill the
+        // crown between the long shoots; a light-demanding pioneer, so they
+        // die out in shade.
+        spur_foliage: 5.0,
+        spur_max_radius_mm: 50.0,
+        spur_min_light: 0.08,
+        colour_spread: 0.5,
     ),
     pigments: (
         chlorophyll: 1.0,

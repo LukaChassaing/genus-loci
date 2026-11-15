@@ -62,13 +62,13 @@ func update_from(height_m: float) -> void:
 	if not shown:
 		return
 	var a: float = soil.face_azimuth(0) + 0.5
-	_standee.position = Vector3(sin(a), 0.0, cos(a)) * soil.radius * 0.62
+	_standee.position = Vector3(sin(a), 0.0, cos(a)) * soil.rim_radius(a) * 0.62
 	_overlay.queue_redraw()
 
 
 func ruler_base() -> Vector3:
 	var a: float = soil.face_azimuth(1) - 0.35
-	return Vector3(sin(a), 0.0, cos(a)) * soil.radius * 0.97
+	return Vector3(sin(a), 0.0, cos(a)) * soil.rim_radius(a) * 0.95
 
 
 ## Tick spacing (m) for the height scale: [minor, major (labelled)].
@@ -113,14 +113,14 @@ func draw_overlay(c: Control) -> void:
 	# --- Depth ticks on the cut faces (only on faces turned toward the camera, or in X-ray). ---
 	var step_d: float = 1.0 if soil.depth <= 6.0 else 2.0
 	for which: int in 2:
-		var a: float = soil.face_azimuth(which)
-		var rim: Vector3 = Vector3(sin(a), 0.0, cos(a)) * soil.radius
+		# On the cut face, above its deep part (the soil body tapers toward the rim).
+		var rim: Vector3 = soil.face_ruler(which)
 		var mid: Vector3 = rim * 0.5
 		if not soil.xray and soil.face_normal(which).dot(camera.global_position - mid) <= 0.0:
 			continue
 		var side: float = 1.0 if which == 0 else -1.0
 		var d: float = step_d
-		while d <= soil.depth - 0.3:
+		while d <= soil.face_ruler_depth(which) - 0.15:
 			var pt: Vector3 = rim + Vector3(0.0, -d, 0.0)
 			if not camera.is_position_behind(pt):
 				var p: Vector2 = _proj(pt)

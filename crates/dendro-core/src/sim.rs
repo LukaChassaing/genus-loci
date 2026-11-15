@@ -508,6 +508,19 @@ impl Simulation {
         self.roots.spread()
     }
 
+    /// Polar occupancy grid of the root system for a display envelope:
+    /// max root depth (m) per (azimuth sector, radial bin) out to `r_max`,
+    /// sector-major; 0 = no root. See [`crate::roots::RootSystem::envelope`].
+    pub fn root_envelope(&self, sectors: usize, bins: usize, r_max: f32) -> Vec<f32> {
+        self.roots.envelope(sectors, bins, r_max)
+    }
+
+    /// Root water uptake (= actual transpiration) of the last simulated day,
+    /// mm/day; per layer in [`Self::soil_layers`] (`uptake_mm`).
+    pub fn water_uptake_mm(&self) -> f32 {
+        self.soil.last.uptake
+    }
+
     /// Mean leaf colour of the canopy today (RGB 0..1).
     pub fn leaf_color(&self) -> [f32; 3] {
         if self.phen.phase == Phase::Dormant {
@@ -825,6 +838,7 @@ impl Simulation {
                     color: col,
                     // Dead limbs end in broken, blunt stubs.
                     tip_taper: if n.is_snag() { 0.85 } else { 0.5 },
+                    path0: 0.0,
                 }
             })
             .collect();
@@ -847,6 +861,7 @@ impl Simulation {
             lobe_count,
             twig_radius: 0.006,
             twig_min_len: (0.6 * self.shoots.voxel).max(0.25),
+            path_uv2: false,
         };
         mesh::build_tubes(&segs, WOOD_TRI_BUDGET, 0.0008, style)
     }
@@ -861,6 +876,7 @@ impl Simulation {
         // alone gives, merging into the buttresses. Mesh only.
         let k = self.genome.roots.rapid_taper.max(0.0);
         let r_max = 0.8 * self.shoots.nodes[0].radius();
+        let path = self.roots.path_starts();
         let segs: Vec<TubeSeg> = self
             .roots
             .nodes
@@ -877,10 +893,12 @@ impl Simulation {
                     continues: n.continues,
                     color: [0.47, 0.37, 0.27, 1.0],
                     tip_taper: 0.3,
+                    path0: path[i],
                 }
             })
             .collect();
-        mesh::build_tubes(&segs, ROOT_TRI_BUDGET, 0.0008, TubeStyle { smooth_min_radius: 0.01, ..Default::default() })
+        let style = TubeStyle { smooth_min_radius: 0.01, path_uv2: true, ..Default::default() };
+        mesh::build_tubes(&segs, ROOT_TRI_BUDGET, 0.0008, style)
     }
 
     /// Fine roots, drawn as sparse fibrous tufts (fans of thin rootlets) at
@@ -911,6 +929,7 @@ impl Simulation {
         let want = (FINE_ROOT_TRI_BUDGET / per_tuft) as f32;
         let mut segs: Vec<TubeSeg> = Vec::new();
         let col = [0.80, 0.71, 0.56, 0.5];
+        let path = self.roots.path_starts();
         for &(i, w) in &cand {
             let n = &self.roots.nodes[i];
             let key = rng::hash(self.seed, S_LEAF ^ 0xF1E, n.id as u64, 0);
@@ -931,45 +950,79 @@ impl Simulation {
                 tip.y = tip.y.min(-0.02);
                 let a = segs.len() as u32;
                 let r = 0.001 + 0.0008 * u(8);
-                segs.push(TubeSeg { parent: u32::MAX, start: e, end: mid, radius: r, continues: false, color: col, tip_taper: 0.3 });
-                segs.push(TubeSeg { parent: a, start: mid, end: tip, radius: r * 0.7, continues: true, color: col, tip_taper: 0.3 });
+                // Path coordinate continues from the parent root's end.
+                let path0 = path[i] + n.length;
+                segs.push(TubeSeg { parent: u32::MAX, start: e, end: mid, radius: r, continues: false, color: col, tip_taper: 0.3, path0 });
+                segs.push(TubeSeg { parent: a, start: mid, end: tip, radius: r * 0.7, continues: true, color: col, tip_taper: 0.3, path0 });
             }
         }
-        mesh::build_tubes(&segs, FINE_ROOT_TRI_BUDGET, 0.0, TubeStyle::default())
+        mesh::build_tubes(&segs, FINE_ROOT_TRI_BUDGET, 0.0, TubeStyle { path_uv2: true, ..Default::default() })
     }
 
     /// Leaf clusters with seasonal colour; empty in winter except for
     /// marcescent (dead, retained) leaves on young trees.
     ///
-    /// Each leafy shoot unit carries several leaf-cluster "tufts", more of
-    /// them on well-lit (outer) shoots, scattered within about half a voxel
-    /// of the shoot tip with an outward bias, so foliage concentrates on the
-    /// crown shell and the shaded interior stays sparse. The card area per
-    /// shoot unit scales with the voxel face (`foliage_density`), so the
-    /// canopy reads as continuous at any tree size; the count is limited so
-    /// the whole canopy fits in `LEAF_TRI_BUDGET`.
+    /// Two kinds of foliage (see the texture atlas in [`crate::mesh`]):
+    /// * **Leafy shoot units** (the current year's long shoots). Each carries
+    ///   one card cluster drawn as a leafy shoot along the unit (card size
+    ///   follows the shoot and leaf length, so a sapling shows single
+    ///   shoots, not tufts), plus, where the unit stands for a lumped twig
+    ///   spray (old trees, large voxels), extra "spray" clusters scattered
+    ///   over the unit's voxel. Card area per unit scales with the voxel
+    ///   face (`foliage_density`), at least one card per lumped annual
+    ///   shoot (`leaves_per_shoot` leaves each).
+    /// * **Short shoots and spurs** along older living wood up to
+    ///   `spur_max_radius_mm`, where light allows (`spur_min_light`):
+    ///   `spur_foliage` card area per metre of wood, so the limbs and the
+    ///   inner crown read as leafy instead of bare wire between the shoot
+    ///   tips.
+    ///
+    /// When the canopy exceeds [`LEAF_TRI_BUDGET`], the spur fill is
+    /// thinned first (leafy units keep at least 70 % of the budget), with
+    /// cards enlarged to keep the covered area. Autumn colouring starts
+    /// per cluster (`colour_spread`): sunlit clusters first, whole boughs
+    /// varying together, and the first to turn are the first to fall.
     pub fn leaf_mesh(&self) -> MeshData {
+        use crate::math::Vec3;
         let phase = self.phen.phase;
         let dormant = phase == Phase::Dormant;
         if dormant && self.marcescent <= 0.0 {
             return MeshData::default();
         }
         let g = &self.genome;
+        let lt = &g.leaf;
         let ext = self.shoots.ext;
         let height = self.shoots.height().max(0.1);
         let voxel = self.shoots.voxel;
-        let leaf_len = g.leaf.length_cm * 0.01;
+        let leaf_len = lt.length_cm * 0.01;
         let size_factor = if dormant {
             0.8
         } else {
             (0.2 + 0.8 * self.phen.expansion) * (1.0 - 0.5 * self.phen.frost_damage)
         };
         let nodes = &self.shoots.nodes;
-        let leafy: Vec<usize> = (0..nodes.len()).filter(|&i| nodes[i].leafy).collect();
+        let spur_r = lt.spur_max_radius_mm * 0.001;
+        let spur_on = lt.spur_foliage > 0.0 && !dormant;
+        // Light of a stretch of wood: its own voxel's, raised towards the
+        // mean light of the foliage it carries (a voxel cannot resolve
+        // that short shoots sit on the lit side of a limb).
+        let spur_light = |n: &crate::growth::Node| {
+            let carried = if n.leaf_n > 0.0 { n.leaf_q / n.leaf_n } else { n.light };
+            (0.5 * (n.light + carried)).max(n.light)
+        };
+        let mut leafy: Vec<usize> = Vec::new();
+        let mut spurs: Vec<usize> = Vec::new();
+        for (i, n) in nodes.iter().enumerate() {
+            if n.leafy {
+                leafy.push(i);
+            } else if spur_on && !n.is_snag() && spur_light(n) > lt.spur_min_light && n.radius() <= spur_r {
+                spurs.push(i);
+            }
+        }
         if leafy.is_empty() {
             return MeshData::default();
         }
-        let mut center = crate::math::Vec3::ZERO;
+        let mut center = Vec3::ZERO;
         for &i in &leafy {
             center += nodes[i].end(ext);
         }
@@ -987,88 +1040,191 @@ impl Simulation {
             let pb = bough[n.parent as usize];
             bough[i] = if pb != u32::MAX { pb } else if n.radius() < r_b { i as u32 } else { u32::MAX };
         }
-        let mut lobe_sum: std::collections::HashMap<u32, (crate::math::Vec3, u32)> = std::collections::HashMap::new();
+        // Per-bough foliage sums, indexed by the bough's node index.
+        let mut lobe_sum: Vec<(Vec3, u32)> = vec![(Vec3::ZERO, 0); nodes.len()];
         for &i in &leafy {
-            let e = lobe_sum.entry(bough[i]).or_insert((crate::math::Vec3::ZERO, 0));
-            e.0 += nodes[i].end(ext);
-            e.1 += 1;
+            if bough[i] != u32::MAX {
+                let e = &mut lobe_sum[bough[i] as usize];
+                e.0 += nodes[i].end(ext);
+                e.1 += 1;
+            }
         }
-        let lobe_center = |i: usize| -> crate::math::Vec3 {
-            match lobe_sum.get(&bough[i]) {
-                Some(&(sum, k)) if k >= 6 && bough[i] != u32::MAX => sum * (1.0 / k as f32),
-                _ => center,
+        let lobe_center = |i: usize| -> Vec3 {
+            match bough[i] {
+                u32::MAX => center,
+                b => match lobe_sum[b as usize] {
+                    (sum, k) if k >= 6 => sum * (1.0 / k as f32),
+                    _ => center,
+                },
             }
         };
-        let cards = mesh::CARDS_PER_CLUSTER;
-        let n_max = ((LEAF_TRI_BUDGET as f32 * 0.95) / (2.0 * cards as f32 * leafy.len() as f32)).floor().max(1.0) as usize;
-        let s_pref = leaf_len * g.leaf.cluster_size_leaves;
-        let s_min = leaf_len * 2.5;
-        let s_max = (voxel * 1.2).max(s_min);
+        let s_pref = leaf_len * lt.cluster_size_leaves;
+        let s_max = (voxel * 1.2).max(s_pref);
         let spread = (0.5 * voxel).max(leaf_len);
-        let mut clusters = Vec::with_capacity(LEAF_TRI_BUDGET / (2 * cards) + leafy.len());
-        for &li in &leafy {
+        let spur_spread = (0.3 * voxel).max(0.6 * leaf_len);
+        let unit = |i: usize, s: u64| rng::unit(rng::hash(self.seed, S_LEAF, nodes[i].id as u64, s));
+
+        // Pass 1: cards wanted per site.
+        let leafy_cards: Vec<(f32, f32)> = leafy
+            .iter()
+            .map(|&i| {
+                let n = &nodes[i];
+                let lit = n.light.clamp(0.0, 1.0);
+                // Shade shoots keep a fair share (shade leaves are larger and
+                // thinner, Niinemets 2010).
+                let area = lt.foliage_density * voxel * voxel * (0.55 + 0.45 * lit);
+                let want = (area / (s_pref * s_pref)).max(n.unit_years as f32).min(60.0);
+                // Small units: one shoot card sized by the shoot itself.
+                let size = if want <= 3.0 {
+                    (n.length + 1.5 * leaf_len).clamp(2.2 * leaf_len, s_pref)
+                } else {
+                    (area / want.round()).sqrt().clamp(0.8 * s_pref, s_max)
+                };
+                (want.round().max(1.0), size)
+            })
+            .collect();
+        let spur_cards: Vec<f32> = spurs
+            .iter()
+            .map(|&i| {
+                let n = &nodes[i];
+                let l = spur_light(n);
+                let x = ((l - lt.spur_min_light) / 0.2).clamp(0.0, 1.0);
+                let lf = x * x * (3.0 - 2.0 * x) * (0.6 + 0.4 * l.min(1.0));
+                let want = lt.spur_foliage * voxel * n.length * lf / (s_pref * s_pref);
+                // Stochastic rounding keeps the expected area.
+                (want.floor() + if want.fract() > unit(i, 0x5B) { 1.0 } else { 0.0 }).min(30.0)
+            })
+            .collect();
+        let want_l: f32 = leafy_cards.iter().map(|c| c.0).sum();
+        let want_s: f32 = spur_cards.iter().sum();
+        // Kept below the hard budget: mesh build time (old oak) and fill rate.
+        let budget = LEAF_TRI_BUDGET as f32 * 0.84 / 2.0;
+        let keep_l = ((budget - want_s).max(0.7 * budget) / want_l.max(1.0)).min(1.0);
+        let keep_s = ((budget - keep_l * want_l) / want_s.max(1.0)).clamp(0.0, 1.0);
+
+        // Per-cluster colour: autumn onset delay (sunlit first, boughs vary
+        // together), fall order, brightness. None = fallen / not shown.
+        let spread_c = lt.colour_spread.clamp(0.0, 0.9);
+        let colouring = self.phen.colouring;
+        let summer = phenology::leaf_colour(&g.pigments, self.phen.expansion, 0.0);
+        let cluster_colour = |i: usize, lit: f32, ck: u64, pos: Vec3, winter_share: f32| -> Option<[f32; 4]> {
+            let u = |s: u64| rng::unit(rng::mix(ck ^ s));
+            let (rgb, sen) = if dormant {
+                // Lower crown keeps its dead leaves more often.
+                let rel = pos.y / height;
+                if u(20) >= self.marcescent * (1.5 - rel) * winter_share {
+                    return None;
+                }
+                let v = 0.85 + 0.3 * u(21);
+                let b = phenology::MARCESCENT_BROWN;
+                ([b[0] * v, b[1] * v, b[2] * v], 0.0)
+            } else {
+                let hb = rng::unit(rng::mix(self.seed ^ (bough[i] as u64).wrapping_mul(0x9E37_79B9)));
+                let delay = spread_c * (0.45 * (1.0 - lit) + 0.35 * u(22) + 0.2 * hb).clamp(0.0, 1.0);
+                let rank = if spread_c > 0.0 { 0.6 * delay / spread_c + 0.4 * u(23) } else { u(23) };
+                if rank < self.phen.fallen {
+                    return None;
+                }
+                if colouring > 0.0 {
+                    let c = ((colouring - delay) / (1.0 - spread_c)).clamp(0.0, 1.0);
+                    (phenology::leaf_colour(&g.pigments, self.phen.expansion, c), c)
+                } else {
+                    (summer, 0.0)
+                }
+            };
+            // Per-cluster brightness and slight hue variation; shaded
+            // clusters darker.
+            let v = (0.78 + 0.3 * u(6)) * (0.8 + 0.2 * lit);
+            Some([
+                (rgb[0] * v * (0.94 + 0.12 * u(7))).min(1.0),
+                (rgb[1] * v).min(1.0),
+                (rgb[2] * v * (0.85 + 0.3 * u(8))).min(1.0),
+                sen,
+            ])
+        };
+        const SHOOT_TILE: [f32; 2] = [0.004, 0.496];
+        const SPRAY_TILE: [f32; 2] = [0.504, 0.996];
+
+        // Pass 2: clusters.
+        let cap = (budget / 2.5) as usize + leafy.len();
+        let mut clusters = Vec::with_capacity(cap);
+        for (&li, &(want, size0)) in leafy.iter().zip(&leafy_cards) {
             let n = &nodes[li];
             let lc = lobe_center(li);
-            let key = rng::hash(self.seed, S_LEAF, n.id as u64, 0);
-            let h1 = rng::unit(key);
-            let h2 = rng::unit(rng::mix(key ^ 1));
-            let end = n.end(ext);
-            let color = if dormant {
-                // Lower crown keeps its dead leaves more often.
-                let rel = end.y / height;
-                if h1 >= self.marcescent * (1.5 - rel) {
-                    continue;
-                }
-                let v = 0.85 + 0.3 * h2;
-                [phenology::MARCESCENT_BROWN[0] * v, phenology::MARCESCENT_BROWN[1] * v, phenology::MARCESCENT_BROWN[2] * v]
-            } else {
-                if h1 < self.phen.fallen {
-                    continue;
-                }
-                // Shaded leaves colour later; per-shoot variation.
-                let c = (self.phen.colouring + 0.3 * (h2 - 0.5) + 0.15 * (n.light - 0.5)).clamp(0.0, 1.0);
-                let c = if self.phen.colouring > 0.0 { c } else { 0.0 };
-                phenology::leaf_colour(&g.pigments, self.phen.expansion, c)
-            };
-            // Card area of this shoot unit: more (and more clusters) where
-            // lit, but shade shoots keep a fair share (shade leaves are
-            // larger and thinner, Niinemets 2010), so the inner and lower
-            // crown read as foliage, not bare wire.
             let lit = n.light.clamp(0.0, 1.0);
-            let area = g.leaf.foliage_density * voxel * voxel * (0.55 + 0.45 * lit);
-            let mut count = ((area / (cards as f32 * s_pref * s_pref)).round() as usize).clamp(1, n_max);
-            if dormant {
-                count = count.div_ceil(3);
-            }
-            let size = (area / (cards as f32 * count as f32)).sqrt().clamp(s_min, s_max) * size_factor;
-            let crown_out = (end - center).normalize_or(crate::math::Vec3::Y);
+            // Thin a unit's cards, never the unit itself; enlarge the rest.
+            let kept = if keep_l < 1.0 {
+                let x = want * keep_l;
+                (x.floor() + if x.fract() > unit(li, 0x6B) { 1.0 } else { 0.0 }).max(1.0)
+            } else {
+                want
+            };
+            let size = size0 * (want / kept).sqrt().min(1.6) * size_factor;
+            let end = n.end(ext);
+            let crown_out = (end - center).normalize_or(Vec3::Y);
             let lobe_out = (end - lc).normalize_or(crown_out);
             let outward = (lobe_out * 0.6 + crown_out * 0.4).normalize_or(crown_out);
-            let len = n.length * ext;
-            for k in 0..count {
-                let ck = rng::hash(self.seed, S_LEAF, n.id as u64, 1 + k as u64);
+            let len = (end - n.start).length();
+            let mut left = kept as usize;
+            let mut k = 0u64;
+            while left > 0 {
+                let ck = rng::hash(self.seed, S_LEAF, n.id as u64, 1 + k);
                 let u = |s: u64| rng::unit(rng::mix(ck ^ s));
-                let pos = if k == 0 {
-                    end
+                let rv = Vec3::new(u(9) - 0.5, u(10) - 0.5, u(11) - 0.5);
+                let (pos, dir, cards, anchor, tile, s) = if k == 0 {
+                    // The shoot itself: card base on the shoot, tip beyond it.
+                    let dir = (n.dir + outward * 0.25 + rv * 0.3).normalize_or(n.dir);
+                    let s = size.min(s_max);
+                    let pos = end - dir * len.min(0.55 * s);
+                    (pos, dir, if dormant { 3 } else { left.clamp(2, 3) }, 0.08, SHOOT_TILE, s)
                 } else {
-                    // Tufts towards the tip of the unit and outward.
-                    let along = n.start + n.dir * (len * (1.0 - 0.6 * u(1) * u(1)));
-                    let rv = crate::math::Vec3::new(u(2) - 0.5, u(3) - 0.5, u(4) - 0.5) * 2.0;
-                    let off = (rv + outward * 0.7).normalize_or(outward) * (spread * u(5).sqrt());
-                    along + off
+                    // Lumped twigs: sprays over the unit's voxel, towards
+                    // the tip and outward.
+                    let along = n.start + n.dir * (len * (1.0 - 0.75 * u(1) * u(1)));
+                    let rv2 = Vec3::new(u(2) - 0.5, u(3) - 0.5, u(4) - 0.5) * 2.0;
+                    let off = (rv2 + outward * 0.7).normalize_or(outward) * (spread * u(5).sqrt());
+                    let dir = (n.dir + outward * 0.6 + rv).normalize_or(n.dir);
+                    (along + off, dir, left.min(3), 0.3, SPRAY_TILE, size * (0.8 + 0.4 * u(12)))
                 };
-                // Per-cluster brightness and slight hue variation; shaded
-                // clusters darker.
-                let v = (0.78 + 0.3 * u(6)) * (0.8 + 0.2 * lit);
-                let col = [
-                    (color[0] * v * (0.94 + 0.12 * u(7))).min(1.0),
-                    (color[1] * v).min(1.0),
-                    (color[2] * v * (0.85 + 0.3 * u(8))).min(1.0),
-                    1.0,
-                ];
-                let dir = (n.dir + outward * 0.6 + crate::math::Vec3::new(u(9) - 0.5, u(10) - 0.5, u(11) - 0.5))
-                    .normalize_or(n.dir);
-                clusters.push(LeafCluster { pos, dir, size: size * (0.8 + 0.4 * u(12)), color: col, key: ck, center: lc });
+                left = left.saturating_sub(cards);
+                k += 1;
+                let Some(color) = cluster_colour(li, lit, ck, pos, if k == 1 { 1.0 } else { 0.33 }) else { continue };
+                clusters.push(LeafCluster { pos, dir, size: s, color, key: ck, center: lc, cards: cards as u8, anchor, tile });
+            }
+        }
+        let spur_scale = (1.0 / keep_s.max(1e-3)).sqrt().min(1.4);
+        for (&si, &want) in spurs.iter().zip(&spur_cards) {
+            if want <= 0.0 || keep_s <= 0.0 {
+                continue;
+            }
+            let n = &nodes[si];
+            let lc = lobe_center(si);
+            let lit = spur_light(n).clamp(0.0, 1.0);
+            let start = n.start;
+            let end = n.end(ext);
+            let len = (end - start).length();
+            let crown_out = (end - center).normalize_or(Vec3::Y);
+            let lobe_out = (end - lc).normalize_or(crown_out);
+            let outward = (lobe_out * 0.6 + crown_out * 0.4).normalize_or(crown_out);
+            let mut left = want as usize;
+            let mut k = 0u64;
+            while left > 0 {
+                let cards = left.min(3);
+                left -= cards;
+                let ck = rng::hash(self.seed, S_LEAF ^ 0x5B0, n.id as u64, k);
+                k += 1;
+                let u = |s: u64| rng::unit(rng::mix(ck ^ s));
+                if keep_s < 1.0 && u(30) >= keep_s {
+                    continue;
+                }
+                let along = start + n.dir * (len * (0.1 + 0.9 * u(1)));
+                let rv = Vec3::new(u(2) - 0.5, u(3) - 0.5, u(4) - 0.5) * 2.0;
+                let off = (rv + outward * 0.5).normalize_or(outward) * (spur_spread * (0.3 + 0.7 * u(5).sqrt()));
+                let dir = (outward * 0.6 + rv * 0.5 + n.dir * 0.3 + Vec3::Y * 0.15).normalize_or(outward);
+                let pos = along + off;
+                let size = s_pref * (0.8 + 0.3 * u(12)) * spur_scale * size_factor;
+                let Some(color) = cluster_colour(si, lit, ck, pos, 0.33) else { continue };
+                clusters.push(LeafCluster { pos, dir, size, color, key: ck, center: lc, cards: cards as u8, anchor: 0.2, tile: SPRAY_TILE });
             }
         }
         mesh::build_leaves(&clusters, LEAF_TRI_BUDGET)
@@ -1158,14 +1314,14 @@ impl Simulation {
                 if fl_amount > 0.0 && u(7) < fl_open {
                     let dir = (n.dir + Vec3::new(u(8) - 0.5, u(9) - 0.5, u(10) - 0.5)).normalize_or(n.dir);
                     let col = [(fcol[0] * v).min(1.0), (fcol[1] * v).min(1.0), (fcol[2] * v).min(1.0), 1.0];
-                    clusters.push(LeafCluster { pos, dir, size: size * (0.8 + 0.4 * u(11)), color: col, key: ck, center });
+                    clusters.push(LeafCluster { pos, dir, size: size * (0.8 + 0.4 * u(11)), color: col, key: ck, center, cards: 3, anchor: 0.25, tile: [0.0, 1.0] });
                 }
                 // Fruits: the clusters that set fruit, hanging on pedicels.
                 if fr_amount > 0.0 && u(12) < set && u(13) < remaining {
                     let dir = (Vec3::new(0.0, -1.0, 0.0) + Vec3::new(u(14) - 0.5, u(15) - 0.5, u(16) - 0.5) * 0.8).normalize_or(-Vec3::Y);
                     let col = [(rcol[0] * v).min(1.0), (rcol[1] * v).min(1.0), (rcol[2] * v).min(1.0), 0.5];
                     let s = size * fruit_ratio * (0.4 + 0.6 * swell) * (0.8 + 0.4 * u(17));
-                    clusters.push(LeafCluster { pos, dir, size: s, color: col, key: ck ^ 0xF4E1, center });
+                    clusters.push(LeafCluster { pos, dir, size: s, color: col, key: ck ^ 0xF4E1, center, cards: 3, anchor: 0.25, tile: [0.0, 1.0] });
                 }
             }
         }

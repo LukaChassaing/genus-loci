@@ -192,13 +192,13 @@ func _arc_segments(r: float) -> int:
 
 
 func _draw() -> void:
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = UiStyle.font()
 	var area_h: float = size.y - TEXT_H
 	var c0: Vector2 = Vector2(size.x * 0.5, area_h * 0.5) + _pan
 	if _radii.size() == 0:
 		draw_circle(c0, 6.0, LATE_HEART)
 		draw_string(font, Vector2(0, size.y - 14), "Aucun cerne complet (moins d'un an)",
-			HORIZONTAL_ALIGNMENT_CENTER, size.x, 16, Color(0.9, 0.9, 0.9))
+			HORIZONTAL_ALIGNMENT_CENTER, size.x, 16, UiStyle.TEXT)
 		return
 	var g: Dictionary = _geometry()
 	var c: Vector2 = g["c"]
@@ -262,7 +262,7 @@ func _draw() -> void:
 	draw_circle(c, maxf(2.5, 0.5 * s), Color(0.30, 0.18, 0.09))
 	_draw_decade_labels(c, s, font, n)
 	# Hover highlight and info text.
-	draw_rect(Rect2(0.0, size.y - TEXT_H, size.x, TEXT_H), Color(0.08, 0.09, 0.11, 0.8))
+	draw_rect(Rect2(0.0, size.y - TEXT_H, size.x, TEXT_H), Color(UiStyle.PANEL.r * 0.6, UiStyle.PANEL.g * 0.6, UiStyle.PANEL.b * 0.6, 0.9))
 	if _hover >= 0:
 		var hr: float = _radii[_hover] * s
 		draw_arc(c, hr, 0.0, TAU, _arc_segments(hr), Color(1, 1, 1, 0.95), 2.0, true)
@@ -272,9 +272,9 @@ func _draw() -> void:
 		_draw_info(font, _hover)
 	else:
 		var hint: String = "%d cernes — survolez pour les détails" % n
-		draw_string(font, Vector2(0, size.y - 26), hint, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(0.85, 0.85, 0.85))
+		draw_string(font, Vector2(0, size.y - 26), hint, HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, UiStyle.TEXT_DIM)
 		draw_string(font, Vector2(0, size.y - 8), "Molette : zoom · glisser : déplacer · double-clic : recentrer"
-			if _zoom > 1.01 else "Molette : zoom", HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(0.7, 0.7, 0.7))
+			if _zoom > 1.01 else "Molette : zoom", HORIZONTAL_ALIGNMENT_CENTER, size.x, 13, UiStyle.TEXT_OFF.lightened(0.15))
 
 
 func _draw_vessels(c: Vector2, s: float, i: int) -> void:
@@ -325,13 +325,13 @@ func _draw_info(font: Font, i: int) -> void:
 	var st: float = _stress[i] if i < _stress.size() else 0.0
 	var forced: bool = i < _forced.size() and _forced[i] != 0
 	var line2: String = "Bois initial %d %% · bois final %d %%" % [roundi(_ef(i) * 100.0), roundi((1.0 - _ef(i)) * 100.0)]
-	var col2: Color = Color(0.85, 0.85, 0.85)
+	var col2: Color = UiStyle.TEXT_DIM
 	if forced:
 		line2 = "Année de sécheresse provoquée — stress hydrique %s" % _fmt(st, 2)
-		col2 = Color(1.0, 0.72, 0.5)
+		col2 = Color(1.0, 0.74, 0.45)
 	elif st > 0.25:
 		line2 = "Année sèche — stress hydrique %s" % _fmt(st, 2)
-		col2 = Color(1.0, 0.72, 0.5)
+		col2 = Color(1.0, 0.74, 0.45)
 	var heart: String = "aubier" if i >= _radii.size() - SAPWOOD_RINGS else "duramen"
-	draw_string(font, Vector2(0, size.y - 26), line1 + " · " + heart, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(1, 1, 1))
-	draw_string(font, Vector2(0, size.y - 8), line2, HORIZONTAL_ALIGNMENT_CENTER, size.x, 13, col2)
+	draw_string(font, Vector2(0, size.y - 26), line1 + " · " + heart, HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, UiStyle.TEXT)
+	draw_string(font, Vector2(0, size.y - 8), line2, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, col2)

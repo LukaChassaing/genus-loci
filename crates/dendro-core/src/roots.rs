@@ -419,6 +419,45 @@ impl RootSystem {
         (s_up / s_all.max(1e-6), t_up / t_all.max(1e-6))
     }
 
+    /// Path length (m) from the root collar to the start of each node,
+    /// along the root (`parent < index` for every node).
+    pub fn path_starts(&self) -> Vec<f32> {
+        let mut p = vec![0.0f32; self.nodes.len()];
+        for i in 1..self.nodes.len() {
+            let par = self.nodes[i].parent as usize;
+            p[i] = p[par] + self.nodes[par].length;
+        }
+        p
+    }
+
+    /// Space occupied by the root system, for a display envelope: the
+    /// maximum depth (m, positive, including the root radius) reached in
+    /// each cell of a polar grid of `sectors` azimuth sectors (sector k
+    /// covers world azimuth atan2(z, x) in [k, k+1) * 2pi/sectors) by `bins`
+    /// equal radial bins out to `r_max` (m); 0 = no root there. Segments
+    /// are sampled every ~10 % of a bin, so long segments mark every cell
+    /// they cross.
+    pub fn envelope(&self, sectors: usize, bins: usize, r_max: f32) -> Vec<f32> {
+        let (sectors, bins) = (sectors.max(1), bins.max(1));
+        let mut out = vec![0.0f32; sectors * bins];
+        let r_max = r_max.max(1e-3);
+        let step = 0.1 * r_max / bins as f32;
+        for n in &self.nodes {
+            let rad = n.radius();
+            let k = ((n.length / step).ceil() as usize).clamp(1, 64);
+            for s in 0..=k {
+                let p = n.start + n.dir * (n.length * s as f32 / k as f32);
+                let r = p.horizontal_len();
+                let az = p.z.atan2(p.x).rem_euclid(2.0 * PI);
+                let si = ((az / (2.0 * PI) * sectors as f32) as usize).min(sectors - 1);
+                let bi = ((r / r_max * bins as f32) as usize).min(bins - 1);
+                let c = &mut out[si * bins + bi];
+                *c = c.max(-p.y + rad);
+            }
+        }
+        out
+    }
+
     /// World azimuths (atan2(z, x)) of the `n` thickest first-order laterals.
     pub fn main_lateral_azimuths(&self, n: usize) -> Vec<f32> {
         let mut v: Vec<(f32, f32)> = self

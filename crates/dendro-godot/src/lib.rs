@@ -228,6 +228,13 @@ impl TreeSim {
     fn get_leaf_serration(&self) -> f32 {
         self.backend.leaf_serration()
     }
+    /// Leaf arrangement for the leaf texture: (leaves per shoot, tip
+    /// bunching 0..1, petiole / blade length ratio, droop 0..1).
+    #[func]
+    fn get_leaf_arrangement(&self) -> Vector4 {
+        let a = self.backend.leaf_arrangement();
+        Vector4::new(a[0], a[1], a[2], a[3])
+    }
     /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous oak).
     #[func]
     fn get_ring_contrast(&self) -> f32 {
@@ -252,6 +259,22 @@ impl TreeSim {
     #[func]
     fn get_root_spread_m(&self) -> f64 {
         self.backend.root_spread_m()
+    }
+    /// `[r_max, depth(sector 0, bin 0), ...]`: max root depth (m, 0 = none) on a polar grid of
+    /// `sectors` azimuth sectors (atan2(z, x), sector-major) x `bins` radial bins out to r_max.
+    #[func]
+    fn get_root_envelope(&self, sectors: i64, bins: i64) -> PackedFloat32Array {
+        PackedFloat32Array::from(self.backend.root_envelope(sectors.clamp(1, 256) as usize, bins.clamp(1, 256) as usize).as_slice())
+    }
+    /// Root water uptake (= transpiration) of the last simulated day, mm/day.
+    #[func]
+    fn get_water_uptake_mm(&self) -> f64 {
+        self.backend.water_uptake_mm()
+    }
+    /// Triplets per soil layer, top down: bottom depth (m), uptake (mm/day), root density 0..1.
+    #[func]
+    fn get_uptake_profile(&self) -> PackedFloat32Array {
+        PackedFloat32Array::from(self.backend.uptake_profile().as_slice())
     }
     #[func]
     fn get_leaf_density(&self) -> f64 {

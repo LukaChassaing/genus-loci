@@ -126,12 +126,23 @@
         // Young oaks often keep dead brown leaves on lower branches in winter.
         marcescence: 0.5,
         marcescence_max_age_years: 30.0,
-        // Informational for now (leaf cards are clusters).
+        // ~5-9 leaves per annual shoot, crowded at its tip (the terminal
+        // bud cluster), on very short petioles, held forward.
         leaves_per_shoot: 7.0,
-        // Rendering: oak leaves bunch at shoot tips into dense tufts of
-        // ~10-20 leaves (cards ~4 leaf lengths); dense, heavy crown.
+        // Rendering: oak leaves bunch at shoot tips into dense tufts;
+        // dense, heavy crown.
         cluster_size_leaves: 3.0,
         foliage_density: 5.0,
+        tip_bunching: 0.75,
+        petiole_ratio: 0.06,
+        leaf_droop: 0.15,
+        // Short shoots (brachyblasts) and epicormic twigs keep the inner
+        // crown and the limbs leafy (oak is moderately shade tolerant).
+        spur_foliage: 4.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        // Oak turns slowly and patchily over about a month.
+        colour_spread: 0.55,
     ),
     pigments: (
         chlorophyll: 1.0,

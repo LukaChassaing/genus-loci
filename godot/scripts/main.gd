@@ -15,7 +15,7 @@ var wood_mi: MeshInstance3D
 var leaf_mi: MeshInstance3D
 var flower_mi: MeshInstance3D
 var flower_mat: ShaderMaterial
-var leaf_mat: StandardMaterial3D
+var leaf_mat: ShaderMaterial
 var _tex_cache: Dictionary = {}   # species look key -> {leaf, bark}
 var _oak_bark: Array[ImageTexture] = []
 var _oak_leaf: ImageTexture
@@ -29,6 +29,7 @@ var leaf_fall: GPUParticles3D
 var leaf_fall_mat: StandardMaterial3D
 var bark_mat: StandardMaterial3D
 var root_mat: ShaderMaterial
+var flux: RootFlux               # root material + water / nutrient flux (dashes, motes)
 var _last_water_q: int = -1
 # Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
 var _stats_dirty: bool = true
@@ -48,6 +49,9 @@ var _rr: int = 0
 var proc_ms_sum: float = 0.0   # own _process() cost (sim + rebuild + HUD), for the bench
 var proc_ms_max: float = 0.0
 var rebuild_counts: Array[int] = [0, 0, 0, 0]  # wood, leaf, root, flower (stats / self-test)
+var envelope_ms: float = 0.0   # time spent turning the root envelope into the soil goal (bench)
+var _envelope_pending: bool = false
+var _envelope_age: float = 10.0
 
 var playing: bool = true
 var speed_dps: float = 30.0
@@ -70,7 +74,21 @@ func _ready() -> void:
 	var species_env: String = OS.get_environment("DENDRO_SPECIES")
 	if species_env != "":
 		sim.set_species(int(species_env))
+	# Arboretum choice from the title screen (the DENDRO_* variables above take precedence).
+	var cfg: Dictionary = Game.take_pending()
+	var start_days: float = 0.0
+	if not cfg.is_empty():
+		if seed_env == "" and int(cfg["seed"]) >= 0:
+			seed_value = int(cfg["seed"])
+		if soil_env == "":
+			sim.set_soil(int(cfg["soil"]))
+		if species_env == "":
+			sim.set_species(int(cfg["species"]))
+		if int(cfg["years"]) > 0:
+			start_days = float(cfg["years"]) * 365.0 + 100.0  # start in spring of that year
 	sim.reset(seed_value)
+	if start_days > 0.0:
+		_advance_days_direct(start_days)
 	_apply_window_overrides()
 	_build_environment()
 	_build_ground()
@@ -90,13 +108,14 @@ func _ready() -> void:
 	hud.select_species(sim.get_species())
 	hud.species_selected.connect(_on_species_selected)
 	_apply_species_look()
-	hud.xray_toggled.connect(_set_xray)
+	hud.soil_opacity_changed.connect(func(v: float) -> void: soil.set_opacity(v))
+	hud.flux_toggled.connect(func(on: bool) -> void: flux.set_enabled(on))
 	hud.guides_toggled.connect(func(on: bool) -> void: guides.set_shown(on))
 	guides.soil = soil
 	guides.cam = cam
 	cam.wedge_dir = soil.wedge_dir
 	hud.set_seed_text(seed_value)
-	_rebuild_meshes()
+	_rebuild_meshes(start_days > 0.0)
 	_settle_view()
 	hud.update_from(sim)
 	print("[dendro] TreeSim loaded: age=%.3f y, height=%.2f m, seed=%d" % [sim.get_age_years(), sim.get_height_m(), seed_value])
@@ -132,19 +151,23 @@ func _apply_species_look() -> void:
 	var lent: float = sim.get_bark_lenticels()
 	var lobes: int = sim.get_leaf_lobes()
 	var serr: float = sim.get_leaf_serration()
-	var key: String = "%d|%.2f|%.2f|%.2f|%.3f|%.3f" % [lobes, serr, fis, lent, sim.get_leaf_length_m(), sim.get_leaf_width_m()]
+	var arr: Vector4 = sim.get_leaf_arrangement()  # leaves per shoot, tip bunching, petiole ratio, droop
+	var key: String = "%d|%.2f|%.2f|%.2f|%.3f|%.3f|%s" % [lobes, serr, fis, lent, sim.get_leaf_length_m(),
+		sim.get_leaf_width_m(), arr]
 	if not _tex_cache.has(key):
 		var t0: int = Time.get_ticks_msec()
-		if lobes > 0 and absf(fis - 0.85) < 0.01 and lent < 0.01:
+		var oak_leaf_look: bool = lobes > 0 and arr.is_equal_approx(Vector4(7.0, 0.75, 0.06, 0.15))
+		if oak_leaf_look and absf(fis - 0.85) < 0.01 and lent < 0.01:
 			_tex_cache[key] = {"leaf": _oak_leaf, "bark": _oak_bark}  # the startup oak textures
 		else:
 			_tex_cache[key] = {
-			"leaf": ProcTextures.make_leaf_cluster_texture(lobes, serr, sim.get_leaf_length_m(), sim.get_leaf_width_m()),
+			"leaf": ProcTextures.make_leaf_cluster_texture(lobes, serr, sim.get_leaf_length_m(), sim.get_leaf_width_m(),
+				arr.x, arr.y, arr.z, arr.w),
 			"bark": ProcTextures.make_bark_textures(fis, lent),
 			}
 		print("[dendro] species textures generated in %d ms" % (Time.get_ticks_msec() - t0))
 	var entry: Dictionary = _tex_cache[key]
-	leaf_mat.albedo_texture = entry["leaf"]
+	leaf_mat.set_shader_parameter("leaf_tex", entry["leaf"])
 	var bt: Array[ImageTexture] = entry["bark"]
 	bark_mat.albedo_texture = bt[0]
 	bark_mat.normal_texture = bt[1]
@@ -233,13 +256,16 @@ func _build_tree_nodes() -> void:
 	flower_mi.material_override = flower_mat
 	flower_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(flower_mi)
+	flux = RootFlux.new(bark_tex)
+	add_child(flux)
 	root_mi = MeshInstance3D.new()
-	root_mat = ProcTextures.make_root_material(bark_tex)
+	root_mi.name = "Roots"
+	root_mat = flux.root_mat
 	root_mi.material_override = root_mat
 	add_child(root_mi)
 	fine_root_mi = MeshInstance3D.new()
-	fine_root_mat = ProcTextures.make_root_material(bark_tex)
-	fine_root_mat.set_shader_parameter("fine_style", 1.0)
+	fine_root_mi.name = "FineRoots"
+	fine_root_mat = flux.fine_root_mat
 	fine_root_mi.material_override = fine_root_mat
 	fine_root_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(fine_root_mi)
@@ -311,6 +337,8 @@ func _rebuild_meshes(force: bool = false) -> void:
 				root_mi.mesh = sim.build_root_mesh()
 				fine_root_mi.mesh = sim.build_fine_root_mesh()
 				_root_ver = vers[2]
+				_envelope_pending = true  # applied in _process, at most 4 times per second
+				flux.set_fine_roots(fine_root_mi.mesh)
 			_:
 				flower_mi.mesh = sim.build_flower_mesh()
 				_flower_ver = vers[3]
@@ -333,10 +361,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not k.pressed or k.echo:
 			return
 		match k.keycode:
+			KEY_ESCAPE:
+				_open_pause_menu(true)
 			KEY_SPACE:
 				hud.set_playing(not hud.is_playing())
 			KEY_X:
-				hud.xray_button.button_pressed = not hud.xray_button.button_pressed
+				hud.set_soil_opacity(SoilBlock.LOW_OPACITY if soil.opacity > 0.5 else 1.0)
 			KEY_G:
 				hud.guides_button.button_pressed = not hud.guides_button.button_pressed
 			KEY_F:
@@ -358,9 +388,13 @@ func _process(delta: float) -> void:
 	if since_rebuild >= REBUILD_INTERVAL / 3.0 and _versions_changed():
 		_rebuild_meshes()
 	_refresh_tree_stats()
-	soil.fit(tree_crown_r, tree_root_depth, delta)
+	_envelope_age += delta
+	if _envelope_pending and _envelope_age >= 0.25:
+		_update_soil_envelope()
+	soil.fit(delta)
 	_update_view_state(delta)
 	_frame_camera(delta)
+	flux.update(sim, delta, playing, cam.distance)
 	hud.update_from(sim)
 	guides.update_from(tree_h)
 	hud.set_legend_visible(soil.xray or cam.root_view)
@@ -388,15 +422,21 @@ func _frame_camera(_delta: float) -> void:
 func _settle_view() -> void:
 	_stats_dirty = true
 	_refresh_tree_stats()
-	soil.fit(tree_crown_r, tree_root_depth, 100.0)
+	_update_soil_envelope()
 	soil.snap()
+	flux.snap(sim)
 	_update_view_state(100.0)
 	_frame_camera(0.0)
 	cam.snap()
 
 
-func _set_xray(on: bool) -> void:
-	soil.set_xray(on)
+## The soil body follows the root system (TreeSim.get_root_envelope); called on each root rebuild.
+func _update_soil_envelope() -> void:
+	_envelope_pending = false
+	_envelope_age = 0.0
+	var t0: int = Time.get_ticks_usec()
+	soil.set_envelope(sim.get_root_envelope(SoilBlock.ENV_SECTORS, SoilBlock.ENV_BINS), sim.get_bedrock_depth_m())
+	envelope_ms += float(Time.get_ticks_usec() - t0) / 1000.0
 
 
 ## Everything that follows the simulation state but is not geometry: backdrop, light, bark age, root
@@ -514,7 +554,9 @@ func _simulate() -> void:
 #                         flowers = blossoms/fruit, also the fallback of leaves when the crown is bare)
 #   DENDRO_SEED=n         fixed random seed (weather and phenology vary a lot between seeds)
 #   DENDRO_YAW / DENDRO_PITCH   camera angles in degrees (override the preset)
-#   DENDRO_XRAY=1         X-ray soil;  DENDRO_GUIDES=1  scale references
+#   DENDRO_XRAY=1         see-through soil (opacity SoilBlock.LOW_OPACITY);  DENDRO_GUIDES=1  scale references
+#   DENDRO_SOIL_OPACITY=0..1  soil opacity;  DENDRO_FLUX=0|1  flux dashes / motes on the roots
+#   DENDRO_FLUX_T=0.25    extra flux phase (dashes travelled) for motion stills
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
 #   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
@@ -528,17 +570,29 @@ func _simulate() -> void:
 
 func _apply_window_overrides() -> void:
 	var vp: Viewport = get_viewport()
-	vp.msaa_3d = Viewport.MSAA_4X  # shipping default (see project.godot too)
+	vp.msaa_3d = Game.msaa_mode()  # user setting; the shipping 4x under automation hooks
 	var m: String = OS.get_environment("DENDRO_MSAA")
 	if m != "":
 		vp.msaa_3d = {"0": Viewport.MSAA_DISABLED, "2": Viewport.MSAA_2X, "4": Viewport.MSAA_4X}.get(m, Viewport.MSAA_4X)
 	# MSAA 4x (edges, alpha-to-coverage leaves) + FXAA (sub-pixel twigs that MSAA cannot resolve).
-	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if OS.get_environment("DENDRO_FXAA") == "0" else Viewport.SCREEN_SPACE_AA_FXAA
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if OS.get_environment("DENDRO_FXAA") == "0" else Game.fxaa_mode()
 	var sz: String = OS.get_environment("DENDRO_SIZE")
 	if sz != "" and DisplayServer.get_name() != "headless":
 		var p: PackedStringArray = sz.split("x")
 		if p.size() == 2:
 			get_window().size = Vector2i(int(p[0]), int(p[1]))
+
+
+## Pause overlay (Esc). `freeze` pauses the scene tree; the DENDRO_SCREEN=pause screenshot shows it unfrozen.
+func _open_pause_menu(freeze: bool) -> void:
+	if get_tree().paused or get_node_or_null("PauseMenu") != null:
+		return
+	var pm: PauseMenu = PauseMenu.new()
+	pm.name = "PauseMenu"
+	pm.species = sim.get_species()
+	add_child(pm)
+	if freeze:
+		get_tree().paused = true
 
 
 func _advance_days_direct(days: float) -> void:
@@ -575,6 +629,17 @@ func _screenshot_and_quit(path: String) -> void:
 	print("[dendro] view: h=%.1f crown_r=%.1f root_depth=%.1f spread=%.1f plug r=%.1f d=%.1f cam dist=%.1f target=%s" % [
 		sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m(),
 		soil.radius, soil.depth, cam.distance, str(cam.target)])
+	for mi: MeshInstance3D in [root_mi, fine_root_mi]:
+		if mi.mesh != null and mi.mesh.get_surface_count() > 0:
+			var out_n: int = 0
+			var worst: float = 0.0
+			var vs: PackedVector3Array = mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+			for p: Vector3 in vs:
+				var o: float = soil.outside(p)
+				if o > 0.02:
+					out_n += 1
+				worst = maxf(worst, o)
+			print("[dendro] %s: %d / %d vertices outside the soil body (worst %.2f m)" % [mi.name, out_n, vs.size(), worst])
 	if flower_mi.mesh != null and flower_mi.mesh.get_surface_count() > 0:
 		print("[dendro] flowers: verts=%d density=%.2f bloom=%.2f fruit=%.2f keep=%.2f" % [
 			(flower_mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size(), sim.get_flower_density(),
@@ -583,6 +648,8 @@ func _screenshot_and_quit(path: String) -> void:
 	if rz != "":
 		var rv: RingView = hud.get_ring_view()
 		rv._zoom_at(Vector2(rv.size.x * 0.5 + 40.0, (rv.size.y - RingView.TEXT_H) * 0.5 - 10.0), float(rz))
+	if OS.get_environment("DENDRO_SCREEN") == "pause":
+		_open_pause_menu(false)
 	for i: int in 12:
 		await get_tree().process_frame
 	if DisplayServer.get_name() == "headless":
@@ -597,7 +664,16 @@ func _screenshot_and_quit(path: String) -> void:
 
 func _apply_view_env() -> void:
 	if OS.get_environment("DENDRO_XRAY") == "1":
-		hud.xray_button.button_pressed = true
+		hud.set_soil_opacity(SoilBlock.LOW_OPACITY)
+	var so: String = OS.get_environment("DENDRO_SOIL_OPACITY")
+	if so != "":
+		hud.set_soil_opacity(float(so))
+	var fx: String = OS.get_environment("DENDRO_FLUX")
+	if fx != "":
+		hud.flux_button.button_pressed = fx != "0"
+	var ft: String = OS.get_environment("DENDRO_FLUX_T")
+	if ft != "":
+		flux.phase += float(ft)
 	if OS.get_environment("DENDRO_GUIDES") == "1":
 		hud.guides_button.button_pressed = true
 
@@ -686,6 +762,9 @@ func _run_bench(seconds: float, shot: String) -> void:
 	var gpu_sum: float = 0.0
 	var cpu_sum: float = 0.0
 	var counts0: Array[int] = rebuild_counts.duplicate()
+	envelope_ms = 0.0
+	soil.build_ms = 0.0
+	var soil_builds0: int = soil.rebuild_count
 	proc_ms_sum = 0.0
 	proc_ms_max = 0.0
 	while float(Time.get_ticks_usec() - t_start) / 1.0e6 < seconds:
@@ -706,6 +785,8 @@ func _run_bench(seconds: float, shot: String) -> void:
 	print("[dendro][bench] end age=%.1f y height=%.1f m rings=%d, mesh rebuilds (wood/leaf/root) = %d/%d/%d in %.1f s" % [
 		sim.get_age_years(), sim.get_height_m(), sim.get_ring_widths().size(),
 		rebuild_counts[0] - counts0[0], rebuild_counts[1] - counts0[1], rebuild_counts[2] - counts0[2], wall / 1000.0])
+	print("[dendro][bench] soil body: %d rebuilds, %.1f ms building, %.1f ms envelope processing (total over the run)" % [
+		soil.rebuild_count - soil_builds0, soil.build_ms, envelope_ms])
 	if shot != "" and DisplayServer.get_name() != "headless":
 		var img: Image = get_viewport().get_texture().get_image()
 		DirAccess.make_dir_recursive_absolute(shot.get_base_dir())
@@ -746,6 +827,29 @@ func _run_until_rings(count: int, max_days: int = 4000) -> void:
 	while sim.get_ring_widths().size() < count and d < max_days:
 		_run_days_ui(5.0)
 		d += 5
+
+
+## The shown soil body (snapped) contains every cell of the core's root envelope: rim beyond the farthest
+## root of each sector, underside below the deepest root at each distance.
+func _check_soil_encloses_roots(label: String) -> void:
+	var ns: int = SoilBlock.ENV_SECTORS
+	var nb: int = SoilBlock.ENV_BINS
+	var env: PackedFloat32Array = sim.get_root_envelope(ns, nb)
+	var bw: float = env[0] / nb
+	var worst: String = ""
+	for s: int in ns:
+		var a: float = PI * 0.5 - (float(s) + 0.5) / ns * TAU  # core sector centre -> soil azimuth
+		for b: int in nb:
+			var d: float = env[1 + s * nb + b]
+			if d <= 0.0:
+				continue
+			var r: float = (float(b) + 0.5) * bw
+			if soil.rim_radius(a) < r - 0.5 * bw:
+				worst = "rim %.2f < root at %.2f (sector %d)" % [soil.rim_radius(a), r, s]
+			elif soil.depth_at(r, a) < d - 0.03:
+				worst = "underside %.2f above root at %.2f m (r %.2f, sector %d)" % [soil.depth_at(r, a), d, r, s]
+	_check("soil body encloses the roots (%s)" % label, worst == "", worst + " r=%.1f d=%.1f spread=%.1f root depth=%.1f" % [
+		soil.radius, soil.depth, sim.get_root_spread_m(), sim.get_root_depth_m()])
 
 
 func _run_selftest() -> void:
@@ -797,7 +901,7 @@ func _run_selftest() -> void:
 	_check("new seed: rings cleared", sim.get_ring_widths().size() == 0)
 	_check("new seed: seed changed", seed_value != old_seed)
 	_check("new seed: drought released", not hud.drought_button.button_pressed)
-	_check("new seed: soil block reset", is_equal_approx(soil.depth, SoilBlock.MIN_DEPTH))
+	_check("new seed: soil body back to a seedling clod", soil.depth < 0.6 and soil.radius < 1.0, "r=%.2f d=%.2f" % [soil.radius, soil.depth])
 
 	# 4. Drought produces a narrower ring (same seed with / without forced drought in year 10).
 	_apply_seed(4242)
@@ -866,6 +970,7 @@ func _run_selftest() -> void:
 	# 7. Framing at default angles: crown + plug inside the free area, tree fills >= 55 % of its height.
 	hud.rings_button.button_pressed = false  # default layout (the ring panel narrows the free area)
 	await get_tree().process_frame
+	var lens_r: Array[float] = []
 	for years: int in [3, 40, 120, 200]:
 		_apply_seed(7)
 		_advance_days_direct(float(years) * 365.0 + 200.0)
@@ -876,7 +981,9 @@ func _run_selftest() -> void:
 		_settle_view()
 		var vsize: Vector2 = get_viewport().get_visible_rect().size
 		var free_raw: Rect2 = hud.free_rect(vsize)
-		var free: Rect2 = free_raw.grow(4.0)
+		# 4 px, or 2 % of the width: a wide root lens is width-bound, and its near rim points shift by ~2 % with
+		# the viewport offset the solver treats as centred.
+		var free: Rect2 = free_raw.grow(maxf(4.0, 0.02 * free_raw.size.x))
 		var camera: Camera3D = cam.get_camera()
 		var h: float = sim.get_height_m()
 		var cr: float = sim.get_crown_radius_m()
@@ -884,8 +991,12 @@ func _run_selftest() -> void:
 		var all_in: bool = true
 		var ymin_s: float = INF
 		var ymax_s: float = -INF
+		var xmin_s: float = INF
+		var xmax_s: float = -INF
 		for p: Vector3 in cam.framing_points(h, cr, soil.radius, soil.depth, soil.wedge_width):
 			var sp2: Vector2 = camera.unproject_position(p)
+			xmin_s = minf(xmin_s, sp2.x)
+			xmax_s = maxf(xmax_s, sp2.x)
 			ymin_s = minf(ymin_s, sp2.y)
 			ymax_s = maxf(ymax_s, sp2.y)
 			if not free.has_point(sp2):
@@ -895,24 +1006,36 @@ func _run_selftest() -> void:
 		var y_base: float = camera.unproject_position(Vector3.ZERO).y
 		var y_top: float = camera.unproject_position(Vector3(0.0, h, 0.0)).y
 		var frac: float = (y_base - y_top) / free_raw.size.y
-		_check("framing: tree fills >= 55 % of free height", frac >= 0.55, "age %d: %.0f %%" % [years, frac * 100.0])
-		# Plug follow rules (the camera/plug were just snapped to this tree).
-		_check("plug radius follows 1.25 x crown (min 2.5 m)", soil.radius >= maxf(1.25 * cr, 2.5) - 0.01, "r=%.2f crown=%.2f" % [soil.radius, cr])
-		_check("plug depth = root depth + margin (min 2 m)", soil.depth >= maxf(sim.get_root_depth_m() + 0.5, 2.0) - 0.01, "d=%.2f root=%.2f" % [soil.depth, sim.get_root_depth_m()])
-		_check("root clip uniform equals plug radius", is_equal_approx(root_mat.get_shader_parameter("clip_radius") as float, soil.radius),
+		# The soil body follows the root spread (2-3 x the crown): an old tree's lens is width-bound, then
+		# it must fill the free width instead.
+		var wfrac: float = (xmax_s - xmin_s) / free_raw.size.x
+		_check("framing: tree fills >= 55 % of free height (or the root lens >= 85 % of its width)", frac >= 0.55 or wfrac >= 0.85,
+			"age %d: height %.0f %%, lens width %.0f %%" % [years, frac * 100.0, wfrac * 100.0])
+		# Soil body follow rules (the camera/soil were just snapped to this tree).
+		_check_soil_encloses_roots("age %d" % years)
+		lens_r.append(soil.radius)
+		_check("root clip uniform equals soil radius", is_equal_approx(root_mat.get_shader_parameter("clip_radius") as float, soil.radius),
 			"%.3f vs %.3f" % [root_mat.get_shader_parameter("clip_radius") as float, soil.radius])
 		_check("root clip depth equals plug depth", is_equal_approx(root_mat.get_shader_parameter("clip_depth") as float, soil.depth))
-	# Plug never shrinks within one tree's life, nor eases below goals.
+	_check("soil body scales with the roots (3 y clod -> 200 y lens)", lens_r.size() == 4 and lens_r[3] > 4.0 * lens_r[0] and lens_r[2] > lens_r[1],
+		str(lens_r))
+	# Eases toward a new envelope, rebuilding only when it moved noticeably (no per-frame rebuild).
+	var builds0: int = soil.rebuild_count
+	for i: int in 10:
+		soil.fit(1.0 / 60.0)
+	_check("soil mesh not rebuilt while the envelope is unchanged", soil.rebuild_count == builds0)
 	_apply_seed(9)
-	_advance_days_direct(60.0 * 365.0)
-	soil.fit(sim.get_crown_radius_m(), sim.get_root_depth_m(), 10.0)
-	var r_big: float = soil.radius
-	var d_big: float = soil.depth
-	soil.fit(0.0, 0.0, 1.0)
-	soil.fit(0.0, 0.0, 100.0)
-	_check("plug never shrinks", soil.radius >= r_big and soil.depth >= d_big, "r %.2f -> %.2f, d %.2f -> %.2f" % [r_big, soil.radius, d_big, soil.depth])
+	_advance_days_direct(30.0 * 365.0)
+	var d_small: float = soil.depth
+	_update_soil_envelope()
+	var frames: int = 0
+	while not soil.settled() and frames < 900:
+		soil.fit(1.0 / 60.0)
+		frames += 1
+	_check("soil eases to the grown roots in a few seconds, with few rebuilds (final shape built)", soil.settled() and soil.depth > d_small
+		and soil.rebuild_count - builds0 <= 16, "%d frames, %d rebuilds, d %.2f -> %.2f" % [frames, soil.rebuild_count - builds0, d_small, soil.depth])
 	soil.reset()
-	_check("plug reset on new seed", is_equal_approx(soil.radius, SoilBlock.MIN_RADIUS) and is_equal_approx(soil.depth, SoilBlock.MIN_DEPTH))
+	_check("soil reset on new seed", soil.radius < 1.0 and soil.depth < 0.6)
 	_check("wedge opens 110 degrees", is_equal_approx(rad_to_deg(soil.wedge_width), 110.0))
 
 	# 8. Camera: free 360-degree orbit (no yaw limit), pitch below the horizon, screen-space pan, zoom.
@@ -962,23 +1085,54 @@ func _run_selftest() -> void:
 	cam.snap()
 	_check("camera position sane after re-frame", cam.get_camera().global_position.distance_to(cam_before) < 1.0)
 
-	# 9. Keys and buttons: X (X-ray), G (Repères), R (root view), F (re-frame) through the real input path.
-	var xray_text0: String = hud.xray_button.text
+	# 9. Keys and controls: X / "Sol" slider (soil opacity), "Flux", G (Repères), R (root view), F (re-frame)
+	#    through the real input path.
+	_check("soil opaque by default", is_equal_approx(hud.soil_slider.value, 1.0) and soil.opacity == 1.0 and not soil.xray)
 	_press_key(KEY_X)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check("key X: X-ray on", hud.xray_button.button_pressed and soil.xray, hud.xray_button.text)
-	_check("X-ray button label", hud.xray_button.text == "Sous-sol : transparence" and xray_text0 == "Sous-sol : coupe")
-	_check("legend shown in X-ray", hud.is_legend_visible())
+	_check("key X: soil see-through", soil.xray and is_equal_approx(soil.opacity, SoilBlock.LOW_OPACITY)
+		and is_equal_approx(hud.soil_slider.value, SoilBlock.LOW_OPACITY), "%.2f" % soil.opacity)
+	_check("legend shown when the soil is see-through", hud.is_legend_visible())
+	_check("see-through soil casts no shadow", soil._soil_mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 	_press_key(KEY_X)
 	await get_tree().process_frame
-	_check("key X: X-ray off", not hud.xray_button.button_pressed and not soil.xray)
-	hud.xray_button.button_pressed = true
+	_check("key X again: opaque", not soil.xray and soil.opacity == 1.0 and soil._soil_mi.material_override == soil._soil_mat)
+	hud.soil_slider.value = 0.5
 	await get_tree().process_frame
-	_check("X-ray button toggles the soil", soil.xray)
-	hud.xray_button.button_pressed = false
+	_check("Sol slider sets the opacity (dithered material)", is_equal_approx(soil.opacity, 0.5) and soil._soil_mi.material_override == soil._soil_dither_mat
+		and is_equal_approx(soil._soil_dither_mat.get_shader_parameter("opacity") as float, 0.5))
+	hud.soil_slider.value = 1.0
 	await get_tree().process_frame
 	_check("legend hidden again", not hud.is_legend_visible())
+	# Flux follows the uptake: none in winter dormancy, strong in July; the toggle hides it.
+	_apply_seed(5)
+	_advance_days_direct(40.0 * 365.0 + 15.0)
+	flux.snap(sim)
+	_check("flux: nothing in January", flux.level == 0.0 and sim.get_water_uptake_mm() == 0.0)
+	_advance_days_direct(185.0)
+	flux.snap(sim)
+	var july: float = flux.level
+	_check("flux: strong in July", july > 0.3, "level %.2f, uptake %.2f mm/day" % [july, sim.get_water_uptake_mm()])
+	var up: PackedFloat32Array = sim.get_uptake_profile()
+	_check("uptake profile: one triplet per soil layer", up.size() % 3 == 0 and up.size() >= 24)
+	_check("flux uniforms reach the root shader", is_equal_approx(root_mat.get_shader_parameter("flux_level") as float, july)
+		and (root_mat.get_shader_parameter("up_n") as int) > 0)
+	_rebuild_meshes(true)
+	var rm: ArrayMesh = root_mi.mesh as ArrayMesh
+	_check("root mesh carries the along-root coordinate (UV2)", rm != null and rm.get_surface_count() > 0
+		and (rm.surface_get_format(0) & Mesh.ARRAY_FORMAT_TEX_UV2) != 0)
+	var ph0: float = flux.phase
+	hud.set_playing(false)
+	for i: int in 3:
+		await get_tree().process_frame
+	_check("flux frozen while paused", is_equal_approx(flux.phase, ph0))
+	hud.flux_button.button_pressed = false
+	await get_tree().process_frame
+	_check("Flux button hides the flux", not flux.enabled and (root_mat.get_shader_parameter("flux_on") as float) == 0.0)
+	hud.flux_button.button_pressed = true
+	await get_tree().process_frame
+	_check("Flux button shows it again", flux.enabled and (fine_root_mat.get_shader_parameter("flux_on") as float) == 1.0)
 	_press_key(KEY_G)
 	await get_tree().process_frame
 	_check("key G: Repères on", hud.guides_button.button_pressed and guides.shown)
@@ -1015,6 +1169,16 @@ func _run_selftest() -> void:
 	sim.set_soil(1)
 	_apply_seed(seed_value)
 	_check("soil choice: shallow soil has rock, default has none", sim.get_bedrock_depth_m() > 0.0, "%.2f m" % sim.get_bedrock_depth_m())
+	_advance_days_direct(50.0 * 365.0 + 200.0)
+	_rebuild_meshes(true)
+	_settle_view()
+	var rock: float = sim.get_bedrock_depth_m() + SoilBlock.ROCK_SLAB
+	var flat: bool = true
+	for f: float in [0.0, 0.2, 0.5, 0.75]:
+		for a: float in [soil.wedge_dir + PI, soil.wedge_dir + PI * 0.6]:
+			flat = flat and absf(soil.depth_at(f * soil.rim_radius(a), a) - rock) < 0.02
+	_check("shallow soil: flat rock bottom under the bedrock surface", flat and soil.depth <= rock + 0.2, "rock %.2f m, depth %.2f" % [rock, soil.depth])
+	_check_soil_encloses_roots("shallow soil")
 	sim.set_soil(0)
 	_apply_seed(seed_value)
 	_check("soil choice: back to deep loam", sim.get_bedrock_depth_m() < 0.0 and sim.get_age_years() < 0.1)
@@ -1048,6 +1212,8 @@ func _run_selftest() -> void:
 	var oak_fl: ArrayMesh = sim.build_flower_mesh()
 	_check("oak: flower mesh empty", oak_fl.get_surface_count() == 0 or (oak_fl.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 0)
 	_check("oak bark look restored", bark_mat.roughness > 0.9 and bark_mat.albedo_texture == _oak_bark[0])
+
+	await UiSelftest.run(self, _check)  # shell screens: title, setup, plates, options, pause, settings, HUD fit
 
 	print("[selftest] %s (%d failure%s)" % ["ALL PASSED" if _failures == 0 else "FAILED", _failures, "" if _failures == 1 else "s"])
 	get_tree().quit(0 if _failures == 0 else 1)

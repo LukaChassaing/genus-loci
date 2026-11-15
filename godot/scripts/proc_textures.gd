@@ -6,68 +6,93 @@ const LEAF_SIZE: int = 256
 const BARK_SIZE: int = 256
 
 
-## Leaf cluster: ~11 overlapping lobed oak leaves (obovate, widest above the middle, sinuate rounded
-## lobes, short petiole) on a twig. Near-white/grey albedo (vertex colour drives hue); alpha = silhouette.
-## Card UV convention: v = 0 at the distal end, so the twig base is at the bottom of the image.
-## `lobes` > 0 gives the oak look; lobes == 0 gives unlobed ovate-acuminate leaves whose margin is
-## toothed by `serration` (wild cherry), hanging a little. `length_m` / `width_m` set the aspect ratio.
+## Leaf texture atlas (512 x 256, two square tiles; see the core's leaf mesh conventions):
+## * left tile: one leafy shoot - a twig rising from the bottom centre with `leaves` alternate leaves, evenly
+##   spaced (`bunching` 0) or crowded at the tip (`bunching` 1, oak), on petioles of `petiole` x the blade
+##   length, held forward (`droop` 0) or hanging back along the shoot (`droop` 1, cherry);
+## * right tile: a twig spray (a short branchlet with side twigs, same leaf arrangement) for lumped twigs,
+##   short shoots and spurs.
+## One card spans ~3 leaf lengths, so blades are ~0.3 of a tile. Near-white/grey albedo (vertex colour drives
+## the hue); alpha = silhouette. v = 0 at the distal end: twig bases are at the bottom of the image.
+## `lobes` > 0 gives lobed oak blades; lobes == 0 gives unlobed ovate-acuminate blades whose margin is toothed
+## by `serration` (wild cherry). `length_m` / `width_m` set the blade aspect ratio.
 static func make_leaf_cluster_texture(lobes: int = 10, serration: float = 0.0, length_m: float = 0.10,
-		width_m: float = 0.06) -> ImageTexture:
+		width_m: float = 0.06, leaves: float = 7.0, bunching: float = 0.75, petiole: float = 0.06,
+		droop: float = 0.15) -> ImageTexture:
 	var n: int = LEAF_SIZE
-	var cfg: Dictionary = {"lobed": lobes > 0, "serr": serration, "half_w": 0.34, "bend": 0.0, "veins": 5.0}
+	var cfg: Dictionary = {"lobed": lobes > 0, "serr": serration, "half_w": 0.34, "bend": 0.0, "veins": 5.0,
+		"pet": clampf(petiole, 0.02, 0.6)}
 	if lobes <= 0:
-		cfg["half_w"] = clampf(0.52 * width_m / maxf(length_m, 0.01), 0.18, 0.40)
-		cfg["bend"] = 0.22
+		cfg["half_w"] = clampf(0.6 * width_m / maxf(length_m, 0.01), 0.18, 0.40)
 		cfg["veins"] = 8.0
-	var data: PackedByteArray = PackedByteArray()
-	data.resize(n * n * 4)
-	# Background RGB = mid grey so mip-mapping does not bleed black into the silhouette edge.
-	for i: int in n * n:
-		data[i * 4] = 150
-		data[i * 4 + 1] = 150
-		data[i * 4 + 2] = 150
-		data[i * 4 + 3] = 0
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = 20240611
-	# Leaves: [origin x, origin y, angle from "up" (rad), length, shade]
-	var leaves: Array[Array] = []
-	var lobed: bool = lobes > 0
-	var n_side: int = 8 if lobed else 6
-	for k: int in n_side:
-		var y: float = lerpf(0.90, 0.52, float(k) / float(n_side - 1))
-		var side: float = 1.0 if k % 2 == 0 else -1.0
-		var a_deg: float = rng.randf_range(32.0, 78.0) if lobed else rng.randf_range(48.0, 92.0)
-		var ang: float = side * deg_to_rad(a_deg)
-		var tx: float = 0.5 + 0.03 * sin((0.95 - y) * 7.0)
-		var ln: float = rng.randf_range(0.30, 0.38) if lobed else rng.randf_range(0.36, 0.44)
-		leaves.append([tx, y, ang, ln, rng.randf_range(0.70, 0.95)])
-	var tip_angles: Array = [-0.5, 0.0, 0.5] if lobed else [-0.45, 0.45]
-	for a: float in tip_angles:
-		var ln2: float = rng.randf_range(0.38, 0.46) if lobed else rng.randf_range(0.44, 0.52)
-		leaves.append([0.5, 0.5, a + rng.randf_range(-0.1, 0.1), ln2, rng.randf_range(0.82, 1.0)])
-	leaves.shuffle()
-	# Twig (dark, thin) drawn first.
-	for yi: int in range(int(0.45 * n), n):
-		var y2: float = float(yi) / float(n)
-		var tx2: float = 0.5 + 0.03 * sin((0.95 - y2) * 7.0)
-		for xi: int in range(int((tx2 - 0.012) * n), int((tx2 + 0.012) * n) + 1):
-			var o: int = (yi * n + xi) * 4
-			data[o] = 96
-			data[o + 1] = 86
-			data[o + 2] = 74
-			data[o + 3] = 255
-	for lf: Array in leaves:
-		_paint_leaf(data, n, lf[0], lf[1], lf[2], lf[3], lf[4], cfg)
-	var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
+	cfg["bend"] = 0.25 * clampf(droop, 0.0, 1.0)
+	var atlas: Image = Image.create_empty(2 * n, n, false, Image.FORMAT_RGBA8)
+	for tile: int in 2:
+		var data: PackedByteArray = PackedByteArray()
+		data.resize(n * n * 4)
+		# Background RGB = mid grey so mip-mapping does not bleed black into the silhouette edge.
+		for i: int in n * n:
+			data[i * 4] = 150
+			data[i * 4 + 1] = 150
+			data[i * 4 + 2] = 150
+			data[i * 4 + 3] = 0
+		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+		rng.seed = 20240611 + tile
+		var nl: int = clampi(roundi(leaves), 3, 14)
+		var twig_col: Color = Color(0.40, 0.36, 0.30)
+		# Twigs: [base, tip, leaves, blade length, side bias]
+		var twigs: Array[Array] = []
+		if tile == 0:
+			twigs.append([Vector2(0.5, 1.0), Vector2(0.52, 0.40), nl, 0.31])
+		else:
+			# Branchlet with two side twigs (a lumped spray of short shoots).
+			twigs.append([Vector2(0.5, 1.0), Vector2(0.47, 0.42), maxi(nl - 2, 3), 0.27])
+			twigs.append([Vector2(0.49, 0.80), Vector2(0.20, 0.50), maxi(nl / 2 + 1, 3), 0.25])
+			twigs.append([Vector2(0.48, 0.66), Vector2(0.78, 0.40), maxi(nl / 2 + 1, 3), 0.25])
+		var blades: Array[Array] = []
+		for tw: Array in twigs:
+			var p0: Vector2 = tw[0]
+			var p1: Vector2 = tw[1]
+			_stalk(data, n, p0, p0.lerp(p1, 0.5) + Vector2(0.015, 0.0), p1, 0.0045, twig_col)
+			var axis: Vector2 = (p1 - p0).normalized()
+			var cnt: int = tw[2]
+			var bl: float = tw[3]
+			var side: float = 1.0 if rng.randf() < 0.5 else -1.0
+			for k: int in cnt:
+				var last: bool = k == cnt - 1
+				var even: float = (float(k) + 0.6) / float(cnt)
+				# Tip bunching: positions crowd towards the shoot tip.
+				var t: float = 1.0 if last else clampf(1.0 - pow(1.0 - even, 1.0 + 3.5 * bunching), 0.12, 0.97)
+				var at: Vector2 = p0.lerp(p1, t)
+				# Angle from the shoot axis: forward near the tip, wider (and hanging, with droop) lower down.
+				var a_deg: float = lerpf(30.0, 62.0, 1.0 - t) + droop * lerpf(25.0, 70.0, 1.0 - t) + rng.randf_range(-12.0, 12.0)
+				if last:
+					a_deg = rng.randf_range(-8.0, 8.0) + droop * 25.0
+				var ang: float = atan2(axis.x, -axis.y) + side * deg_to_rad(a_deg)
+				side = -side
+				# Blades seen at varied angles: foreshortened length/width; younger (distal) blades a bit smaller
+				# on evenly leaved shoots.
+				var ln: float = bl * rng.randf_range(0.82, 1.06) * lerpf(1.0, 0.85, t * (1.0 - bunching))
+				var ws: float = rng.randf_range(0.78, 1.04)
+				var dirv: Vector2 = Vector2(sin(ang), -cos(ang))
+				var o: Vector2 = at + dirv * (ln * cfg["pet"])
+				blades.append([o.x, o.y, ang, ln, rng.randf_range(0.70, 0.98), ws])
+		# Lower blades first so the distal ones overlap them.
+		blades.sort_custom(func(x: Array, y: Array) -> bool: return x[1] > y[1])
+		for lf: Array in blades:
+			_paint_leaf(data, n, lf[0], lf[1], lf[2], lf[3], lf[4], cfg, lf[5])
+		var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
+		atlas.blit_rect(img, Rect2i(0, 0, n, n), Vector2i(tile * n, 0))
+	atlas.generate_mipmaps()
+	return ImageTexture.create_from_image(atlas)
 
 
 static func _paint_leaf(data: PackedByteArray, n: int, ox: float, oy: float, ang: float, length: float, shade: float,
-		cfg: Dictionary) -> void:
+		cfg: Dictionary, wscale: float = 1.0) -> void:
 	var dir: Vector2 = Vector2(sin(ang), -cos(ang))  # image y grows downward, "up" = -y
 	var perp: Vector2 = Vector2(-dir.y, dir.x)
-	var half_w: float = cfg["half_w"]
+	var half_w: float = cfg["half_w"] * wscale
+	var pet: float = cfg.get("pet", 0.15)
 	var lobed: bool = cfg["lobed"]
 	var serr: float = cfg["serr"]
 	var veins: float = cfg["veins"]
@@ -78,7 +103,7 @@ static func _paint_leaf(data: PackedByteArray, n: int, ox: float, oy: float, ang
 	var xmax: float = -1.0
 	var ymin: float = 2.0
 	var ymax: float = -1.0
-	for t: float in [-0.15, 1.0]:
+	for t: float in [-pet, 1.0]:
 		for s: float in [-half_w, half_w]:
 			var p: Vector2 = Vector2(ox, oy) + (dir * t + perp * s) * length
 			xmin = minf(xmin, p.x)
@@ -98,13 +123,13 @@ static func _paint_leaf(data: PackedByteArray, n: int, ox: float, oy: float, ang
 				var t0: float = maxf(p.dot(dir) / length, 0.0)
 				p.y -= bend * t0 * t0 * length  # sag: sample the undrooped leaf from higher up
 			var t: float = p.dot(dir) / length
-			if t < -0.15 or t > 1.0:
+			if t < -pet or t > 1.0:
 				continue
 			var s: float = p.dot(perp) / length
 			var d: float  # signed distance inside the shape, leaf-length units
 			var v: float = shade
 			if t < 0.0:
-				d = 0.016 - absf(s)  # petiole
+				d = 0.013 - absf(s)  # petiole
 				v = shade * 0.7
 			else:
 				var tb: float = t
@@ -232,19 +257,49 @@ static func make_bark_textures(fissures: float = 0.85, lenticels: float = 0.0) -
 	return [ImageTexture.create_from_image(ai), ImageTexture.create_from_image(ni)]
 
 
-static func make_leaf_material(tex: ImageTexture) -> StandardMaterial3D:
-	var m: StandardMaterial3D = StandardMaterial3D.new()
-	m.albedo_texture = tex
-	m.vertex_color_use_as_albedo = true
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-	m.alpha_scissor_threshold = 0.5
-	m.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.roughness = 0.9
-	m.metallic_specular = 0.0
-	m.backlight_enabled = true
-	m.backlight = Color(0.42, 0.46, 0.26)
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+## Leaf material: single pass, alpha-scissor with alpha-to-coverage (no blending), both faces.
+## Vertex colour RGB = leaf colour; A = autumn senescence 0..1 (see the core's mesh conventions). Summer
+## greens are used as linear albedo (the established look); autumn hues were picked as display colours, so
+## they are moved most of the way towards linear (gamma 1.5) as the leaf turns - otherwise scarlet reads as
+## copper (full sRGB decoding reads too dark and crimson). Light shining through a leaf takes its
+## colour: the yellow-green summer backlight gives way to the leaf's own hue.
+## Alpha is raised with the texture's mip level so distant crowns keep their coverage (mip-mapped cut-outs
+## otherwise thin out with distance).
+static func make_leaf_material(tex: ImageTexture) -> ShaderMaterial:
+	var sh: Shader = Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode cull_disabled, diffuse_burley, specular_schlick_ggx, alpha_to_coverage;
+uniform sampler2D leaf_tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform vec3 summer_backlight = vec3(0.42, 0.46, 0.26);
+uniform float autumn_backlight = 0.75;
+// Compensates the self-shadowing of the denser crown, so summer greens keep their established brightness.
+uniform float summer_gain = 1.12;
+uniform float autumn_gamma = 1.5;
+uniform float autumn_gain = 1.45;
+uniform float mip_alpha_boost = 0.22;
+void fragment() {
+	vec2 tsize = vec2(textureSize(leaf_tex, 0));
+	vec4 t = texture(leaf_tex, UV);
+	float sen = smoothstep(0.0, 0.5, COLOR.a);
+	vec3 c = COLOR.rgb;
+	c = mix(c * summer_gain, pow(c, vec3(autumn_gamma)) * autumn_gain, sen);
+	ALBEDO = t.rgb * c;
+	BACKLIGHT = mix(summer_backlight, c * autumn_backlight, sen);
+	ROUGHNESS = 0.9;
+	SPECULAR = 0.0;
+	vec2 dx = dFdx(UV * tsize);
+	vec2 dy = dFdy(UV * tsize);
+	float lod = max(0.0, 0.5 * log2(max(dot(dx, dx), dot(dy, dy))));
+	ALPHA = t.a * (1.0 + mip_alpha_boost * lod);
+	ALPHA_SCISSOR_THRESHOLD = 0.5;
+	ALPHA_ANTIALIASING_EDGE = 0.3;
+	ALPHA_TEXTURE_COORDINATE = UV * tsize;
+}
+"""
+	var m: ShaderMaterial = ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("leaf_tex", tex)
 	return m
 
 

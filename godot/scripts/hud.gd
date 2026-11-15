@@ -10,7 +10,8 @@ signal new_seed_requested
 signal soil_selected(index: int)
 signal species_selected(index: int)
 signal rings_toggled(shown: bool)
-signal xray_toggled(on: bool)
+signal soil_opacity_changed(opacity: float)
+signal flux_toggled(on: bool)
 signal guides_toggled(on: bool)
 
 const MONTHS: Array[String] = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
@@ -44,7 +45,8 @@ var _bottom_panel: PanelContainer
 var drought_button: Button
 var seed_button: Button
 var rings_button: Button
-var xray_button: Button
+var soil_slider: HSlider     # soil opacity 0..1 ("Sol")
+var flux_button: Button      # water / nutrient flux on the roots ("Flux")
 var guides_button: Button
 var play_button: Button
 var speed_slider: HSlider
@@ -54,9 +56,7 @@ func _ready() -> void:
 	var root: Control = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var th: Theme = Theme.new()
-	th.default_font_size = 18
-	root.theme = th
+	root.theme = UiStyle.make_theme(18)  # serif, dark translucent panels, thin light borders
 	add_child(root)
 	_build_info_panel(root)
 	_build_legend(root)
@@ -112,7 +112,7 @@ func _build_info_panel(root: Control) -> void:
 	_water.show_percentage = false
 	v.add_child(_water)
 	var hint: Label = Label.new()
-	hint.text = "F cadrer · R racines · X transparence · G repères"
+	hint.text = "F cadrer · R racines · X sol transparent · G repères"
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.modulate = Color(1, 1, 1, 0.7)
 	v.add_child(hint)
@@ -198,8 +198,7 @@ func _build_bottom_bar(root: Control) -> void:
 	root.add_child(p)
 	var h: HBoxContainer = HBoxContainer.new()
 	h.add_theme_constant_override("separation", 3)
-	var bar_theme: Theme = Theme.new()
-	bar_theme.default_font_size = 17  # a notch smaller so every control fits at 1280 px
+	var bar_theme: Theme = UiStyle.make_theme(15, 8.0, 4.0)  # a notch smaller so every control fits at 1280 px
 	p.theme = bar_theme
 	p.add_child(h)
 
@@ -220,7 +219,7 @@ func _build_bottom_bar(root: Control) -> void:
 	_speed_slider.max_value = 1.0
 	_speed_slider.step = 0.001
 	_speed_slider.value = log(30.0) / log(MAX_SPEED_DAYS)
-	_speed_slider.custom_minimum_size = Vector2(56, 0)
+	_speed_slider.custom_minimum_size = Vector2(110, 0)
 	_speed_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_speed_slider.value_changed.connect(_on_speed_changed)
 	speed_slider = _speed_slider
@@ -264,14 +263,27 @@ func _build_bottom_bar(root: Control) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(spacer)
 
-	var xray: Button = _no_focus(Button.new()) as Button
-	xray.toggle_mode = true
-	xray.text = "Sous-sol : coupe"
-	xray_button = xray
-	xray.toggled.connect(func(on: bool) -> void:
-		xray.text = "Sous-sol : transparence" if on else "Sous-sol : coupe"
-		xray_toggled.emit(on))
-	h.add_child(xray)
+	var soil_lbl: Label = Label.new()
+	soil_lbl.text = "Sol"
+	h.add_child(soil_lbl)
+	soil_slider = _no_focus(HSlider.new()) as HSlider
+	soil_slider.min_value = 0.0
+	soil_slider.max_value = 1.0
+	soil_slider.step = 0.01
+	soil_slider.value = 1.0
+	soil_slider.tooltip_text = "Opacité du sol (X : opaque / transparent)"
+	soil_slider.custom_minimum_size = Vector2(80, 0)
+	soil_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	soil_slider.value_changed.connect(func(v: float) -> void: soil_opacity_changed.emit(v))
+	h.add_child(soil_slider)
+
+	flux_button = _no_focus(Button.new()) as Button
+	flux_button.text = "Flux"
+	flux_button.toggle_mode = true
+	flux_button.button_pressed = true
+	flux_button.tooltip_text = "Eau et sels minéraux absorbés par les racines"
+	flux_button.toggled.connect(func(on: bool) -> void: flux_toggled.emit(on))
+	h.add_child(flux_button)
 
 	var guides: Button = _no_focus(Button.new()) as Button
 	guides.text = "Repères"
@@ -289,6 +301,11 @@ func _build_bottom_bar(root: Control) -> void:
 		rings_toggled.emit(on))
 	h.add_child(rings)
 	_on_speed_changed(_speed_slider.value)
+
+
+## Soil opacity 0..1 through the slider (same signal path as a drag).
+func set_soil_opacity(v: float) -> void:
+	soil_slider.value = clampf(v, 0.0, 1.0)
 
 
 func set_rings_visible(on: bool) -> void:

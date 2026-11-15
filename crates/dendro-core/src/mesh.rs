@@ -15,10 +15,15 @@
 //!   structural roots (`root_mesh`), 0.5 on fine-root tufts
 //!   (`fine_root_mesh`), so one material can style both.
 //! * Leaves: single-sided quads ("cards"); render with back-face culling
-//!   disabled and alpha-scissor on a leaf-cluster texture. UVs cover 0..1 on
-//!   each card (v = 0 at the card's distal end). Normals are bent outward
-//!   from the crown centre (standard foliage-shading trick). Vertex colour RGB
-//!   is the seasonal leaf colour, A = 1.
+//!   disabled and alpha-scissor on a leaf texture atlas of two tiles side
+//!   by side: u in 0..0.5 = one leafy shoot (the current year's long shoot),
+//!   u in 0.5..1 = a twig spray (lumped twigs, short shoots and spurs); a
+//!   card may be mirrored (u reversed). v = 0 at the card's distal end.
+//!   Normals are bent outward from the crown centre (standard
+//!   foliage-shading trick). Vertex colour RGB is the seasonal leaf colour
+//!   (linear, as a summer green albedo); A = the card's autumn senescence
+//!   0..1 (0 in spring, summer and on winter's dead leaves), so a renderer
+//!   can treat autumn hues (picked as display colours) differently.
 
 use crate::math::Vec3;
 use crate::rng;
@@ -30,6 +35,14 @@ pub struct MeshData {
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
     pub colors: Vec<[f32; 4]>,
+    /// Optional second UV channel: empty, or one entry per vertex. Roots
+    /// (`root_mesh`, `fine_root_mesh`): x = path length (m) from the root
+    /// collar along the root to this vertex's ring; y = an axis key (an
+    /// integer 0..63, constant along one drawn axis, for per-root variation
+    /// in a shader) + the drawn tube radius there in m, capped at 0.99 (a
+    /// proxy for the sap flow it carries, pipe model): key = floor(y),
+    /// radius = fract(y).
+    pub uv2: Vec<[f32; 2]>,
     pub indices: Vec<u32>,
 }
 
@@ -70,6 +83,7 @@ impl MeshData {
         self.normals.extend_from_slice(&other.normals);
         self.uvs.extend_from_slice(&other.uvs);
         self.colors.extend_from_slice(&other.colors);
+        self.uv2.extend_from_slice(&other.uv2);
         self.indices.extend(other.indices.iter().map(|i| i + base));
     }
 
@@ -117,6 +131,9 @@ pub(crate) struct TubeSeg {
     pub color: [f32; 4],
     /// End radius factor for axis tips (relative to own radius).
     pub tip_taper: f32,
+    /// Path length (m) from the root collar to `start`, written to `uv2`
+    /// when `TubeStyle::path_uv2` is set (only read on axis starts).
+    pub path0: f32,
 }
 
 /// Stylisation of the tube junctions (mesh only: never feeds back into the
@@ -147,6 +164,8 @@ pub(crate) struct TubeStyle {
     /// `twig_min_len` (m) apart (0 disables).
     pub twig_radius: f32,
     pub twig_min_len: f32,
+    /// Fill `MeshData::uv2` with (path length from the collar, radius).
+    pub path_uv2: bool,
 }
 
 const NONE: u32 = u32::MAX;
@@ -316,7 +335,9 @@ pub(crate) fn build_tubes(segs: &[TubeSeg], tri_budget: usize, min_radius: f32, 
         }
         let irregular = if root_axis { 0.0 } else { style.irregularity };
         let phase = rng::unit(rng::mix(start as u64 ^ 0xBA4C)) * std::f32::consts::TAU;
-        used += emit_rings(&mut mesh, &rings, radial, if root_axis { style } else { TubeStyle::default() }, irregular, phase);
+        let path0 = style.path_uv2.then(|| (segs[start as usize].path0, (rng::mix(start as u64 ^ 0xF10) % 64) as f32));
+        let flare = if root_axis { style } else { TubeStyle::default() };
+        used += emit_rings(&mut mesh, &rings, radial, flare, irregular, phase, path0);
     }
     mesh
 }
@@ -388,7 +409,9 @@ pub(crate) fn axis_rings(segs: &[TubeSeg], chain: &[usize], style: &TubeStyle, r
     }
 }
 
-fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeStyle, irregular: f32, phase: f32) -> usize {
+/// `path0`: (path length at the axis start, axis key); when set, `uv2` =
+/// (path0 + arc length along the axis, key + ring radius), see `MeshData::uv2`.
+fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeStyle, irregular: f32, phase: f32, path0: Option<(f32, f32)>) -> usize {
     let m = rings.len() - 1;
     let base_r = rings[0].radius.max(1e-4);
     let circumference = std::f32::consts::TAU * base_r;
@@ -446,6 +469,10 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
             }
             mesh.vert(ring.center + dirv * r, dirv, [j as f32 / radial as f32, v], ring.color);
         }
+        if let Some((p0, key)) = path0 {
+            let e = [p0 + arclen, key + ring.radius.min(0.99)];
+            mesh.uv2.extend(std::iter::repeat_n(e, radial + 1));
+        }
     }
     let row = radial as u32 + 1;
     for k in 0..m as u32 {
@@ -464,6 +491,8 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
 /// A leaf cluster to be drawn as crossed cards.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct LeafCluster {
+    /// Attachment point: the card spans from `anchor * size` behind it to
+    /// `(1 - anchor) * size` ahead of it along `dir`.
     pub pos: Vec3,
     pub dir: Vec3,
     pub size: f32,
@@ -472,9 +501,17 @@ pub(crate) struct LeafCluster {
     /// Centre of the foliage lobe this cluster belongs to (normals are bent
     /// away from it).
     pub center: Vec3,
+    /// Number of crossed cards (1..=3), rotated 180/cards deg apart about
+    /// `dir`.
+    pub cards: u8,
+    /// Fraction of the card length behind `pos`.
+    pub anchor: f32,
+    /// Horizontal texture range `[u0, u1]` of the cards (texture atlas
+    /// tile); a random half of the cards is mirrored.
+    pub tile: [f32; 2],
 }
 
-/// Crossed cards per leaf cluster.
+/// Crossed cards per (full) leaf cluster.
 pub(crate) const CARDS_PER_CLUSTER: usize = 3;
 
 /// Build leaf cards; at most `tri_budget` triangles (clusters are thinned
@@ -484,9 +521,10 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
     if clusters.is_empty() {
         return mesh;
     }
-    let max_clusters = tri_budget / (CARDS_PER_CLUSTER * 2);
-    let keep = if clusters.len() > max_clusters { max_clusters as f32 / clusters.len() as f32 } else { 1.0 };
-    let cap = clusters.len().min(max_clusters + max_clusters / 8) * CARDS_PER_CLUSTER;
+    let total_cards: usize = clusters.iter().map(|c| c.cards.max(1) as usize).sum();
+    let max_cards = tri_budget / 2;
+    let keep = if total_cards > max_cards { max_cards as f32 / total_cards as f32 } else { 1.0 };
+    let cap = total_cards.min(max_cards + max_cards / 8);
     mesh.reserve(cap * 4, cap * 6);
     let scale = 1.0 / keep.sqrt();
     let mut center = Vec3::ZERO;
@@ -501,7 +539,8 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
         if keep < 1.0 && rng::unit(rng::mix(c.key ^ 0x5EED)) >= keep {
             continue;
         }
-        if tris + CARDS_PER_CLUSTER * 2 > tri_budget {
+        let cards = c.cards.clamp(1, 3) as usize;
+        if tris + cards * 2 > tri_budget {
             break;
         }
         let s = c.size * scale;
@@ -511,23 +550,26 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
         let perp = dir.any_perpendicular();
         let perp2 = dir.cross(perp);
         let spin = rng::unit(rng::mix(c.key)) * std::f32::consts::PI;
-        // Card k is rotated by k x 180/CARDS deg: rotate (sin, cos) instead
+        // Card k is rotated by k x 180/cards deg: rotate (sin, cos) instead
         // of evaluating them per card (this loop runs ~10^5 times).
         let (mut sa, mut ca) = spin.sin_cos();
-        let (sr, cr) = (std::f32::consts::PI / CARDS_PER_CLUSTER as f32).sin_cos();
-        for k in 0..CARDS_PER_CLUSTER {
+        let (sr, cr) = (std::f32::consts::PI / cards as f32).sin_cos();
+        let mid_k = 0.5 * (cards as f32 - 1.0);
+        for k in 0..cards {
             if k > 0 {
                 let s2 = sa * cr + ca * sr;
                 ca = ca * cr - sa * sr;
                 sa = s2;
             }
+            let h = rng::mix(c.key ^ (0x71 + k as u64));
             let b = perp * ca + perp2 * sa; // card width axis
             // Card length axis: along the shoot, tilted by a varied per-card
             // amount so the cluster reads as a volume from all sides.
-            let tilt = 0.35 * (k as f32 - 1.0) + 0.5 * (rng::unit(rng::mix(c.key ^ (0x71 + k as u64))) - 0.5);
+            let tilt = 0.35 * (k as f32 - mid_k) + 0.5 * (rng::unit(h) - 0.5);
             let a = (dir + b.cross(dir) * tilt).normalize_or(dir);
-            let mid = c.pos + a * (s * 0.25);
-            let mut face = a.cross(b).normalize_or(outward);
+            let mid = c.pos + a * (s * (0.5 - c.anchor));
+            // a and b are orthonormal: their cross product is a unit vector.
+            let mut face = a.cross(b);
             let flipped = face.dot(outward) < 0.0;
             if flipped {
                 face = -face;
@@ -539,7 +581,8 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
             let q = [mid - ha - hb, mid + ha - hb, mid + ha + hb, mid - ha + hb];
             mesh.positions.extend_from_slice(&q.map(|p| p.to_array()));
             mesh.normals.extend_from_slice(&[nrm; 4]);
-            mesh.uvs.extend_from_slice(&[[0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]);
+            let (u0, u1) = if h & (1 << 40) != 0 { (c.tile[1], c.tile[0]) } else { (c.tile[0], c.tile[1]) };
+            mesh.uvs.extend_from_slice(&[[u0, 1.0], [u0, 0.0], [u1, 0.0], [u1, 1.0]]);
             mesh.colors.extend_from_slice(&[c.color; 4]);
             // q0,q1,q2 is CCW around a x b. Emit CW around the chosen face normal.
             if flipped {
@@ -558,7 +601,7 @@ mod tests {
     use super::*;
 
     fn seg(parent: u32, start: Vec3, end: Vec3, radius: f32, continues: bool) -> TubeSeg {
-        TubeSeg { parent, start, end, radius, continues, color: [0.5; 4], tip_taper: 0.5 }
+        TubeSeg { parent, start, end, radius, continues, color: [0.5; 4], tip_taper: 0.5, path0: 0.0 }
     }
 
     /// Buttress lobes peak at the supplied world azimuths (over the main

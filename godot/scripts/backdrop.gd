@@ -4,16 +4,16 @@ extends CanvasLayer
 ## drawn on a canvas layer behind the 3D scene (Environment.BG_CANVAS). Cool and pale in winter, warm in
 ## summer; also tints the ambient light and the sun.
 
-const COOL_TOP: Color = Color(0.74, 0.80, 0.87)
-const COOL_BOTTOM: Color = Color(0.91, 0.93, 0.95)
-const WARM_TOP: Color = Color(0.66, 0.80, 0.92)
-const WARM_BOTTOM: Color = Color(0.97, 0.94, 0.85)
+const COOL_TOP: Color = Color(0.46, 0.55, 0.68)
+const COOL_BOTTOM: Color = Color(0.82, 0.80, 0.76)
+const WARM_TOP: Color = Color(0.28, 0.50, 0.72)
+const WARM_BOTTOM: Color = Color(0.96, 0.80, 0.58)
 
 const SHADER: String = """
 shader_type canvas_item;
-uniform vec4 top : source_color = vec4(0.66, 0.80, 0.92, 1.0);
-uniform vec4 bottom : source_color = vec4(0.97, 0.94, 0.85, 1.0);
-uniform float vignette = 0.16;
+uniform vec4 top : source_color = vec4(0.28, 0.50, 0.72, 1.0);
+uniform vec4 bottom : source_color = vec4(0.96, 0.80, 0.58, 1.0);
+uniform float vignette = 0.32;
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }

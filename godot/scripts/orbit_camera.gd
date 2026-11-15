@@ -86,7 +86,7 @@ func framing_points(height_m: float, crown_r: float, plug_r: float, plug_d: floa
 		# ~60 % of the radius (the plug is much wider than deep; the whole disc would be tiny).
 		for which: float in [-1.0, 1.0]:
 			var fa: float = wedge_dir + which * wedge_w * 0.5
-			var fr: float = plug_r * 0.8
+			var fr: float = plug_r * 0.5  # the soil body follows the root spread: frame its inner half
 			pts.append(Vector3(sin(fa) * fr, 2.0, cos(fa) * fr))
 			pts.append(Vector3(sin(fa) * fr, -plug_d, cos(fa) * fr))
 		pts.append(Vector3(0.0, 2.2, 0.0))
@@ -134,7 +134,7 @@ func solve_framing(pts: Array[Vector3], yw: float, pt: float) -> Dictionary:
 	for p: Vector3 in pts:
 		rad = maxf(rad, (p - Vector3(0.0, ty, 0.0)).length())
 	var d: float = rad * 3.5 / tan_half * 0.5 + 2.0   # starts well outside: every point in front of the camera
-	for it: int in 10:
+	for it: int in 16:
 		var t: Vector3 = Vector3(0.0, ty, 0.0)
 		var sy_min: float = INF
 		var sy_max: float = -INF
@@ -174,13 +174,15 @@ func fit_to(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge
 		return
 	if manual:
 		return
+	if root_view:
+		goal_pitch = root_pitch()  # follows the soil body's flatness
 	# The solve is only redone when its inputs change (it is cheap, but runs in script every frame).
 	var key: Array = [snappedf(height_m, 0.01), snappedf(crown_r, 0.01), snappedf(plug_r, 0.01), snappedf(plug_d, 0.01),
 		wedge_w, root_view, wedge_dir, _free_rect, _view_size]
 	if key != _fit_key:
 		_fit_key = key
 		var pts: Array[Vector3] = framing_points(height_m, crown_r, plug_r, plug_d, wedge_w)
-		var sol: Dictionary = solve_framing(pts, wedge_dir if root_view else DEFAULT_YAW, ROOT_PITCH if root_view else DEFAULT_PITCH)
+		var sol: Dictionary = solve_framing(pts, wedge_dir if root_view else DEFAULT_YAW, root_pitch() if root_view else DEFAULT_PITCH)
 		_fit_sol = sol
 	goal_distance = clampf(_fit_sol["distance"], 1.0, 600.0)
 	goal_target = Vector3(0.0, _fit_sol["target_y"], 0.0)
@@ -209,7 +211,14 @@ func reframe() -> void:
 	manual = false
 	use_override = false
 	goal_yaw = wedge_dir if root_view else DEFAULT_YAW
-	goal_pitch = ROOT_PITCH if root_view else DEFAULT_PITCH
+	goal_pitch = root_pitch() if root_view else DEFAULT_PITCH
+
+
+## Root-view pitch: the soil body follows the root system, a flat lens under an old tree (much wider than
+## deep) is looked at from higher up so its roots spread out instead of collapsing into a thin band.
+func root_pitch() -> float:
+	var aspect: float = _plug_d / maxf(_plug_r, 0.1)
+	return lerpf(0.45, ROOT_PITCH, smoothstep(0.08, 0.35, aspect))
 
 
 ## R: toggle the root view (centred on the root zone, looking through the wedge).
@@ -302,9 +311,16 @@ func recentre_at(screen_pos: Vector2) -> void:
 		best_t = t
 		best_c = crown_c
 		best_dist = distance
-	# Root zone: the plug below the surface (sphere around its middle).
+	# Root zone: the soil body below the surface (a flat lens: its mid-depth disc, or a sphere seen edge-on).
 	var root_c: Vector3 = Vector3(0.0, -_plug_d * 0.5, 0.0)
-	t = _ray_sphere(o, d, root_c, maxf(_plug_d * 0.6, _plug_r * 0.7))
+	t = -1.0
+	if absf(d.y) > 1e-3:
+		var tp: float = (root_c.y - o.y) / d.y
+		var hp: Vector3 = o + d * tp
+		if tp > 0.0 and Vector2(hp.x, hp.z).length() < _plug_r * 0.7:
+			t = tp
+	if t < 0.0:
+		t = _ray_sphere(o, d, root_c, _plug_d * 0.6)
 	if t >= 0.0 and t < best_t:
 		best_t = t
 		best_c = root_c

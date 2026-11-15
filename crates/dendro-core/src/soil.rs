@@ -249,6 +249,9 @@ pub struct SoilLayerState {
     /// Absolute root length density (km of root per m3 of soil, fine roots
     /// included; order-of-magnitude, see `roots.rs`).
     pub root_length_km_m3: f32,
+    /// Water taken up by the roots from this layer on the last simulated
+    /// day (mm), i.e. its share of the actual transpiration.
+    pub uptake_mm: f32,
 }
 
 /// Internal per-layer data.
@@ -279,6 +282,8 @@ pub(crate) struct Layer {
     /// Days saturated during the last growing season (fraction).
     pub season_wet: f32,
     wet_sum: f32,
+    /// Root water uptake from this layer on the last simulated day (mm).
+    pub uptake: f32,
 }
 
 impl Layer {
@@ -313,6 +318,8 @@ pub(crate) struct WaterDay {
     /// Root-weighted hypoxia 0..1 (saturated layers count fully, others by
     /// their air-filled porosity, see `Layer::hypoxia`).
     pub hypoxic: f32,
+    /// Actual transpiration taken up by the roots (mm/day).
+    pub uptake: f32,
 }
 
 /// The simulated soil column.
@@ -386,6 +393,7 @@ impl SoilColumn {
                     season_n: 0.0,
                     season_wet: if below_table { 1.0 } else { 0.0 },
                     wet_sum: 0.0,
+                    uptake: 0.0,
                 }
             })
             .collect();
@@ -393,7 +401,7 @@ impl SoilColumn {
             bedrock: profile.bedrock_depth_m,
             profile,
             layers,
-            last: WaterDay { rew: 1.0, anoxic: 0.0, hypoxic: 0.0 },
+            last: WaterDay { rew: 1.0, anoxic: 0.0, hypoxic: 0.0, uptake: 0.0 },
             root_zone_m2: 1.0,
             track_hypoxia: false,
             states: Vec::new(),
@@ -486,13 +494,20 @@ impl SoilColumn {
                 wsum += l.root_len * l.rew();
             }
         }
+        let mut uptake = 0.0;
+        for l in self.layers.iter_mut() {
+            l.uptake = 0.0;
+        }
         if t_act > 0.0 && wsum > 0.0 {
             for l in self.layers.iter_mut() {
                 if l.saturated() {
                     continue;
                 }
                 let share = t_act * l.root_len * l.rew() / wsum;
-                l.water -= share.min((l.water - l.wp).max(0.0));
+                let taken = share.min((l.water - l.wp).max(0.0));
+                l.water -= taken;
+                l.uptake = taken;
+                uptake += taken;
             }
         }
         // Rooted fraction in saturated layers (anoxia), and root-weighted
@@ -526,7 +541,7 @@ impl SoilColumn {
                 l.wet_sum += l.saturated() as u8 as f32;
             }
         }
-        self.last = WaterDay { rew: self.rooted_rew(), anoxic, hypoxic };
+        self.last = WaterDay { rew: self.rooted_rew(), anoxic, hypoxic, uptake };
         self.refresh_states();
         self.last
     }
@@ -599,6 +614,7 @@ impl SoilColumn {
                     root_density: if max > 0.0 { (dens / max).clamp(0.0, 1.0) } else { 0.0 },
                     // Root length per m3 of soil within the root zone.
                     root_length_km_m3: dens / self.root_zone_m2.max(1e-3) * 1e-3,
+                    uptake_mm: l.uptake,
                 }
             })
             .collect();

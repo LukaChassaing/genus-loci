@@ -660,3 +660,60 @@ fn soil_layers_api() {
     let g = &SoilProfile::gley_clay().horizons[2];
     assert!(g.aeration() < a.aeration());
 }
+
+#[test]
+fn root_mesh_flux_coordinates() {
+    let sim = &long_run().summer_200;
+    for (m, name) in [(sim.root_mesh(), "roots"), (sim.fine_root_mesh(), "fine roots")] {
+        assert_eq!(m.uv2.len(), m.positions.len(), "{name}: one uv2 per vertex");
+        let mut max_path = 0.0f32;
+        for (p, t) in m.positions.iter().zip(&m.uv2) {
+            assert!(t[0].is_finite() && t[0] >= 0.0 && (0.0..64.0).contains(&t[1]), "{name}: uv2 {t:?}");
+            let r = t[1].fract();
+            // Along the root is never shorter than the straight line from
+            // the collar (minus the tube radius and the sinking of shallow roots).
+            let d = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+            assert!(t[0] >= d - 1.1 * r - 0.6, "{name}: path {} < distance {d}", t[0]);
+            max_path = max_path.max(t[0]);
+        }
+        assert!(max_path > 0.8 * sim.root_spread_m(), "{name}: longest path {max_path}");
+    }
+    // Other meshes carry no second UV channel.
+    assert!(sim.wood_mesh().uv2.is_empty());
+}
+
+#[test]
+fn root_envelope_covers_the_roots() {
+    let sim = &long_run().at_60;
+    let (sectors, bins) = (24, 20);
+    let spread = sim.root_spread_m();
+    let env = sim.root_envelope(sectors, bins, spread);
+    assert_eq!(env.len(), sectors * bins);
+    let deepest = env.iter().copied().fold(0.0, f32::max);
+    assert!(deepest >= sim.root_depth_m() && deepest < sim.root_depth_m() + 0.3, "{deepest} vs {}", sim.root_depth_m());
+    // Roots reach the outer bin in most directions (first-order laterals all around).
+    let outer = (0..sectors).filter(|&s| env[s * bins + bins - 1] > 0.0 || env[s * bins + bins - 2] > 0.0).count();
+    assert!(outer >= 3, "outer bins occupied in {outer} sectors");
+    // Deeper near the stem than at the rim (heart-sinker system).
+    let ring = |b: usize| (0..sectors).map(|s| env[s * bins + b]).fold(0.0, f32::max);
+    assert!(ring(0) > ring(bins - 1));
+    assert_eq!(env, sim.root_envelope(sectors, bins, spread), "deterministic");
+}
+
+#[test]
+fn water_uptake_follows_season_and_drought() {
+    let mut sim = oak(7);
+    sim.advance_years(30);
+    sim.advance_days(15); // mid-January
+    assert_eq!(sim.water_uptake_mm(), 0.0, "no uptake in winter dormancy");
+    let mut normal = sim.clone();
+    normal.advance_days(185); // early July
+    let mut dry = sim.clone();
+    dry.set_drought(true);
+    dry.advance_days(185);
+    let sum = |s: &Simulation| s.soil_layers().iter().map(|l| l.uptake_mm).sum::<f32>();
+    let (u, ud) = (normal.water_uptake_mm(), dry.water_uptake_mm());
+    assert!(u > 0.5, "July uptake {u} mm/day");
+    assert!((sum(&normal) - u).abs() < 1e-3, "layers add up to the total");
+    assert!(ud < 0.6 * u, "drought uptake {ud} vs {u}");
+}

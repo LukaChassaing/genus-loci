@@ -35,6 +35,10 @@ pub fn mesh_data_to_array_mesh(data: &MeshData) -> Gd<ArrayMesh> {
         let v: PackedColorArray = data.colors.iter().map(|c| Color::from_rgba(c[0], c[1], c[2], c[3])).collect();
         arrays.set(ArrayType::COLOR.ord() as usize, &v.to_variant());
     }
+    if data.uv2.len() == n {
+        let v: PackedVector2Array = data.uv2.iter().map(|p| Vector2::new(p[0], p[1])).collect();
+        arrays.set(ArrayType::TEX_UV2.ord() as usize, &v.to_variant());
+    }
     let idx = PackedInt32Array::from_iter(data.indices.iter().map(|&i| i as i32));
     arrays.set(ArrayType::INDEX.ord() as usize, &idx.to_variant());
 
@@ -310,6 +314,13 @@ impl Backend {
         self.sim.genome().leaf.serration
     }
 
+    /// Leaf arrangement on the shoot (for the leaf texture): leaves per
+    /// shoot, tip bunching 0..1, petiole / blade length, droop 0..1.
+    pub fn leaf_arrangement(&self) -> [f32; 4] {
+        let l = &self.sim.genome().leaf;
+        [l.leaves_per_shoot, l.tip_bunching, l.petiole_ratio, l.leaf_droop]
+    }
+
     /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous).
     pub fn ring_contrast(&self) -> f32 {
         self.sim.genome().wood.ring_contrast
@@ -333,6 +344,25 @@ impl Backend {
 
     pub fn root_spread_m(&self) -> f64 {
         self.sim.root_spread_m() as f64
+    }
+
+    /// Root envelope for the soil display: `[r_max, then sectors x bins max depths]` (see
+    /// `Simulation::root_envelope`), with `r_max` = root spread + 0.5 m (fine-root reach).
+    pub fn root_envelope(&self, sectors: usize, bins: usize) -> Vec<f32> {
+        let r_max = self.sim.root_spread_m() + 0.5;
+        let mut v = vec![r_max];
+        v.extend(self.sim.root_envelope(sectors, bins, r_max));
+        v
+    }
+
+    /// Root water uptake of the last simulated day (mm/day).
+    pub fn water_uptake_mm(&self) -> f64 {
+        self.sim.water_uptake_mm() as f64
+    }
+
+    /// Per simulated soil layer, top down: (bottom depth m, uptake mm/day, root density 0..1).
+    pub fn uptake_profile(&self) -> Vec<f32> {
+        self.sim.soil_layers().iter().flat_map(|l| [l.bottom_m, l.uptake_mm, l.root_density]).collect()
     }
 
     pub fn leaf_density(&self) -> f64 {

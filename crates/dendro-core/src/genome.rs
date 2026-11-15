@@ -253,13 +253,61 @@ pub struct LeafTraits {
     pub marcescence: f32,
     /// Age (years) after which marcescence fades out.
     pub marcescence_max_age_years: f32,
-    /// Leaves borne by one annual shoot (informational for now).
+    /// Leaves borne by one annual shoot. Rendering: one leaf card depicts a
+    /// shoot with this many leaves (front-end texture), so a young tree
+    /// gets about one card per annual shoot.
     pub leaves_per_shoot: f32,
     /// Rendering: size of one leaf-cluster card, in leaf lengths.
     pub cluster_size_leaves: f32,
     /// Rendering: leaf-card area per lit shoot unit, in voxel faces (crown
     /// density; ~1 sparse, ~3 dense).
     pub foliage_density: f32,
+    /// Leaf arrangement on the shoot (front-end texture): 0 = leaves evenly
+    /// spaced along the shoot, 1 = bunched at the shoot tip (oak).
+    #[serde(default)]
+    pub tip_bunching: f32,
+    /// Petiole length relative to the blade (front-end texture; oak ~0.05,
+    /// long-stalked cherry ~0.3).
+    #[serde(default = "petiole_default")]
+    pub petiole_ratio: f32,
+    /// How far the blades hang from the shoot, 0 (held forward) .. 1
+    /// (drooping back along the shoot; front-end texture).
+    #[serde(default)]
+    pub leaf_droop: f32,
+    /// Rendering: foliage of short shoots and spurs along older living wood
+    /// (the leafy shoot units only stand for the current year's long
+    /// shoots): leaf-card area per metre of bearing wood, in voxel sizes,
+    /// at full light. 0 = none.
+    #[serde(default)]
+    pub spur_foliage: f32,
+    /// Rendering: thickest wood (radius, mm) still carrying short shoots.
+    #[serde(default = "spur_radius_default")]
+    pub spur_max_radius_mm: f32,
+    /// Rendering: light exposure (0..1) below which wood carries no short
+    /// shoots (they fade in over the next 0.2).
+    #[serde(default = "spur_light_default")]
+    pub spur_min_light: f32,
+    /// Rendering: spread of the autumn colouring onset between leaf
+    /// clusters, as a fraction of the colouring period (outer, sunlit
+    /// leaves turn first; whole boughs vary together). 0 = uniform.
+    #[serde(default = "colour_spread_default")]
+    pub colour_spread: f32,
+}
+
+fn petiole_default() -> f32 {
+    0.1
+}
+
+fn spur_radius_default() -> f32 {
+    15.0
+}
+
+fn spur_light_default() -> f32 {
+    0.1
+}
+
+fn colour_spread_default() -> f32 {
+    0.5
 }
 
 /// Relative leaf pigment contents (0..1), driving seasonal colour.
