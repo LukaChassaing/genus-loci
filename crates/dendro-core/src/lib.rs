@@ -25,11 +25,13 @@
 //! `(seed, entity, year)`; the simulation is single-threaded.
 
 pub mod climate;
+pub mod flux;
 pub mod genome;
 mod growth;
 mod math;
 pub mod mesh;
 pub mod phenology;
+pub mod pruning;
 pub mod rings;
 mod rng;
 mod roots;
@@ -37,12 +39,17 @@ mod sim;
 pub mod soil;
 
 pub use climate::{ClimateParams, Weather};
+pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
+pub use genome::{MycorrhizaType, SymbiosisTraits};
 pub use genome::{
     Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
     Tolerances, WoodTraits,
 };
 pub use mesh::MeshData;
 pub use phenology::{Phase, ReproStage, Season};
+pub use pruning::{
+    Action, BoleMetrics, CutKind, CutPreview, CutSpec, JournalEntry, LogEvent, PickHit, PruneMetrics, PruningTraits, ShootInfo, WoundState,
+};
 pub use rings::Ring;
 pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
 pub use sim::{

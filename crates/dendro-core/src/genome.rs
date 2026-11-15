@@ -41,9 +41,19 @@ pub struct Genome {
     /// Lifespan: age-related decline of vigour.
     #[serde(default)]
     pub longevity: LongevityTraits,
+    /// Root symbioses (mycorrhizae). Used by [`crate::flux`] only: the
+    /// growth simulation itself is unaffected (neutral default).
+    #[serde(default)]
+    pub symbiosis: SymbiosisTraits,
+    /// Response to pruning: wound closure, compartmentalisation, latent buds
+    /// (see [`crate::pruning`]). Defaults are neutral-ish averages.
+    #[serde(default)]
+    pub pruning: crate::pruning::PruningTraits,
 }
 
-/// Above-ground architecture (bud/shoot model, after Palubicki et al. 2009).
+/// Above-ground architecture (bud/shoot model, after Palubicki et al. 2009,
+/// ACM Trans Graph 28(3):58, doi:10.1145/1531326.1531364; see growth.rs for
+/// the other references and docs/sources.md).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Architecture {
     /// Apical control lambda of the Borchert-Honda resource split in young
@@ -155,8 +165,9 @@ pub struct Architecture {
     pub shade_survival_years: u8,
     /// Branches whose foliage *mean* light exposure (0..1) is below this are
     /// shed too, even if some of their shoots are well lit: a branch that is
-    /// mostly shaded is a net carbon sink (branch autonomy, Sprugel et al.
-    /// 1991). Drives the rise of the crown base (clear bole).
+    /// mostly shaded is a net carbon sink (branch autonomy, Sprugel, Hinckley
+    /// & Schaap 1991, Annu Rev Ecol Syst; carbon autonomy of branches).
+    /// Thresholds per species are calibration, not measurements. Drives the rise of the crown base (clear bole).
     pub shedding_mean_threshold: f32,
     /// Natural pruning of the stem (stylised): laterals inserted on the stem
     /// below `clear_bole_fraction` x tree height (and below
@@ -204,6 +215,10 @@ pub struct Architecture {
     /// size limit (fast-growing pioneers).
     #[serde(default = "foliage_exponent_default")]
     pub hydraulic_foliage_exponent: f32,
+}
+
+fn afp_default() -> f32 {
+    0.10
 }
 
 fn foliage_exponent_default() -> f32 {
@@ -341,15 +356,31 @@ fn anthocyanin_color_default() -> [f32; 3] {
 /// Phenology parameters.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PhenologyTraits {
-    /// Chilling days (daily mean within the chilling range) needed for full
-    /// dormancy release.
+    /// Chill days (daily mean within `chill_temp_min_c..=chill_temp_max_c`,
+    /// counted from `chill_start_doy`) after which the extra forcing due to
+    /// incomplete chilling has fallen to 5 % of `chill_forcing_gdd` (three
+    /// e-folding lengths of the exponential of Cannell & Smith 1983 /
+    /// Murray et al. 1989, see `phenology.rs`).
     pub chilling_requirement_days: f32,
     pub chill_temp_min_c: f32,
     pub chill_temp_max_c: f32,
     /// Base temperature of growing degree days (degC).
     pub gdd_base_c: f32,
-    /// Forcing (degC.day since Jan 1) to budburst once chilling is met.
+    /// Forcing (degC.day above `gdd_base_c` from `forcing_start_doy`) to
+    /// budburst with ample chilling (the asymptote `a` of
+    /// `T = a + b exp(r C)`).
     pub gdd_budburst: f32,
+    /// Extra forcing needed after a winter without any chill day (`b`).
+    #[serde(default)]
+    pub chill_forcing_gdd: f32,
+    /// Day of year (0-based) from which forcing is summed (31 = Feb 1, as
+    /// in Cannell & Smith 1983).
+    #[serde(default = "forcing_start_default")]
+    pub forcing_start_doy: u32,
+    /// Day of year (0-based) from which chill days are counted (304 =
+    /// Nov 1, as in Cannell & Smith 1983).
+    #[serde(default = "chill_start_default")]
+    pub chill_start_doy: u32,
     /// Forcing after budburst to full leaf expansion (degC.day).
     pub leaf_expansion_gdd: f32,
     /// Photoperiod (h) below which senescence can start (after midsummer).
@@ -360,6 +391,30 @@ pub struct PhenologyTraits {
     pub senescence_cdd: f32,
     /// Duration of leaf fall (days).
     pub leaf_fall_days: f32,
+}
+
+fn forcing_start_default() -> u32 {
+    31
+}
+
+fn chill_start_default() -> u32 {
+    304
+}
+
+impl PhenologyTraits {
+    /// Extra forcing (degC.day) required after `chill_days` chill days:
+    /// `b exp(r C)` with `r = -3 / chilling_requirement_days` (Cannell &
+    /// Smith 1983; Murray, Cannell & Smith 1989).
+    pub fn chill_penalty_gdd(&self, chill_days: f32) -> f32 {
+        let r = 3.0 / self.chilling_requirement_days.max(1.0);
+        self.chill_forcing_gdd * (-r * chill_days.max(0.0)).exp()
+    }
+
+    /// Thermal time to budburst (degC.day from `forcing_start_doy`) after
+    /// `chill_days` chill days: `a + b exp(r C)`.
+    pub fn budburst_requirement_gdd(&self, chill_days: f32) -> f32 {
+        self.gdd_budburst + self.chill_penalty_gdd(chill_days)
+    }
 }
 
 /// Wood / secondary growth traits.
@@ -385,7 +440,9 @@ pub struct WoodTraits {
     #[serde(default = "five_hundred_f32")]
     pub snag_years_per_m: f32,
     /// Pressler coefficient: m2 of new sapwood per m2 of light-weighted
-    /// foliage above, per year, in an average year.
+    /// foliage above, per year, in an average year. Calibration: fitted to
+    /// the target DBH-age curves, not a published constant; the proportional
+    /// foliage-to-sapwood idea is the pipe model (Shinozaki et al. 1964).
     pub growth_coefficient: f32,
     /// Radius of a new current-year shoot (mm).
     pub twig_radius_mm: f32,
@@ -455,6 +512,12 @@ pub struct RootTraits {
     /// how far roots enter permanently saturated soil.
     #[serde(default)]
     pub hypoxia_sensitivity: f32,
+    /// Air-filled porosity (m3/m3) below which the roots suffer from
+    /// hypoxia (see `soil.rs`). ~0.10 is the usual threshold (Grable &
+    /// Siemer 1968, maize); sensitive species react from wetter (higher)
+    /// values.
+    #[serde(default = "afp_default")]
+    pub hypoxia_air_porosity: f32,
     /// Drought-deepening plasticity: relative deepening of laterals and
     /// boost of sinker/taproot growth per unit of last year's water stress.
     #[serde(default)]
@@ -523,9 +586,9 @@ pub struct ReproductionTraits {
     pub flower_display: f32,
     /// Rendering weight 0..1 of the fruits.
     pub fruit_display: f32,
-    /// Forcing (degC.day above `gdd_base_c` since Jan 1) to bloom onset once
-    /// chilling is met (raised like the budburst requirement when chilling
-    /// is incomplete).
+    /// Forcing (degC.day above `gdd_base_c` from `forcing_start_doy`) to
+    /// bloom onset with ample chilling (plus the same chilling penalty
+    /// `PhenologyTraits::chill_penalty_gdd` as budburst).
     pub bloom_gdd: f32,
     /// Forcing from bloom onset to the end of petal fall (degC.day).
     pub bloom_duration_gdd: f32,
@@ -622,8 +685,78 @@ pub struct Tolerances {
     pub frost_c: f32,
     /// Drought tolerance 0..1 (shifts stomatal closure to drier soil).
     pub drought: f32,
-    /// Shade tolerance 0..1 (lower bud break / shedding thresholds).
+    /// Shade tolerance 0..1 (lower bud break / shedding thresholds) of the
+    /// established tree.
     pub shade: f32,
+    /// Shade tolerance of the young tree, if different (e.g. pioneers that
+    /// tolerate shade as seedlings and become light-demanding later). Kept
+    /// until `shade_juvenile_years`, then blended smoothly into `shade` by
+    /// `shade_mature_years`. None = `shade` at all ages.
+    #[serde(default)]
+    pub shade_juvenile: Option<f32>,
+    #[serde(default)]
+    pub shade_juvenile_years: f32,
+    #[serde(default)]
+    pub shade_mature_years: f32,
+}
+
+impl Tolerances {
+    /// Shade tolerance 0..1 at `age` years (see `shade_juvenile`).
+    pub fn shade_at(&self, age: f32) -> f32 {
+        let Some(young) = self.shade_juvenile else {
+            return self.shade;
+        };
+        let span = (self.shade_mature_years - self.shade_juvenile_years).max(1.0);
+        let t = ((age - self.shade_juvenile_years) / span).clamp(0.0, 1.0);
+        let s = t * t * (3.0 - 2.0 * t);
+        young + (self.shade - young) * s
+    }
+}
+
+/// Mycorrhizal association of a species.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MycorrhizaType {
+    /// No mycorrhiza (default).
+    #[default]
+    None,
+    /// Arbuscular mycorrhiza (Glomeromycota hyphae inside root cortex
+    /// cells; short extraradical hyphae).
+    Arbuscular,
+    /// Ectomycorrhiza (fungal mantle and Hartig net around root tips;
+    /// extramatrical mycelium, sometimes rhizomorphs).
+    Ecto,
+}
+
+/// Root symbiosis traits (see [`crate::flux`]). Defaults are neutral (no
+/// fungus), so genomes without this section behave as before.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SymbiosisTraits {
+    pub mycorrhiza: MycorrhizaType,
+    /// Share of net primary production given to the fungal partner (0..1).
+    pub carbon_cost: f32,
+    /// Share of the tree's P uptake delivered by fungal hyphae (0..1).
+    pub phosphorus_share: f32,
+    /// Share of the tree's N uptake delivered by fungal hyphae (0..1).
+    pub nitrogen_share: f32,
+    /// Share of the root water uptake that passes through hyphae (0..1).
+    pub water_share: f32,
+    /// Extent of the extraradical mycelium beyond the root surface (m),
+    /// as drawn.
+    pub hyphal_reach_m: f32,
+}
+
+impl Default for SymbiosisTraits {
+    fn default() -> Self {
+        SymbiosisTraits {
+            mycorrhiza: MycorrhizaType::None,
+            carbon_cost: 0.0,
+            phosphorus_share: 0.0,
+            nitrogen_share: 0.0,
+            water_share: 0.0,
+            hyphal_reach_m: 0.0,
+        }
+    }
 }
 
 /// Error parsing a genome file.

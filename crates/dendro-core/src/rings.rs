@@ -6,6 +6,16 @@
 //! the climate signal (drought => narrow latewood). The model follows this:
 //! earlywood increment scales with last year's productivity, latewood with
 //! the current summer's productivity (see `sim.rs`).
+//!
+//! Basis: Barbaroux & Breda 2002, "Contrasting distribution and seasonal
+//! dynamics of carbohydrate reserves in stem wood of adult ring-porous
+//! sessile oak and diffuse-porous beech trees", Tree Physiol 22:1201-1210,
+//! doi:10.1093/treephys/22.17.1201 (oak starch reserves drop sharply during
+//! budburst and early wood growth, consistent with earlywood being built from
+//! stored carbohydrate). The `ring_porous` / `earlywood_share` split itself,
+//! and the climate signal being carried by latewood, is the standard
+//! dendrochronological picture of oak; the model's exact rule (previous-year
+//! productivity for earlywood) is a stylisation, not a fitted relation.
 
 /// One annual ring, measured on the stem.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -31,7 +41,8 @@ pub struct Ring {
 }
 
 /// Radius increment (mm) produced by an area increment `da` (m2) on a stem
-/// section of area `a` (m2).
+/// section of area `a` (m2). Pure geometry (circular section), no source
+/// needed; the stem is treated as round, ring eccentricity is ignored.
 pub(crate) fn width_mm(a_before: f32, a_after: f32) -> f32 {
     let pi = std::f32::consts::PI;
     ((a_after / pi).sqrt() - (a_before / pi).sqrt()).max(0.0) * 1000.0

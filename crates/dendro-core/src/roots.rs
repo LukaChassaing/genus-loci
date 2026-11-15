@@ -4,10 +4,24 @@
 //! highly soil-dependent. What is grounded in literature: oak seedlings invest
 //! in a strong taproot (often > 1 m within a few years), which later loses
 //! dominance to a "heart" system of horizontal laterals in the top ~50 cm and
-//! vertical sinkers near the trunk; laterals extend well beyond the crown
-//! (commonly quoted 1.5-3x crown radius). Everything else here (extension
+//! vertical sinkers near the trunk; laterals extend beyond the crown. For
+//! mature Q. robur, Lucot & Bruckert 1992, "Organisation du systeme
+//! racinaire du chene pedoncule (Quercus robur) developpe en conditions
+//! edaphiques non contraignantes", Ann Sci For 49:465-479,
+//! doi:10.1051/forest:19920503: surface system 0-0.6 m, intensive rooting
+//! within ~3 m of the stem, sinkers below 4 m, roots ~20 m from 150-year-old
+//! trees (species traits `lateral_spread`, `max_depth_m`). Everything else here (extension
 //! rates, branching probabilities, soil crowding rule) is a plausible
 //! stylisation chosen for visuals and robustness, not fitted data.
+//!
+//! Sources for the grounded part: Kutschera & Lichtenegger 2002, "Wurzelatlas
+//! mitteleuropaeischer Waldbaeume und Straeucher", Leopold Stocker Verlag,
+//! Graz (root-system drawings and morphology of central-European trees,
+//! including Quercus robur and Prunus avium); Stone & Kalisz 1991, "On the
+//! maximum extent of tree roots", For Ecol Manage 46:59-102,
+//! doi:10.1016/0378-1127(91)90245-Q (maximum rooting depth and radial extent).
+//! The spread is a multiple of the crown radius (`lateral_spread`), set per
+//! species; the oak's is calibrated on Lucot & Bruckert's ~20 m.
 //!
 //! * Explicit axes: taproot, first-order laterals, sinkers and side roots up
 //!   to `max_order`. Fine roots are implicit: a per-soil-layer density
@@ -16,7 +30,10 @@
 //!   permanently waterlogged layers, moisture (see `grow`).
 //! * Tip extension each year scaled by the tree's productivity, a soil
 //!   crowding factor (coarse occupancy grid), depth/spread limits.
-//! * Thickening: pipe model. The collar receives the same cross-section
+//! * Thickening: pipe model (Shinozaki et al. 1964, "A quantitative analysis
+//!   of plant form - the pipe model theory. I. Basic analyses", Jpn J Ecol
+//!   14:97-105; originally formulated for shoots, its use for roots is an
+//!   extension made here). The collar receives the same cross-section
 //!   increment as the stem base; each root segment gets a share equal to the
 //!   fraction of root tips it supports.
 
@@ -30,6 +47,9 @@ pub(crate) const NONE: u32 = u32::MAX;
 
 /// Fine-root proliferation factor of a soil layer (stylised): nutrients
 /// (sqrt), last season's moisture, and avoidance of saturated soil.
+/// Qualitative basis: roots proliferate in nutrient-rich patches (Hodge 2004,
+/// New Phytol 162:9-24). Calibration: the sqrt, the 0.4/0.6 moisture weights
+/// and the waterlogging term are invented functional forms, not fitted.
 pub(crate) fn proliferation(l: &Layer, rt: &RootTraits) -> f32 {
     let tol = rt.waterlogging_tolerance.clamp(0.0, 1.0);
     l.nutrient.max(0.0).sqrt() * (0.4 + 0.6 * l.season_rew) * (1.0 - (1.0 - tol) * l.season_wet)
@@ -126,9 +146,10 @@ impl RootSystem {
     ///
     /// `stress` is last season's mean water stress (0..1): a dry year raises
     /// the allocation to roots and sends sinkers and laterals deeper
-    /// (drought-deepening plasticity), a basis in e.g. Brunner et al. 2015
-    /// (fine-root responses to drought) and the functional-equilibrium
-    /// allocation theory (Poorter et al. 2012). Penetration slows with soil
+    /// (drought-deepening plasticity), a basis in e.g. Brunner et al. 2015,
+    /// "How tree roots respond to drought", Front Plant Sci 6:547,
+    /// doi:10.3389/fpls.2015.00547 (review) and the functional-equilibrium
+    /// allocation theory (Poorter et al. 2012, New Phytol 193:30-50). Penetration slows with soil
     /// strength and stops at bedrock or in permanently saturated (anoxic)
     /// soil, with laterals deflected along the barrier: shallow "plate"
     /// root systems on shallow or waterlogged soils, deep rooting on loose
@@ -219,7 +240,11 @@ impl RootSystem {
         let moist = |depth: f32| layer(depth).map(|l| if l.season_wet > 0.5 { 0.3 } else { l.season_rew }).unwrap_or(0.0);
 
         let spread_limit = rt.lateral_spread * crown_radius.max(0.4) + 0.4;
-        // Allocation to roots rises with water stress (functional balance).
+        // Allocation to roots rises with water stress (functional balance:
+        // Poorter et al. 2012, "Biomass allocation to leaves, stems and roots:
+        // meta-analyses of interspecific variation and environmental control",
+        // New Phytol 193:30-50, doi:10.1111/j.1469-8137.2011.03952.x).
+        // Calibration: the gain `root_shoot_stress_gain` is a game value.
         let alloc = 1.0 + rt.root_shoot_stress_gain * stress;
         let prod = ((0.3 + 0.7 * productivity) * alloc).clamp(0.2, 1.8);
         // Drought deepening of sinkers / taproot.
@@ -243,8 +268,10 @@ impl RootSystem {
                 2 => (0.25 * spread_limit).max(0.8),
                 _ => (0.08 * spread_limit).max(0.3),
             };
-            // Soil strength slows elongation (Bengough et al. 2011:
-            // halved at ~1-2 MPa, stopped at the species' maximum).
+            // Soil strength slows elongation (Bengough et al. 2011, J Exp Bot
+            // 62:59-68: halved at ~0.8-2 MPa, stopped at the species'
+            // maximum). Calibration: the squared linear ramp is a
+            // smooth stand-in for that threshold behaviour.
             let r_soil = resist(depth + 0.05);
             let f_soil = (1.0 - r_soil / rt.max_penetration_mpa.max(0.1)).clamp(0.0, 1.0).powi(2);
             let limit = match n.kind {
@@ -382,7 +409,9 @@ impl RootSystem {
     /// Root length per soil layer: structural (explicit axes) and fine roots.
     ///
     /// Fine roots are not simulated individually. Their length in a layer
-    /// is `fine_root_per_m` metres per metre of structural root there,
+    /// is `fine_root_per_m` metres per metre of structural root there
+    /// (Calibration: the ratio is tuned to give topsoil root length
+    /// densities of order km/m3; it is not a measured ratio),
     /// times a proliferation factor: nutrient-rich (Hodge 2004) and moist
     /// layers get more, seasonally saturated (anoxic) layers fewer
     /// (stylised). This density drives water uptake and is drawn as sparse
@@ -471,7 +500,8 @@ impl RootSystem {
     }
 
     /// Pipe-model thickening: the collar gets `collar_da` (m2), each segment
-    /// the share of root ends it supports.
+    /// the share of root ends it supports (Shinozaki et al. 1964; one unit
+    /// cross-section per root tip, a stylisation of the pipe model).
     pub fn thicken(&mut self, collar_da: f32) {
         if collar_da <= 0.0 {
             return;

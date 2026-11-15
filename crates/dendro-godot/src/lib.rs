@@ -1,5 +1,7 @@
 //! Thin gdext layer: exposes `TreeSim` to Godot. All behaviour lives in `backend.rs`.
 mod backend;
+/// Pruning (« Taille ») functions of `TreeSim`.
+mod prune_api;
 
 use backend::{mesh_data_to_array_mesh, Backend};
 use godot::classes::ArrayMesh;
@@ -291,5 +293,42 @@ impl TreeSim {
     #[func]
     fn get_root_version(&self) -> i64 {
         self.backend.root_version()
+    }
+    /// The day's flows in real units (L/day, g C/day, g/day), keyed by name (see backend `flux_values`).
+    #[func]
+    fn get_flux(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        for (k, v) in self.backend.flux_values() {
+            d.set(&k.to_variant(), &(v as f64).to_variant());
+        }
+        d
+    }
+    /// Flow paths: `[shoot ribbons, root ribbons, hypha ribbons (ArrayMesh, see FluxGeometry::ribbon_mesh),
+    /// gas site positions (PackedVector3Array), gas site (kind 0 leaf / 1 wood / 2 root, weight) pairs
+    /// (PackedFloat32Array)]`.
+    #[func]
+    fn build_flux_geometry(&self) -> VarArray {
+        use dendro_core::{FluxGeometry, GasSiteKind};
+        let g = self.backend.flux_geometry();
+        let mut a = VarArray::new();
+        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.shoot_paths, 0.0)).to_variant());
+        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.root_paths, 0.5)).to_variant());
+        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.hyphae, 1.0)).to_variant());
+        let pos: PackedVector3Array = g.gas_sites.iter().map(|s| Vector3::new(s.pos[0], s.pos[1], s.pos[2])).collect();
+        let info: PackedFloat32Array = g
+            .gas_sites
+            .iter()
+            .flat_map(|s| {
+                let k = match s.kind {
+                    GasSiteKind::Leaf => 0.0,
+                    GasSiteKind::Wood => 1.0,
+                    GasSiteKind::Root => 2.0,
+                };
+                [k, s.weight]
+            })
+            .collect();
+        a.push(&pos.to_variant());
+        a.push(&info.to_variant());
+        a
     }
 }

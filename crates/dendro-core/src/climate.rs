@@ -1,10 +1,29 @@
 //! Procedural temperate-oceanic climate and a soil water bucket.
 //!
-//! Stylised weather generator for western Europe (~48 degN, e.g. Rennes /
-//! Nantes): annual mean ~12 degC, January ~5 degC, July ~19.5 degC,
-//! ~750 mm precipitation on ~165 wet days, wetter winters. Daily temperature
-//! is a seasonal cosine plus an AR(1) anomaly; each year draws seeded
-//! anomalies (warm/cold year, cold spring, dry summer).
+//! Stylised weather generator for western Europe, anchored on the Meteo-France
+//! 1991-2020 normals of Rennes-St Jacques (48.07 degN, station 35281001,
+//! "Fiche climatologique, statistiques 1991-2020"): annual mean 12.4 degC,
+//! January 6.2 degC, July/August 19.2-19.3 degC, mean daily range (Tx - Tn)
+//! from 5.9 degC in January to 11.1 degC in July, 691 mm of precipitation
+//! (115 days >= 1 mm), wetter autumn-winter, Penman PET 856 mm/yr. Daily
+//! temperature is a seasonal cosine plus an AR(1) anomaly; each year draws
+//! seeded anomalies (warm/cold year, cold spring, dry summer).
+//!
+//! Calibration: the seasonal cosines are fitted by eye to those monthly
+//! normals (not a statistical fit). The AR(1) daily anomaly (rho 0.72, sd
+//! 2.6 degC), the smaller diurnal range on wet days and the anomaly
+//! probabilities are stylised weather-generator settings (no source); the
+//! unit test checks the generated normals against the station values.
+//!
+//! Potential evapotranspiration: Hargreaves & Samani 1985, "Reference crop
+//! evapotranspiration from temperature", Appl Eng Agric 1(2):96-99, in the
+//! form given as the temperature-only fallback of FAO-56 (Allen et al.
+//! 1998, FAO Irrigation and Drainage Paper 56, eq. 52), with the
+//! extraterrestrial radiation Ra of FAO-56 eq. 21 (eqs. 23-25 for the
+//! inverse Earth-Sun distance, declination and sunset hour angle). Inputs:
+//! the generated daily mean, the generated diurnal range and latitude.
+//! Full Penman-Monteith would need radiation, humidity and wind that this
+//! generator does not produce honestly.
 
 use crate::rng::{self, S_RAIN, S_RAIN_AMT, S_TEMP, S_YEAR};
 use serde::{Deserialize, Serialize};
@@ -34,22 +53,42 @@ pub struct ClimateParams {
     pub dry_year_prob: f32,
     /// Probability that a year has a cold spring.
     pub cold_spring_prob: f32,
+    /// Annual mean of the daily temperature range Tmax - Tmin (degC).
+    #[serde(default = "dtr_mean_default")]
+    pub dtr_mean_c: f32,
+    /// Half the seasonal swing of the daily range (smallest around Jan 1,
+    /// largest around Jul 1; degC).
+    #[serde(default = "dtr_amplitude_default")]
+    pub dtr_amplitude_c: f32,
+}
+
+fn dtr_mean_default() -> f32 {
+    8.8
+}
+
+fn dtr_amplitude_default() -> f32 {
+    2.6
 }
 
 impl Default for ClimateParams {
+    /// Rennes-St Jacques 1991-2020 (see the module header).
     fn default() -> Self {
         ClimateParams {
-            latitude_deg: 48.0,
-            mean_temp_c: 12.0,
-            temp_amplitude_c: 7.2,
-            coldest_doy: 15.0,
+            latitude_deg: 48.07,
+            mean_temp_c: 12.4,
+            temp_amplitude_c: 6.6,
+            coldest_doy: 20.0,
             daily_temp_sd: 2.6,
             daily_temp_autocorr: 0.72,
             annual_temp_sd: 0.6,
-            annual_precip_mm: 750.0,
-            wet_day_prob: 0.45,
+            // Calibration: 760 gives the station's ~690 mm once dry years
+            // and the generator's other terms are applied (tested below).
+            annual_precip_mm: 760.0,
+            wet_day_prob: 0.42,
             dry_year_prob: 0.12,
             cold_spring_prob: 0.15,
+            dtr_mean_c: dtr_mean_default(),
+            dtr_amplitude_c: dtr_amplitude_default(),
         }
     }
 }
@@ -59,6 +98,10 @@ impl Default for ClimateParams {
 pub struct Weather {
     /// Daily mean air temperature (degC).
     pub temp_c: f32,
+    /// Daily minimum / maximum air temperature (degC): mean -/+ half the
+    /// generated diurnal range.
+    pub tmin_c: f32,
+    pub tmax_c: f32,
     /// Precipitation (mm).
     pub precip_mm: f32,
     /// Potential evapotranspiration (mm).
@@ -87,12 +130,43 @@ pub struct Climate {
 
 /// Day length (h) from latitude and 0-based day of year, using solar
 /// declination and the standard -0.833 deg horizon correction.
+///
+/// Same family as the daylength models compared in Forsythe et al. 1995, "A
+/// model comparison for daylength as a function of latitude and day of year",
+/// Ecol Model 80:87-95, doi:10.1016/0304-3800(94)00034-f (who find such
+/// formulas within minutes of almanac values at mid-latitudes). The
+/// declination expression here is the common sinusoidal approximation, not
+/// their exact CBM formula.
 pub fn photoperiod_h(latitude_deg: f32, doy: u32) -> f32 {
     let decl = 23.44_f32.to_radians() * (TAU * (284.0 + doy as f32 + 1.0) / 365.0).sin();
     let lat = latitude_deg.to_radians();
     let c = ((-0.833_f32).to_radians().sin() - lat.sin() * decl.sin()) / (lat.cos() * decl.cos());
     let h = c.clamp(-1.0, 1.0).acos();
     24.0 * h / std::f32::consts::PI
+}
+
+/// Daily extraterrestrial radiation Ra (MJ m-2 day-1) at a latitude and
+/// 0-based day of year: FAO-56 (Allen et al. 1998) eq. 21, with eq. 23
+/// (inverse relative Earth-Sun distance), eq. 24 (declination) and eq. 25
+/// (sunset hour angle); solar constant 0.0820 MJ m-2 min-1.
+pub fn extraterrestrial_radiation_mj(latitude_deg: f32, doy: u32) -> f32 {
+    let j = doy as f32 + 1.0;
+    let phi = latitude_deg.to_radians();
+    let dr = 1.0 + 0.033 * (TAU * j / 365.0).cos();
+    let decl = 0.409 * (TAU * j / 365.0 - 1.39).sin();
+    let ws = (-phi.tan() * decl.tan()).clamp(-1.0, 1.0).acos();
+    let ra = 24.0 * 60.0 / std::f32::consts::PI
+        * 0.0820
+        * dr
+        * (ws * phi.sin() * decl.sin() + phi.cos() * decl.cos() * ws.sin());
+    ra.max(0.0)
+}
+
+/// Reference evapotranspiration (mm/day) after Hargreaves & Samani 1985
+/// (Appl Eng Agric 1:96-99), as FAO-56 eq. 52:
+/// `ET0 = 0.0023 (Tmean + 17.8) (Tmax - Tmin)^0.5 x 0.408 Ra`.
+pub fn hargreaves_pet_mm(tmean_c: f32, dtr_c: f32, ra_mj: f32) -> f32 {
+    (0.0023 * (tmean_c + 17.8) * dtr_c.max(0.0).sqrt() * 0.408 * ra_mj).max(0.0)
 }
 
 /// Smooth bump: 1 in [a+r, b-r], 0 outside [a, b], linear ramps.
@@ -159,10 +233,12 @@ impl Climate {
             temp += 1.3 * summer;
         }
 
-        // Precipitation: wetter winters (oceanic regime).
-        let season = (TAU * (d - 15.0) / 365.0).cos();
-        let mut p_wet = p.wet_day_prob * (1.0 + 0.22 * season);
-        let mean_amount = p.annual_precip_mm / (365.0 * p.wet_day_prob) * (1.0 + 0.12 * season);
+        // Precipitation: wetter autumn-winter (oceanic regime; Rennes has
+        // ~73 mm/month in Oct-Dec against ~44 mm in Jul-Aug). Calibration:
+        // peak in mid-December, +-18 % wet-day frequency and +-10 % amount.
+        let season = (TAU * (d - 350.0) / 365.0).cos();
+        let mut p_wet = p.wet_day_prob * (1.0 + 0.18 * season);
+        let mean_amount = p.annual_precip_mm / (365.0 * p.wet_day_prob) * (1.0 + 0.10 * season);
         let mut mult = a.precip_mult;
         if a.dry_summer {
             p_wet *= 1.0 - 0.6 * summer;
@@ -175,18 +251,35 @@ impl Climate {
             0.0
         };
 
-        // PET: simple temperature x day-length index (Thornthwaite-like),
-        // ~3.5 mm/d in July, <1 mm/d in winter, ~650 mm/yr.
+        // Diurnal temperature range: seasonal cosine fitted to the Rennes
+        // normals (5.9 degC in January, 11.1 degC in July). Cloudy wet days
+        // have a smaller range than clear dry days. Calibration: wet days
+        // get 0.75 x the seasonal range and dry days are raised so that the
+        // seasonal mean is kept (no source for the 0.75).
+        let dtr_season = p.dtr_mean_c - p.dtr_amplitude_c * (TAU * d / 365.0).cos();
+        let pw = p_wet.clamp(0.0, 0.9);
+        let dtr = if wet { 0.75 * dtr_season } else { dtr_season * (1.0 - 0.75 * pw) / (1.0 - pw) };
+        let dtr = dtr.max(1.0);
+
+        // PET: Hargreaves-Samani with FAO-56 Ra (see module header). It
+        // responds to the warmer, clearer (larger diurnal range) days of a
+        // dry summer by itself.
         let photo = photoperiod_h(p.latitude_deg, doy);
-        let mut pet = (0.25 + 0.135 * temp.max(0.0) * photo / 12.0).max(0.1);
-        if a.dry_summer {
-            pet *= 1.0 + 0.15 * summer;
-        }
+        let ra = extraterrestrial_radiation_mj(p.latitude_deg, doy);
+        let mut pet = hargreaves_pet_mm(temp, dtr, ra);
         if forced_drought {
+            // Gameplay control, not weather: no rain and +40 % demand.
             precip = 0.0;
             pet *= 1.4;
         }
-        Weather { temp_c: temp, precip_mm: precip, pet_mm: pet, photoperiod_h: photo }
+        Weather {
+            temp_c: temp,
+            tmin_c: temp - 0.5 * dtr,
+            tmax_c: temp + 0.5 * dtr,
+            precip_mm: precip,
+            pet_mm: pet,
+            photoperiod_h: photo,
+        }
     }
 }
 
@@ -208,10 +301,16 @@ impl SoilWater {
     }
 
     /// Daily update. `demand_mm` is the potential canopy+soil evaporation.
-    /// Actual ET declines linearly below REW 0.4 (Granier et al. 1999).
+    /// Actual ET declines linearly below REW 0.4: Granier, Breda, Biron &
+    /// Villette 1999, "A lumped water balance model to evaluate duration and
+    /// intensity of drought constraints in forest stands", Ecol Model
+    /// 116:269-283 (BILJOU; transpiration reduced once relative extractable
+    /// water < 0.4).
     /// Returns actual evapotranspiration (mm).
     pub fn step(&mut self, precip_mm: f32, demand_mm: f32) -> f32 {
-        self.water_mm += precip_mm * 0.9; // ~10% interception loss
+        // Calibration: flat 10 % interception loss, a simplification (real
+        // interception varies with canopy, season and rain intensity).
+        self.water_mm += precip_mm * 0.9;
         let supply = (self.rew() / 0.4).min(1.0);
         let et = (demand_mm * supply).min(self.water_mm);
         self.water_mm = (self.water_mm - et).clamp(0.0, self.capacity_mm);
@@ -232,10 +331,14 @@ mod tests {
 
     #[test]
     fn climate_is_plausible() {
+        // Checked against the Rennes-St Jacques 1991-2020 normals (module
+        // header): mean 12.4 degC, Jan 6.2, Jul 19.2, 691 mm on 115 days
+        // >= 1 mm, Penman PET 856 mm (Jan 22 mm, Jul 137 mm). The PET range
+        // was 450-850 mm for the former ad hoc index; it now encodes the
+        // station Penman total +-12 % (Hargreaves is a different method).
         let mut c = Climate::new(ClimateParams::default(), 7);
-        let (mut t, mut p, mut pet) = (0.0f64, 0.0f64, 0.0f64);
-        let mut jan = 0.0;
-        let mut jul = 0.0;
+        let (mut t, mut p, mut pet, mut wet1) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        let (mut jan, mut jul, mut pet_jan, mut pet_jul, mut dtr_jan, mut dtr_jul) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let years = 30;
         for y in 0..years {
             for d in 0..365 {
@@ -243,24 +346,37 @@ mod tests {
                 t += w.temp_c as f64;
                 p += w.precip_mm as f64;
                 pet += w.pet_mm as f64;
+                wet1 += (w.precip_mm >= 1.0) as u8 as f64;
                 if d < 31 {
                     jan += w.temp_c as f64;
+                    pet_jan += w.pet_mm as f64;
+                    dtr_jan += (w.tmax_c - w.tmin_c) as f64;
                 }
                 if (181..212).contains(&d) {
                     jul += w.temp_c as f64;
+                    pet_jul += w.pet_mm as f64;
+                    dtr_jul += (w.tmax_c - w.tmin_c) as f64;
                 }
             }
         }
         let n = (years * 365) as f64;
+        let yf = years as f64;
         let t = t / n;
-        let p = p / years as f64;
-        let pet = pet / years as f64;
-        let jan = jan / (31.0 * years as f64);
-        let jul = jul / (31.0 * years as f64);
-        assert!((10.5..13.5).contains(&t), "mean T {t}");
-        assert!((550.0..950.0).contains(&p), "precip {p}");
-        assert!((450.0..850.0).contains(&pet), "pet {pet}");
-        assert!(jan < 7.5 && jul > 17.0, "jan {jan} jul {jul}");
+        let p = p / yf;
+        let pet = pet / yf;
+        let jan = jan / (31.0 * yf);
+        let jul = jul / (31.0 * yf);
+        let (pet_jan, pet_jul) = (pet_jan / yf, pet_jul / yf);
+        let (dtr_jan, dtr_jul) = (dtr_jan / (31.0 * yf), dtr_jul / (31.0 * yf));
+        let wet1 = wet1 / yf;
+        println!("T {t:.2} jan {jan:.2} jul {jul:.2} P {p:.0} wet>=1 {wet1:.0} PET {pet:.0} jan {pet_jan:.1} jul {pet_jul:.1} dtr {dtr_jan:.1}/{dtr_jul:.1}");
+        assert!((11.9..12.9).contains(&t), "mean T {t}");
+        assert!((5.0..7.5).contains(&jan) && (18.0..20.5).contains(&jul), "jan {jan} jul {jul}");
+        assert!((600.0..800.0).contains(&p), "precip {p}");
+        assert!((95.0..140.0).contains(&wet1), "days >= 1 mm {wet1}");
+        assert!((750.0..960.0).contains(&pet), "pet {pet}");
+        assert!((8.0..35.0).contains(&pet_jan) && (115.0..165.0).contains(&pet_jul), "pet jan {pet_jan} jul {pet_jul}");
+        assert!((5.0..7.0).contains(&dtr_jan) && (10.0..12.5).contains(&dtr_jul), "dtr {dtr_jan} {dtr_jul}");
         let ph_june = photoperiod_h(48.0, 171);
         let ph_dec = photoperiod_h(48.0, 354);
         assert!((15.8..16.5).contains(&ph_june), "{ph_june}");

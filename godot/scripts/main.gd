@@ -29,6 +29,8 @@ var leaf_fall: GPUParticles3D
 var leaf_fall_mat: StandardMaterial3D
 var bark_mat: StandardMaterial3D
 var root_mat: ShaderMaterial
+var flux_panel: FluxPanel        # per-kind flux toggles, legend and live values (shown with Flux)
+var prune_tool: PruneTool         # pruning tool « Taille » (T), wounds, control ghost
 var flux: RootFlux               # root material + water / nutrient flux (dashes, motes)
 var _last_water_q: int = -1
 # Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
@@ -110,10 +112,17 @@ func _ready() -> void:
 	_apply_species_look()
 	hud.soil_opacity_changed.connect(func(v: float) -> void: soil.set_opacity(v))
 	hud.flux_toggled.connect(func(on: bool) -> void: flux.set_enabled(on))
+	flux_panel = FluxPanel.new(flux.view)
+	hud.add_child(flux_panel)
+	hud.flux_toggled.connect(func(on: bool) -> void: flux_panel.visible = on)
 	hud.guides_toggled.connect(func(on: bool) -> void: guides.set_shown(on))
+	prune_tool = PruneTool.new()
+	add_child(prune_tool)
+	prune_tool.setup(self)
 	guides.soil = soil
 	guides.cam = cam
 	cam.wedge_dir = soil.wedge_dir
+	cam.soil = soil
 	hud.set_seed_text(seed_value)
 	_rebuild_meshes(start_days > 0.0)
 	_settle_view()
@@ -180,6 +189,8 @@ func _apply_species_look() -> void:
 func _apply_seed(new_seed: int) -> void:
 	seed_value = new_seed
 	sim.reset(seed_value)
+	if prune_tool != null:
+		prune_tool.on_reset()
 	_apply_species_look()
 	hud.set_seed_text(seed_value)
 	hud.force_ring_refresh()
@@ -330,6 +341,7 @@ func _rebuild_meshes(force: bool = false) -> void:
 			0:
 				wood_mi.mesh = sim.build_wood_mesh()
 				_wood_ver = vers[0]
+				flux.mark_geometry_dirty()
 			1:
 				leaf_mi.mesh = sim.build_leaf_mesh()
 				_leaf_ver = vers[1]
@@ -339,6 +351,7 @@ func _rebuild_meshes(force: bool = false) -> void:
 				_root_ver = vers[2]
 				_envelope_pending = true  # applied in _process, at most 4 times per second
 				flux.set_fine_roots(fine_root_mi.mesh)
+				flux.mark_geometry_dirty()
 			_:
 				flower_mi.mesh = sim.build_flower_mesh()
 				_flower_ver = vers[3]
@@ -373,6 +386,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				cam.reframe()
 			KEY_R:
 				cam.toggle_root_view()
+			KEY_E:
+				cam.toggle_ensemble()
 			_:
 				return
 		get_viewport().set_input_as_handled()
@@ -395,6 +410,7 @@ func _process(delta: float) -> void:
 	_update_view_state(delta)
 	_frame_camera(delta)
 	flux.update(sim, delta, playing, cam.distance)
+	_place_flux_panel()
 	hud.update_from(sim)
 	guides.update_from(tree_h)
 	hud.set_legend_visible(soil.xray or cam.root_view)
@@ -415,7 +431,7 @@ func _refresh_tree_stats() -> void:
 func _frame_camera(_delta: float) -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	cam.set_free_rect(hud.free_rect(view), view)
-	cam.fit_to(tree_h, tree_crown_r, soil.radius, soil.depth, soil.wedge_width)
+	cam.fit_to(tree_h, tree_crown_r, soil.radius, soil.depth, soil.wedge_width, soil.keel_depth)
 
 
 ## Snaps plug, season look and camera to the current tree (start-up, screenshots, tests).
@@ -455,6 +471,7 @@ func _update_view_state(delta: float) -> void:
 	for m: ShaderMaterial in [root_mat, fine_root_mat]:
 		m.set_shader_parameter("clip_radius", soil.radius)
 		m.set_shader_parameter("clip_depth", soil.depth)
+	flux.set_clip(soil.radius, soil.depth)
 
 	# Bark: darker and rougher with trunk diameter, so an old trunk reads massive rather than pale.
 	var age_t: float = smoothstep(8.0, 90.0, sim.get_trunk_diameter_cm())
@@ -550,13 +567,14 @@ func _simulate() -> void:
 #   DENDRO_SPECIES=1      species index (0 oak, 1 wild cherry)
 #   DENDRO_YEARS=60       years to fast-forward (default 40)
 #   DENDRO_DOY=300        day of year to stop at (default 200 = mid-July)
-#   DENDRO_CAM=leaves|flowers|trunk|low|roots|default   camera preset (roots = root view through the wedge;
+#   DENDRO_CAM=leaves|flowers|trunk|low|roots|wide|default   camera preset (wide = whole block; roots = root view through the wedge;
 #                         flowers = blossoms/fruit, also the fallback of leaves when the crown is bare)
 #   DENDRO_SEED=n         fixed random seed (weather and phenology vary a lot between seeds)
 #   DENDRO_YAW / DENDRO_PITCH   camera angles in degrees (override the preset)
 #   DENDRO_XRAY=1         see-through soil (opacity SoilBlock.LOW_OPACITY);  DENDRO_GUIDES=1  scale references
 #   DENDRO_SOIL_OPACITY=0..1  soil opacity;  DENDRO_FLUX=0|1  flux dashes / motes on the roots
 #   DENDRO_FLUX_T=0.25    extra flux phase (dashes travelled) for motion stills
+#   DENDRO_FLUX_KINDS=all|none|water,minerals,sugar,o2,co2,vapour,myco   flux kinds shown (panel toggles)
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
 #   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
@@ -625,10 +643,12 @@ func _screenshot_and_quit(path: String) -> void:
 	_apply_camera_preset()
 	_settle_view()
 	cam.snap()
+	await prune_tool.prepare_shot()  # DENDRO_GHOST / DENDRO_PRUNE_HOVER
 	hud.update_from(sim)
 	print("[dendro] view: h=%.1f crown_r=%.1f root_depth=%.1f spread=%.1f plug r=%.1f d=%.1f cam dist=%.1f target=%s" % [
 		sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m(),
 		soil.radius, soil.depth, cam.distance, str(cam.target)])
+	print("[dendro] framing extent px=%s free=%s cam=%s" % [str(cam.projected_extent()), str(hud.free_rect(get_viewport().get_visible_rect().size)), str(cam.get_camera().global_position)])
 	for mi: MeshInstance3D in [root_mi, fine_root_mi]:
 		if mi.mesh != null and mi.mesh.get_surface_count() > 0:
 			var out_n: int = 0
@@ -662,18 +682,36 @@ func _screenshot_and_quit(path: String) -> void:
 	get_tree().quit()
 
 
+## Flux panel: top-right corner of the free view area (usually sky; bottom-right with the ring panel) (left of the ring panel when it is shown).
+func _place_flux_panel() -> void:
+	if not flux_panel.visible:
+		return
+	var fr: Rect2 = hud.free_rect(get_viewport().get_visible_rect().size)
+	flux_panel.size = flux_panel.get_combined_minimum_size()
+	# With the ring panel open the top of the free area is the crown: go to the bottom corner instead.
+	var y: float = fr.end.y - flux_panel.size.y if hud.is_rings_visible() else fr.position.y
+	flux_panel.position = Vector2(fr.end.x - flux_panel.size.x, y)
+
+
 func _apply_view_env() -> void:
+	prune_tool.apply_env_script()  # DENDRO_PRUNE / DENDRO_TAILLE / DENDRO_GHOST
 	if OS.get_environment("DENDRO_XRAY") == "1":
 		hud.set_soil_opacity(SoilBlock.LOW_OPACITY)
 	var so: String = OS.get_environment("DENDRO_SOIL_OPACITY")
 	if so != "":
-		hud.set_soil_opacity(float(so))
+		hud.set_soil_opacity(float(so) / (100.0 if float(so) > 1.0 else 1.0))  # 0..1, or a percentage
 	var fx: String = OS.get_environment("DENDRO_FLUX")
 	if fx != "":
 		hud.flux_button.button_pressed = fx != "0"
 	var ft: String = OS.get_environment("DENDRO_FLUX_T")
 	if ft != "":
 		flux.phase += float(ft)
+		for k: String in flux.view.phases:
+			flux.view.phases[k] += float(ft)
+	var fk: String = OS.get_environment("DENDRO_FLUX_KINDS")
+	if fk != "":
+		flux.view.set_kinds_from_string(fk)
+		flux_panel.sync_checks()
 	if OS.get_environment("DENDRO_GUIDES") == "1":
 		hud.guides_button.button_pressed = true
 
@@ -726,7 +764,9 @@ func _apply_camera_preset() -> void:
 		cam.override_dist = 1.4
 		cam.set_angles(0.0, 0.05)
 	elif preset == "low":
-		cam.set_angles(0.5, -0.3)
+		cam.frame_from(0.5, -0.3)
+	elif preset == "wide":
+		cam.toggle_ensemble()
 	elif preset == "roots":
 		cam.toggle_root_view()
 	var yw: String = OS.get_environment("DENDRO_YAW")
@@ -971,7 +1011,14 @@ func _run_selftest() -> void:
 	hud.rings_button.button_pressed = false  # default layout (the ring panel narrows the free area)
 	await get_tree().process_frame
 	var lens_r: Array[float] = []
-	for years: int in [3, 40, 120, 200]:
+	var species0: int = sim.get_species()
+	var combos: Array[Vector2i] = []
+	for sp: int in [0, 1]:
+		for yrs: int in [1, 5, 20, 40, 100, 200, 300]:
+			combos.append(Vector2i(sp, yrs))
+	for combo: Vector2i in combos:
+		var years: int = combo.y
+		sim.set_species(combo.x)
 		_apply_seed(7)
 		_advance_days_direct(float(years) * 365.0 + 200.0)
 		_rebuild_meshes(true)
@@ -993,7 +1040,7 @@ func _run_selftest() -> void:
 		var ymax_s: float = -INF
 		var xmin_s: float = INF
 		var xmax_s: float = -INF
-		for p: Vector3 in cam.framing_points(h, cr, soil.radius, soil.depth, soil.wedge_width):
+		for p: Vector3 in cam.framing_points(h, cr, soil.radius, soil.depth, soil.wedge_width, soil.keel_depth):
 			var sp2: Vector2 = camera.unproject_position(p)
 			xmin_s = minf(xmin_s, sp2.x)
 			xmax_s = maxf(xmax_s, sp2.x)
@@ -1006,18 +1053,21 @@ func _run_selftest() -> void:
 		var y_base: float = camera.unproject_position(Vector3.ZERO).y
 		var y_top: float = camera.unproject_position(Vector3(0.0, h, 0.0)).y
 		var frac: float = (y_base - y_top) / free_raw.size.y
-		# The soil body follows the root spread (2-3 x the crown): an old tree's lens is width-bound, then
-		# it must fill the free width instead.
-		var wfrac: float = (xmax_s - xmin_s) / free_raw.size.x
-		_check("framing: tree fills >= 55 % of free height (or the root lens >= 85 % of its width)", frac >= 0.55 or wfrac >= 0.85,
-			"age %d: height %.0f %%, lens width %.0f %%" % [years, frac * 100.0, wfrac * 100.0])
+		# The default view frames the TREE (crown + trunk + the soil mass under it), not the 80 m soil disc: the
+		# rim of an old tree's lens may run off-screen, so the tree must still fill the free height.
+		# (A seedling is smaller than the clod it grows in: only 28 % there.)
+		_check("framing: tree fills 50-98 %% of the free height (sp %d)" % combo.x, frac >= (0.5 if h >= 3.0 else 0.28) and frac <= 0.98,
+			"age %d: height %.0f %%" % [years, frac * 100.0])
+		_check("framing: camera outside the trunk and the soil", not cam.is_blocked(camera.global_position),
+			"cam %s" % str(camera.global_position))
 		# Soil body follow rules (the camera/soil were just snapped to this tree).
 		_check_soil_encloses_roots("age %d" % years)
 		lens_r.append(soil.radius)
 		_check("root clip uniform equals soil radius", is_equal_approx(root_mat.get_shader_parameter("clip_radius") as float, soil.radius),
 			"%.3f vs %.3f" % [root_mat.get_shader_parameter("clip_radius") as float, soil.radius])
 		_check("root clip depth equals plug depth", is_equal_approx(root_mat.get_shader_parameter("clip_depth") as float, soil.depth))
-	_check("soil body scales with the roots (3 y clod -> 200 y lens)", lens_r.size() == 4 and lens_r[3] > 4.0 * lens_r[0] and lens_r[2] > lens_r[1],
+	sim.set_species(species0)
+	_check("soil body scales with the roots (1 y clod -> 200 y lens)", lens_r.size() == 14 and lens_r[5] > 4.0 * lens_r[0] and lens_r[4] > lens_r[3],
 		str(lens_r))
 	# Eases toward a new envelope, rebuilding only when it moved noticeably (no per-frame rebuild).
 	var builds0: int = soil.rebuild_count
@@ -1084,6 +1134,31 @@ func _run_selftest() -> void:
 	_frame_camera(0.0)
 	cam.snap()
 	_check("camera position sane after re-frame", cam.get_camera().global_position.distance_to(cam_before) < 1.0)
+	# Never inside the trunk or the ground, even at maximum zoom, with a low pitch, or aimed at the trunk.
+	var blocked: String = ""
+	for pitch_t: float in [OrbitCamera.MIN_PITCH, 0.0, 0.5]:
+		for dist_t: float in [OrbitCamera.MIN_DIST, 0.5, 2.0, 8.0]:
+			cam.manual = true
+			cam.goal_target = Vector3(0.0, 1.0, 0.0)
+			cam.target = cam.goal_target
+			cam.set_angles(0.9, pitch_t)
+			cam.goal_distance = dist_t
+			cam.distance = dist_t
+			cam.snap()
+			if cam.is_blocked(cam.get_camera().global_position):
+				blocked += " (pitch %.2f dist %.2f)" % [pitch_t, dist_t]
+	_check("camera never ends up inside the trunk or the soil", blocked == "", blocked)
+	_check("zoom limits: leaf to whole block", OrbitCamera.MIN_DIST <= 0.2 and OrbitCamera.MAX_DIST >= 3.0 * soil.radius)
+	# Ensemble preset (E / DENDRO_CAM=wide): crown, full rim and keel all inside the free area.
+	cam.reset_view()
+	cam.toggle_ensemble()
+	_frame_camera(0.0)
+	cam.snap()
+	var ext: Rect2 = cam.projected_extent()
+	var free_e: Rect2 = hud.free_rect(get_viewport().get_visible_rect().size).grow(6.0)
+	_check("ensemble preset frames everything", cam.ensemble and free_e.encloses(ext), "%s in %s" % [str(ext), str(free_e)])
+	cam.toggle_ensemble()
+	_check("ensemble toggles off", not cam.ensemble)
 
 	# 9. Keys and controls: X / "Sol" slider (soil opacity), "Flux", G (Repères), R (root view), F (re-frame)
 	#    through the real input path.
@@ -1100,7 +1175,7 @@ func _run_selftest() -> void:
 	_check("key X again: opaque", not soil.xray and soil.opacity == 1.0 and soil._soil_mi.material_override == soil._soil_mat)
 	hud.soil_slider.value = 0.5
 	await get_tree().process_frame
-	_check("Sol slider sets the opacity (dithered material)", is_equal_approx(soil.opacity, 0.5) and soil._soil_mi.material_override == soil._soil_dither_mat
+	_check("Sol slider sets the opacity (dithered material)", is_equal_approx(soil.opacity, 0.5) and (soil._soil_mi.material_override == soil._soil_dither_mat or soil._soil_mi.material_override == soil._soil_a2c_mat)
 		and is_equal_approx(soil._soil_dither_mat.get_shader_parameter("opacity") as float, 0.5))
 	hud.soil_slider.value = 1.0
 	await get_tree().process_frame
@@ -1133,6 +1208,23 @@ func _run_selftest() -> void:
 	hud.flux_button.button_pressed = true
 	await get_tree().process_frame
 	_check("Flux button shows it again", flux.enabled and (fine_root_mat.get_shader_parameter("flux_on") as float) == 1.0)
+	# Whole-tree flux (TreeFluxView): real-unit values, paths, panel toggles.
+	var fv: Dictionary = sim.get_flux()
+	_check("flux: July sap and sugar flows", float(fv["xylem_l"]) > 1.0 and float(fv["phloem_down_gc"]) > float(fv["phloem_up_gc"])
+		and float(fv["co2_in_g"]) > 0.0, "xylem %.1f L/j" % float(fv["xylem_l"]))
+	flux.view.rebuild_geometry(sim)
+	var paths: Array = sim.build_flux_geometry()
+	_check("flux: path ribbons and gas sites built", (paths[0] as ArrayMesh).get_surface_count() == 1
+		and (paths[1] as ArrayMesh).get_surface_count() == 1 and (paths[3] as PackedVector3Array).size() > 0)
+	_check("flux panel shown with Flux", flux_panel.visible)
+	flux_panel.toggle_for("sugar").button_pressed = false
+	await get_tree().process_frame
+	_check("flux panel: sugar toggle hides phloem dashes", not flux.view.kind_on["sugar"])
+	flux_panel.toggle_for("sugar").button_pressed = true
+	hud.flux_button.button_pressed = false
+	await get_tree().process_frame
+	_check("flux panel hidden with Flux off", not flux_panel.visible)
+	hud.flux_button.button_pressed = true
 	_press_key(KEY_G)
 	await get_tree().process_frame
 	_check("key G: Repères on", hud.guides_button.button_pressed and guides.shown)

@@ -6,6 +6,8 @@
 // Main sources: Savill 2013 "The Silviculture of Trees used in British
 // Forestry"; Russell 2003 (EUFORGEN Technical Guidelines, Prunus avium);
 // Welk et al. 2016 (European Atlas of Forest Tree Species).
+// Full references in docs/sources.md. Note: those general sources describe
+// the species qualitatively; most numeric values below are calibrations.
 (
     species: "Prunus avium",
     common_name: "Wild cherry",
@@ -29,7 +31,7 @@
         // ramify, instead of many similar starved branches.
         lateral_competition: 2.0,
         // Metamers per unit light (calibrated): vigorous pioneer.
-        vigour_per_light: 7.0,
+        vigour_per_light: 7.5,
         bud_break_threshold: 1.0,
         // Long shoots: internodes 3-6 cm, leaders 0.8-1.2 m/yr in youth
         // (cherry is one of the fastest-growing European broadleaves).
@@ -82,7 +84,8 @@
         clear_bole_fraction: 0.2,
         clear_bole_max_m: 4.5,
         clear_bole_limb_ratio: 0.5,
-        // Short-lived tree: crown dieback from ~80 y (heart rot, bacterial
+        // Short-lived tree (individual trees 100-150 y according to the Future
+        // Trees Trust wild cherry monograph; Russell 2003): crown dieback from ~80 y (heart rot, bacterial
         // canker and silver leaf disease attack old cherries; few live
         // beyond ~100-150 y, Russell 2003). Fast ramp, little reiteration.
         retrenchment_onset_years: 80.0,
@@ -130,6 +133,7 @@
     ),
     pigments: (
         chlorophyll: 1.0,
+        // Calibration: pigment weights are tuned by eye for the renderer.
         // Brilliant orange-red autumn colour: strong anthocyanin synthesis
         // over carotenoid yellow, little brown; the red persists until the
         // leaves fall.
@@ -141,23 +145,36 @@
         anthocyanin_color: (0.78, 0.14, 0.06),
     ),
     phenology: (
-        // Prunus avium has a high chilling requirement (~1000 chill hours,
-        // i.e. ~60-80 days with a daily mean of 0-7 degC; Alburquerque et
-        // al. 2008 for sweet cherry cultivars).
-        chilling_requirement_days: 70.0,
-        chill_temp_min_c: 0.0,
-        chill_temp_max_c: 7.0,
-        // Leaf-out early-mid April, 1-2 weeks before the oak, together with
-        // the flowers (calibrated).
+        // Same chilling-forcing model as the oak (Cannell & Smith 1983;
+        // Murray, Cannell & Smith 1989 fitted it to P. avium too, but their
+        // coefficients could not be read here). Chilling requirement: sweet
+        // cherry cultivars need 176-788 h below 7 degC (397-1001 Utah chill
+        // units), most of them ~400-800 h (Alburquerque et al. 2008, Environ
+        // Exp Bot 64:162-170, doi:10.1016/j.envexpbot.2008.01.003, Table 3,
+        // Murcia; no figure was found for wild, forest P. avium). The former
+        // "~1000 chill hours" matched only the latest cultivar in chill
+        // units. Here the requirement is mostly met after ~30 days with a
+        // mean <= 5 degC (a typical Rennes winter), i.e. like the oak's.
+        // Calibration: a, b and the requirement are tuned so that leaf-out
+        // falls in early-mid April, about a week before the oak, together
+        // with the bloom.
+        chilling_requirement_days: 45.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
         gdd_base_c: 5.0,
-        gdd_budburst: 194.0,
+        gdd_budburst: 185.0,
+        chill_forcing_gdd: 250.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
         leaf_expansion_gdd: 170.0,
+        // Senescence structure after Delpierre et al. 2009 (fitted for beech
+        // and oak, not cherry: values here are calibrated).
         // Early senescence: colouring from mid-September, leaves gone by
         // late October (a month before the oak).
         senescence_photoperiod_h: 12.4,
         senescence_temp_base_c: 18.0,
         senescence_cdd: 115.0,
-        leaf_fall_days: 14.0,
+        leaf_fall_days: 12.0,
     ),
     wood: (
         // Basic density ~0.5-0.6 g/cm3; green MOE ~7-9 GPa.
@@ -170,11 +187,13 @@
         ring_contrast: 0.3,
         // Pressler coefficient (calibrated on DBH targets); wide juvenile
         // rings (up to ~1 cm on vigorous young trees).
-        growth_coefficient: 0.0000310,
+        growth_coefficient: 0.0000330,
         twig_radius_mm: 2.5,
         max_ring_width_mm: 12.0,
         // Mesh: slender limbs, round stem, a modest root collar flare.
-        pipe_exponent: 2.3,
+        // Within Eloy's 2011 range (1.8-2.3, see the oak file); calibration:
+        // near da Vinci's 2 for the slender, excurrent cherry (it was 2.3).
+        pipe_exponent: 2.1,
         limb_draw_boost: 1.3,
         bark_irregularity: 0.02,
         collar_flare: 0.2,
@@ -220,6 +239,14 @@
         // among the most flooding-sensitive fruit trees, Schaffer et al.
         // 1992). Stylised strength (calibrated).
         hypoxia_sensitivity: 1.0,
+        // Mazzard F12/1 (a P. avium rootstock clone) lost 51.5 % of its shoot
+        // growth and 69 % of its maximum photosynthesis in soil at 9 %
+        // against 21 % air-filled porosity, where tolerant Prunus rootstocks
+        // did not (Morales-Olmedo et al. 2021, Plant Soil 469:457-473,
+        // doi:10.1007/s11104-021-05184-5; rootstocks, not wild seedlings).
+        // Calibration: hypoxia counted from 15 % air-filled porosity
+        // (generic 10 %).
+        hypoxia_air_porosity: 0.15,
         drought_deepening: 0.3,
         hydrotropism: 0.4,
         root_shoot_ratio: 0.25,
@@ -232,17 +259,31 @@
         frost_c: -2.0,
         // Fairly drought tolerant on deep, well-drained soils.
         drought: 0.45,
-        // Strongly light-demanding.
+        // Shade tolerant when young, becoming strongly light-demanding with
+        // age (Future Trees Trust wild cherry monograph, citing Joyce et al.
+        // 1998 and Savill; "light demanding" for the adult tree in Russell
+        // 2003 and Welk et al. 2016). Calibration: the juvenile value 0.55
+        // (oak 0.3) and the 8 -> 20 year transition are ours; no source
+        // gives the age.
         shade: 0.25,
+        shade_juvenile: Some(0.55),
+        shade_juvenile_years: 8.0,
+        shade_mature_years: 20.0,
     ),
     reproduction: (
-        // Seedlings flower from ~4-7 years when open-grown.
+        // Seedlings flower from ~4-7 years when open-grown (EUFORGEN: from
+        // about 4 y under optimal conditions; Pryor 1988, Forestry Commission
+        // Bulletin 75: often under 10 y).
         first_flowering_age_years: 5.5,
         // Showy white flowers, red-black cherries.
         flower_display: 1.0,
         fruit_display: 1.0,
-        // Bloom in April, just before / as the leaves break (calibrated).
-        bloom_gdd: 196.0,
+        // Bloom just before / as the leaves break (calibrated, same forcing
+        // sum from Feb 1 and chilling penalty as leaf-out): early-mid April
+        // at Rennes; the mean onset of cherry bloom in Germany was 17 April
+        // in 1991-2020 (Deutscher Wetterdienst phenological network), a
+        // cooler climate.
+        bloom_gdd: 172.0,
         bloom_duration_gdd: 110.0,
         // Umbels of 2-6 flowers on short spurs of 2-year and older wood,
         // throughout the outer crown (bloom reads as a white cloud; only the
@@ -272,5 +313,52 @@
         decline_onset_years: 85.0,
         decline_years: 40.0,
         decline_min_vigour: 0.3,
+    ),
+    // Prunus (Rosaceae) forms arbuscular mycorrhizae, the ancestral and
+    // dominant type (Wang & Qiu 2006, Mycorrhiza 16:299-363); wild cherry is
+    // colonised by Glomus spp. (Lovato et al. 1994, "Mycorrhization of
+    // micropropagated mature wild cherry (Prunus avium L.) and common ash",
+    // Agricultural Science in Finland). AM hyphae can supply most of the plant's
+    // P and a smaller part of its N (Marschner & Dell 1994, Plant Soil
+    // 159:89-102); the shares here are calibrations. AM fungi receive a few
+    // to ~20 % of the host's photosynthate (Smith & Read 2008, Mycorrhizal
+    // Symbiosis, 3rd ed.); 10 % of NPP here. Extraradical AM hyphae stay
+    // within a few cm of the root (drawn reach exaggerated for legibility).
+    symbiosis: (
+        mycorrhiza: Arbuscular,
+        carbon_cost: 0.10,
+        phosphorus_share: 0.7,
+        nitrogen_share: 0.2,
+        water_share: 0.03,
+        hyphal_reach_m: 0.12,
+    ),
+    // Response to pruning (see crates/dendro-core/src/pruning.rs). Wild
+    // cherry has few viable latent buds and coppices poorly; it regenerates
+    // by root suckers instead (EuroCoppice silviculture guidelines; Pryor
+    // 1988, Forestry Commission Bulletin 75). Its winter wounds are the
+    // entry point of silver leaf (Chondrostereum purpureum, spores Sept-May,
+    // RHS advice) and bacterial canker (Pseudomonas syringae; Kennelly et
+    // al. 2007, Plant Dis 91:4-17), so it is pruned in summer. Wounds
+    // gum and compartmentalise less well than oak's (calibration). All
+    // numbers are calibrations chosen for these qualitative rankings.
+    pruning: (
+        epicormic_potential: 0.2,
+        sprout_vigour: 1.4,
+        stump_sprouting: 0.35,
+        root_suckering: 0.8,
+        compensatory_growth: 0.25,
+        woundwood_ratio: 1.8,
+        compartmentalization: 0.45,
+        decay_infection_rate: 0.08,
+        decay_axial_m_per_year: 0.12,
+        decay_radial_mm_per_year: 8.0,
+        pathogen_dormant_risk: 0.45,
+        pathogen_summer_risk: 0.04,
+        pathogen_dieback_years: 3.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.4,
+        sap_bleeding: 0.2,
+        // Wild cherry is short-lived (rarely much over 100 years).
+        typical_lifespan_years: 110.0,
     ),
 )

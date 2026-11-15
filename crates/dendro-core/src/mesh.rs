@@ -1,5 +1,9 @@
 //! Engine-agnostic mesh output.
 //!
+//! Sources: geometry is a rendering stylisation. Where radii follow the pipe
+//! model, see Shinozaki et al. 1964 (Jpn J Ecol 14:97-105) and the Leonardo
+//! exponent note in `sim.rs` (Eloy 2011).
+//!
 //! Conventions (all meshes):
 //! * Right-handed, **Y up**, metres, tree base (root collar) at the origin.
 //! * Triangles are wound **clockwise when seen from the front face** (the side

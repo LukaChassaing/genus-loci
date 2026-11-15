@@ -1,12 +1,20 @@
 // Pedunculate oak, Quercus robur L.
 // Values are literature-plausible orders of magnitude, some calibrated so the
 // emergent tree matches open-grown oak sizes (marked "calibrated").
+// Sources (full list in docs/sources.md): Jones 1959, "Biological Flora of
+// the British Isles: Quercus L.", J Ecol 47:169-222 (general ecology of
+// Q. robur); Kutschera & Lichtenegger 2002 (roots); Cannell & Smith 1983 and
+// Delpierre et al. 2009 (phenology); Parelle et al. 2006 (waterlogging).
+// Where a number has no direct source it is marked "stylised" or "calibrated".
 (
     species: "Quercus robur",
     common_name: "Pedunculate oak",
     common_name_fr: "Chêne pédonculé",
     architecture: (
-        // Borchert-Honda lambda of the stem (calibrated by eye). Oak is excurrent when
+        // Borchert-Honda lambda of the stem (Borchert & Honda 1984, "Control
+        // of development in the bifurcating branch system of Tabebuia rosea:
+        // a computer simulation", Bot Gaz 145:184-195; the lambda values here
+        // are calibrated by eye, not measured). Oak is excurrent when
         // young (strong apical control keeps basal shoots from becoming
         // co-dominant stems), strongly decurrent when mature: below 0.5 the
         // laterals out-compete the leader and the stem dissolves into a few
@@ -29,7 +37,9 @@
         // Metamers per unit light (calibrated).
         vigour_per_light: 5.7,
         bud_break_threshold: 1.0,
-        // Oak internodes on vigorous shoots ~3-5 cm.
+        // Oak internodes on vigorous shoots ~3-5 cm (typical value, no
+        // specific source checked).
+
         internode_length_m: 0.045,
         // Vigorous oak leaders reach 0.5-0.8 m/yr (first flush only, no lammas).
         max_shoot_length_m: 0.5,
@@ -47,7 +57,9 @@
         // Leader orthotropic; laterals corrected towards their set-points.
         gravitropism: 0.35,
         lateral_gravitropism: 0.3,
-        // Gravitropic set-points (concept: Digby & Firn 1995; values
+        // Gravitropic set-points (concept: Digby & Firn 1995, "The
+        // gravitropic set-point angle (GSA)...", Plant Cell Environ
+        // 18:1434-1440, doi:10.1111/j.1365-3040.1995.tb00205.x; values
         // calibrated by eye): lower limbs of open-grown oak run out at
         // 60-70 deg from vertical, upper ones ascend; twigs spread outward.
         limb_setpoint_low_deg: 60.0,
@@ -82,7 +94,8 @@
         straightening_deg_per_year: 1.5,
         straightening_keep_deg: 12.0,
         straightening_min_radius_mm: 15.0,
-        // Oak is light-demanding, but shade leaves of the lower and inner
+        // Shade tolerance and self-pruning: no direct source; thresholds are
+        // calibrated. Oak is light-demanding, but shade leaves of the lower and inner
         // crown persist down to ~9 % of open-sky light (calibrated; with the
         // 3-year survival below), so the open-grown crown stays deep.
         shedding_threshold: 0.09,
@@ -99,7 +112,9 @@
         // Crown retrenchment of veteran oaks (stylised rates): from ~200 y
         // the farthest boughs die back (stag-headed top, dead limbs that
         // break up over decades) while epicormic shoots rebuild a lower
-        // inner crown ("growing downwards", Lonsdale 2013).
+        // inner crown ("growing downwards", Lonsdale (ed.) 2013, "Ancient and other
+        // veteran trees: further guidance on management", The Tree Council,
+        // London; the onset age and the rates below are stylised).
         retrenchment_onset_years: 200.0,
         retrenchment_rate: 0.08,
         // Dieback probability ramps up over a century after onset.
@@ -108,7 +123,7 @@
         epicormic_rate: 0.04,
         // Collar-to-bud distance (m) where extension stops; calibrated so
         // open-grown height reaches ~30 m at 200 years.
-        hydraulic_path_max_m: 36.5,
+        hydraulic_path_max_m: 37.0,
         // Height growth stays vigorous to mid-life, then plateaus (calibrated).
         hydraulic_exponent: 1.8,
         // Foliage efficiency declines early and gradually with transport
@@ -152,28 +167,50 @@
         tannins: 0.9,
     ),
     phenology: (
-        // Oak has a moderate chilling requirement (days with mean 0-7 degC).
-        chilling_requirement_days: 60.0,
-        chill_temp_min_c: 0.0,
-        chill_temp_max_c: 7.0,
-        // Budburst mid/late April in western France (~250 degC.d base 5 from Jan 1).
+        // Budburst: T = a + b exp(-3 C / chilling_requirement_days), T in
+        // degC.day > 5 degC from Feb 1, C = days with mean <= 5 degC from
+        // Nov 1 (Cannell & Smith 1983, J Appl Ecol 20:951-963; fitted per
+        // species, Q. robur included, by Murray, Cannell & Smith 1989, J
+        // Appl Ecol 26:693-700, who class oak among the species whose
+        // forcing requirement depends little on chilling). Calibration: the
+        // a, b and requirement values are ours, tuned so that budburst
+        // falls in mid/late April in the Rennes climate (oak stands in
+        // France leaf out from mid-April, Lebourgeois et al. 2010, Int J
+        // Biometeorol 54:563-581; late April-early May across Europe, Eaton
+        // et al. 2016, European Atlas of Forest Tree Species).
+        chilling_requirement_days: 45.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
         gdd_base_c: 5.0,
-        gdd_budburst: 250.0,
+        gdd_budburst: 270.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
         leaf_expansion_gdd: 190.0,
-        // Senescence after Delpierre et al. 2009 (photoperiod gate + cold sum):
-        // colouring from early October, full colour early November.
-        senescence_photoperiod_h: 11.6,
+        // Senescence after Delpierre et al. 2009 (Agric For Meteorol
+        // 149:938-948; photoperiod gate + cold sum; parameter values here are
+        // calibrated to the stated dates, not copied from their fits):
+        // colouring from late September, half-coloured mid-October (French
+        // oak stands yellow in mid-October, Lebourgeois et al. 2010), full
+        // colour early-mid November, bare by ~29 November (gate was 11.6 h,
+        // which with the Rennes climate left oaks leafy into December).
+        senescence_photoperiod_h: 12.0,
         senescence_temp_base_c: 17.0,
         senescence_cdd: 190.0,
-        leaf_fall_days: 28.0,
+        leaf_fall_days: 21.0,
     ),
     wood: (
-        // Q. robur basic density ~ 0.55-0.65 g/cm3 (load of the sag model).
+        // Q. robur basic density ~ 0.55-0.65 g/cm3 (load of the sag model;
+        // typical handbook range, not individually sourced).
+
         density_kg_m3: 640.0,
         // Green oak MOE ~ 8-10 GPa.
         elasticity_gpa: 9.0,
         // Oak is the textbook ring-porous wood: large earlywood vessels formed
-        // before budburst from reserves; latewood carries climate variability.
+        // at budburst from reserves; latewood carries climate variability
+        // (Barbaroux & Breda 2002, Tree Physiol 22:1201-1210, for the
+        // reserve use; see also rings.rs).
+
         ring_porous: true,
         earlywood_share: 0.35,
         // Renderer: strong ring contrast (wide band of large earlywood pores).
@@ -182,17 +219,27 @@
         // radius bough ~50 years; stylised).
         snag_years_per_m: 500.0,
         // Pressler law coefficient (calibrated on DBH targets).
-        growth_coefficient: 0.0000180,
+        growth_coefficient: 0.0000200,
         twig_radius_mm: 2.5,
         max_ring_width_mm: 9.0,
         // Mesh-only stylisation (not measured): visible branch collars, and
         // the strong root flare of old oaks with a few buttress lobes over
         // the main lateral roots.
         collar_flare: 0.25,
-        // Branching exponent for drawn radii (measured da Vinci exponents
-        // ~1.8-2.8; oak's massive limbs suggest > 2).
-        pipe_exponent: 2.6,
-        // Up to x1.6 for boughs; twigs keep their simulated radius.
+        // Branching exponent for drawn radii. Leonardo's rule (sum of
+        // daughter areas ~ parent area, exponent 2): Eloy 2011, "Leonardo's
+        // rule, self-similarity, and wind-induced stresses in trees", Phys
+        // Rev Lett 107:258101, doi:10.1103/PhysRevLett.107.258101 (exponents
+        // between ~1.8 and 2.3 reported across species); da Vinci's rule
+        // holds approximately in field data (Minamino & Tateno 2014, "Tree
+        // branching: Leonardo da Vinci's rule versus biomechanical models",
+        // PLoS ONE 9:e93535; Fagus crenata, Abies homolepis). No measurement
+        // for Q. robur was found. Calibration: the upper end of the range
+        // (the oak's thick, sympodial limbs); it was 2.6, outside it.
+        pipe_exponent: 2.3,
+        // Cap of the drawn widening (with e = 2.3 the factor stays below
+        // ~1.3 on limbs, so the cap rarely binds); twigs keep their
+        // simulated radius.
         limb_draw_boost: 1.6,
         // Old oak limbs and stems are fluted and out of round.
         bark_irregularity: 0.07,
@@ -214,15 +261,26 @@
     roots: (
         // Oak forms a strong taproot in the first years (often > 1 m by
         // 5 years), which loses dominance within a few decades to a "heart"
-        // system of laterals and sinkers (Lyford 1980; Kutschera &
-        // Lichtenegger 2002).
+        // system of laterals and sinkers (Kutschera & Lichtenegger 2002;
+        // Lucot & Bruckert 1992 for mature Q. robur, see lateral_spread).
         taproot_dominance: 0.9,
         taproot_decline_years: 12.0,
         // Genetic maximum rooting depth; the soil usually stops roots first
-        // (oak: 2-3 m on loam, 4-5 m on deep sand; Stone & Kalisz 1991).
+        // (oak: 2-3 m on loam, 4-5 m on deep sand; Stone & Kalisz 1991, For
+        // Ecol Manage 46:59-102; the split by soil is a summary, not a table
+        // value we checked).
         max_depth_m: 4.5,
-        // Laterals spread 1.5-3x the crown radius.
-        lateral_spread: 2.2,
+        // Lateral spread as a multiple of crown radius. Lucot & Bruckert
+        // 1992 ("Organisation du systeme racinaire du chene pedoncule
+        // (Quercus robur) developpe en conditions edaphiques non
+        // contraignantes", Ann Sci For 49:465-479, doi:10.1051/forest:19920503)
+        // found 150-year-old Q. robur rooting intensively within ~3 m of the
+        // stem (surface system 0-0.6 m), with sub-vertical sinkers below 4 m
+        // and extensive roots reaching ~20 m from the tree. Calibration: 1.4
+        // x the (open-grown, wide) crown radius gives ~22 m at 150 years
+        // (it was 2.2, i.e. ~35 m, beyond that observation); their stand
+        // trees had narrower crowns, so the ratio itself is uncertain.
+        lateral_spread: 1.4,
         lateral_count: 8,
         // Preferred depth of the main laterals (they run 0.3-1 x this deep).
         lateral_depth_m: 0.45,
@@ -234,10 +292,12 @@
         // around 3 MPa for most species).
         max_penetration_mpa: 3.2,
         // Q. robur tolerates waterlogging better than Q. petraea (Parelle et
-        // al. 2006) but its roots still avoid permanently anoxic soil.
+        // al. 2006, Ann For Sci 63:849-859, seedlings) but its roots still avoid permanently anoxic soil.
         waterlogging_tolerance: 0.4,
         // Q. robur roots tolerate hypoxia well (hypertrophied lenticels,
-        // adventitious roots; Colin-Belgrand et al. 1991): treated as fully
+        // adventitious roots; Parelle et al. 2006; Colin-Belgrand, Dreyer &
+        // Biron 1991, Ann Sci For 48:193-204, seedlings of Q. robur, Q.
+        // rubra, Q. palustris): treated as fully
         // tolerant of poorly aerated, non-saturated soil.
         hypoxia_sensitivity: 0.0,
         // Moderate deepening after dry years (stylised).
@@ -252,8 +312,10 @@
         rapid_taper: 1.2,
     ),
     tolerances: (
-        // Expanding oak leaves are killed by late frosts around -2..-3 degC.
-        frost_c: -2.5,
+        // New oak foliage is killed around -3 degC (Eaton et al. 2016,
+        // "Quercus robur and Quercus petraea in Europe", European Atlas of
+        // Forest Tree Species).
+        frost_c: -3.0,
         // Q. robur is moderately drought tolerant (less than Q. petraea).
         drought: 0.45,
         // Light-demanding pioneer-ish species.
@@ -291,5 +353,50 @@
         decline_onset_years: 0.0,
         decline_years: 50.0,
         decline_min_vigour: 0.3,
+    ),
+    // Oaks are ectomycorrhizal (mantle + Hartig net; Smith & Read 2008,
+    // "Mycorrhizal Symbiosis", 3rd ed., Academic Press). Carbon cost: Hobbie
+    // 2006, Ecology 87:563-569, doi:10.1890/05-0755 (1-21 % of NPP to
+    // ectomycorrhizal fungi in culture studies; 15 % here, calibration
+    // within that range). Nutrient / water shares and the drawn reach of the
+    // extramatrical mycelium (medium- to long-distance exploration types,
+    // Agerer 2001, Mycorrhiza 11:107-114, doi:10.1007/s005720100108) are
+    // calibrations, not measurements. Used by the flux view only.
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // Response to pruning (see crates/dendro-core/src/pruning.rs for the
+    // model and its references). Pedunculate oak releases latent buds
+    // abundantly after pruning, thinning or topping (epicormic shoots,
+    // Meier, Saunders & Michler 2012, Tree Physiol 32:565-584; Fontaine et
+    // al. 2001, Ann For Sci 58:583-592 on Quercus petraea) and coppices
+    // readily (traditional oak coppice and pollards, Read 2000). Durable
+    // heartwood and good compartmentalisation (Shigo 1984). Oak pathogens
+    // entering pruning wounds are a minor risk in Europe (no oak wilt).
+    // All numbers are calibrations chosen for these qualitative rankings.
+    pruning: (
+        epicormic_potential: 0.9,
+        sprout_vigour: 2.2,
+        stump_sprouting: 0.85,
+        root_suckering: 0.0,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // Open-grown pedunculate oaks commonly live 500+ years.
+        typical_lifespan_years: 600.0,
     ),
 )

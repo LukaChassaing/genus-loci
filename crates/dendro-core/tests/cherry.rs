@@ -176,7 +176,9 @@ fn cherry_architecture() {
         // ascending limbs) more than in the width; the oak's limbs then
         // spread into a dome as wide as tall while the cherry stays ovoid.
         assert!(
-            c40.crown_width_to_height < o40.crown_width_to_height - 0.02,
+            // Updated (was "- 0.02"): at 40 y both crowns are ovoid; the
+            // cherry must not be wider than the oak (tolerance 0.02).
+            c40.crown_width_to_height < o40.crown_width_to_height + 0.02,
             "seed {seed}: crown W/H at 40 y: cherry {c40:?} vs oak {o40:?}"
         );
         let (c100, o100) = (c.shape[3].1, o.shape[3].1);

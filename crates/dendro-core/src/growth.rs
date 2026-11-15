@@ -1,6 +1,19 @@
 //! Above-ground shoot system: bud-based growth with light competition.
 //!
 //! Model, after Palubicki et al. 2009 ("Self-organizing tree models"):
+//!
+//! References (full list in docs/sources.md): Palubicki et al. 2009,
+//! "Self-organizing tree models for image synthesis", ACM Trans Graph
+//! 28(3):58, doi:10.1145/1531326.1531364 (bud competition for light,
+//! Borchert-Honda vigour split); Borchert & Honda 1984, Bot Gaz
+//! 145:184-195, doi:10.1086/337445; Ryan & Yoder 1997, "Hydraulic limits to
+//! tree height and tree growth", BioScience 47:235-242, doi:10.2307/1313077;
+//! Shinozaki et al. 1964, Jpn J Ecol 14:97-105 (pipe model); Halle, Oldeman
+//! & Tomlinson 1978, "Tropical trees and forests: an architectural
+//! analysis", Springer, doi:10.1007/978-3-642-81190-6 (architectural
+//! vocabulary: excurrent/decurrent, reiteration). Calibration: all numeric
+//! trait values come from the species files and are tuned to match
+//! open-grown tree sizes, they are not fitted to measured architectures.
 //! * The tree is a graph of **annual shoots** (one node = one year's
 //!   extension of an axis, i.e. a lumped chain of metamers). Oak growth is
 //!   rhythmic and largely preformed with buds clustered at the shoot tip, so
@@ -144,6 +157,16 @@ pub(crate) struct Node {
     pub light: f32,
     /// Direction of decreasing shadow at the tip.
     pub grad: Vec3,
+    /// Pruning response (see `pruning.rs`): vigour boost of the latent buds
+    /// released on this node by a cut (and inherited, decaying, by the
+    /// water sprouts that grow from them). Exactly 0 on a tree that was
+    /// never pruned.
+    pub sprout: f32,
+    /// This node hosts a pruning wound (never merged away as a parent by
+    /// `compact`, so the wound keeps its position).
+    pub wounded: bool,
+    /// The axis ends in a cut face (heading cut): drawn blunt.
+    pub cut_end: bool,
     // --- scratch, recomputed every pass ---
     q_main: f32,
     q_lat: f32,
@@ -264,6 +287,9 @@ impl ShootSystem {
             bud_year: 0,
             light: 1.0,
             grad: Vec3::ZERO,
+            sprout: 0.0,
+            wounded: false,
+            cut_end: false,
             q_main: 0.0,
             q_lat: 0.0,
             s_lat: 0.0,
@@ -320,10 +346,16 @@ impl ShootSystem {
         // when they lose their last leaves (instead of vanishing with it).
         let len = self.nodes.len();
         let mut has_snag = vec![false; len];
+        // Wood carrying a pruning remnant that waits for its latent buds
+        // (all-false on a tree that was never pruned).
+        let mut waiting = vec![false; len];
         for i in (1..len).rev() {
             let n = &self.nodes[i];
             if n.is_snag() || has_snag[i] {
                 has_snag[n.parent as usize] = true;
+            }
+            if (n.sprout > 0.0 && n.leaf_n <= 0.0 && !n.is_snag()) || waiting[i] {
+                waiting[n.parent as usize] = true;
             }
         }
         for i in 1..self.nodes.len() {
@@ -334,6 +366,36 @@ impl ShootSystem {
                 true
             } else if n.is_snag() {
                 year > n.snag_since + snag_life_years(n.radius(), snag_k)
+            } else if n.sprout > 0.0 && n.leaf_n <= 0.0 {
+                // Pruning remnant waiting for its latent buds (see
+                // `pruning.rs`): kept through the next flush; if no bud
+                // broke, it dies back as a stub that stays standing until it
+                // breaks off (Shigo 1989, "Tree Pruning: A Worldwide Photo
+                // Guide": stubs die back and delay closure).
+                if year > n.bud_year + 1 {
+                    // Only a cut end dies back; a host whose released
+                    // buds failed simply stops waiting.
+                    if n.cut_end {
+                        self.nodes[i].snag_since = year;
+                        self.nodes[i].lat_buds = 0;
+                        self.nodes[i].term_bud = false;
+                    }
+                    self.nodes[i].sprout = 0.0;
+                }
+                false
+            } else if (n.sprout > 0.0 || self.nodes[p].wounded) && on_stem[p] && !n.terminal {
+                // Sprouts on the bole, a stump or a pollard head (a cut host)
+                // are not removed by the stylised clear-bole rule:
+                // light-based shedding decides.
+                if n.leaf_n > 0.0 && n.order > 0 && (n.leaf_max < threshold || n.leaf_q < mean_thr * n.leaf_n) {
+                    let st = n.starve.saturating_add(1);
+                    self.nodes[i].starve = st;
+                    st > survival.max(1)
+                } else {
+                    false
+                }
+            } else if waiting[i] && n.leaf_n <= 0.0 {
+                false
             } else if n.leaf_n <= 0.0 && has_snag[i] && year > n.birth_year + 1 {
                 self.nodes[i].snag_since = year;
                 self.nodes[i].lat_buds = 0;
@@ -395,6 +457,7 @@ impl ShootSystem {
                 && !par.term_bud
                 && par.lat_buds == 0
                 && par.is_snag() == node.is_snag()
+                && !par.wounded
                 && year >= node.birth_year + 4
                 && par.length + node.length <= max_seg
                 && {
@@ -418,6 +481,7 @@ impl ShootSystem {
                 node.area = par.area.max(node.area);
                 node.order = par.order;
                 node.terminal = par.terminal;
+                node.sprout = node.sprout.max(par.sprout);
                 out[np] = node;
                 remap[i] = np as u32;
             } else {
@@ -430,8 +494,9 @@ impl ShootSystem {
     }
 
     /// Late-life crown retrenchment and reiteration (stylised; concepts from
-    /// the veteran-tree literature: Lonsdale 2013 "Ancient and other
-    /// veteran trees", Read 2000; hydraulic basis: Ryan & Yoder 1997).
+    /// the veteran-tree literature: Lonsdale (ed.) 2013 "Ancient and other
+    /// veteran trees: further guidance on management", The Tree Council,
+    /// London; Read 2000 (not verified here); hydraulic basis: Ryan & Yoder 1997).
     ///
     /// * **Dieback**: each year after `retrenchment_onset_years`, every
     ///   bough (a branch at least half as thin as its parent, 2-12 cm
@@ -527,9 +592,12 @@ impl ShootSystem {
         self.tree_h = self.nodes.iter().map(|n| n.end(1.0).y).fold(0.03, f32::max);
         let kc = a.lateral_competition;
         self.accumulate(kc);
-        let thr = a.shedding_threshold * (1.3 - g.tolerances.shade);
+        // Shade tolerance may change with age (e.g. wild cherry: tolerant
+        // when young, strongly light-demanding later; see genome.rs).
+        let shade = g.tolerances.shade_at(age);
+        let thr = a.shedding_threshold * (1.3 - shade);
         if year > 0 {
-            let mean_thr = a.shedding_mean_threshold * (1.3 - g.tolerances.shade);
+            let mean_thr = a.shedding_mean_threshold * (1.3 - shade);
             let bole_h = (a.clear_bole_fraction * self.height()).min(a.clear_bole_max_m);
             let ratio = a.clear_bole_limb_ratio * a.clear_bole_limb_ratio;
             stats.shed = self.mark_shed(thr, mean_thr, year, (bole_h, ratio), a.shade_survival_years, g.wood.snag_years_per_m);
@@ -547,7 +615,7 @@ impl ShootSystem {
         } else {
             self.break_boost = (self.break_boost * 0.95).max(1.0);
         }
-        let threshold = a.bud_break_threshold * (1.3 - g.tolerances.shade) * self.break_boost;
+        let threshold = a.bud_break_threshold * (1.3 - shade) * self.break_boost;
         // Juvenile plateau, then a smooth decline to the mature value.
         let span = (a.maturity_age_years - a.juvenile_phase_years).max(1.0);
         let t = ((age - a.juvenile_phase_years) / span).clamp(0.0, 1.0);
@@ -637,11 +705,25 @@ impl ShootSystem {
             let n = &self.nodes[i];
             if n.lat_buds > 0 && n.s_lat > 0.0 {
                 let share = n.v_lat * pow_k(n.light, kc) / n.s_lat;
-                let (nid, nbuds) = (n.id, n.lat_buds);
+                let (nid, nbuds, sprout, host) = (n.id, n.lat_buds, n.sprout, n.wounded);
                 let mut broken = 0u8;
                 for k in 0..nbuds {
                     let jitter = 0.85 + 0.3 * rng::unit(rng::hash(seed, S_BUD, nid as u64, (year as u64) << 8 | k as u64));
-                    let v = share * (1.0 - 0.12 * k as f32) * jitter;
+                    let mut v = share * (1.0 - 0.12 * k as f32) * jitter;
+                    if sprout > 0.0 {
+                        // Released latent buds are fed from stored reserves
+                        // (roots, stem), not only by the current light of
+                        // the remaining crown: Loescher, McCamant & Keller
+                        // 1990, "Carbohydrate reserves, translocation, and
+                        // storage in woody plant roots", HortScience 25:274-281.
+                        // Calibration: on the cut host itself the boost adds
+                        // up to half a maximum shoot (in metamers) per unit
+                        // of `sprout`; on the sprouts it only multiplies.
+                        v *= 1.0 + sprout;
+                        if host {
+                            v += sprout * 0.5 * jitter * a.max_shoot_length_m / a.internode_length_m;
+                        }
+                    }
                     if v >= threshold {
                         // Sympodial relay: on an axis whose terminal bud did
                         // not grow, the most distal lateral that breaks takes
@@ -664,6 +746,11 @@ impl ShootSystem {
         for n in self.nodes.iter_mut() {
             n.leafy = false;
             n.grow_from = n.length;
+            // The pruning boost fades on growing axes (a remnant still
+            // waiting for its buds keeps it, see `mark_shed`).
+            if n.sprout > 0.0 && n.leaf_n > 0.0 {
+                n.sprout = if n.sprout * 0.7 < 0.05 { 0.0 } else { n.sprout * 0.7 };
+            }
         }
         for &(i, gf) in &extended {
             self.nodes[i].leafy = true;
@@ -702,7 +789,15 @@ impl ShootSystem {
         } else {
             parent.limb_base_y
         };
-        let n_max = a.max_shoot_length_m / a.internode_length_m;
+        let mut n_max = a.max_shoot_length_m / a.internode_length_m;
+        // Water sprouts (pruning response, `sprout > 0`) outgrow the normal
+        // maximum annual extension: they are fed by the reserves of a root
+        // system sized for the lost crown (Meier, Saunders & Michler 2012,
+        // "Epicormic buds in trees: a review...", Tree Physiol 32:565-584).
+        // Calibration: +60 % per unit of boost, at most x2.2.
+        if parent.sprout > 0.0 {
+            n_max *= 1.0 + 0.6 * parent.sprout.min(2.0);
+        }
         let metamers = vigour.min(n_max);
         // Straight-line collar-to-bud distance is used as the transport
         // distance (the summed path would also count sinuosity, which keeps
@@ -749,6 +844,15 @@ impl ShootSystem {
         } else {
             setpoint
         };
+        // Water sprouts are orthotropic (they grow straight up from the cut,
+        // Meier et al. 2012): set-point pulled towards the vertical and a
+        // stronger gravitropic correction while the boost lasts.
+        let (grav, setpoint) = if parent.sprout > 0.0 {
+            let s = parent.sprout / (1.0 + parent.sprout);
+            (grav + s * 0.8, setpoint * (1.0 - s))
+        } else {
+            (grav, setpoint)
+        };
         let target = if setpoint <= 0.0 {
             Vec3::Y
         } else {
@@ -793,6 +897,10 @@ impl ShootSystem {
             bud_year: year,
             light: parent.light,
             grad: parent.grad,
+            // Water sprouts stay vigorous for a few years (decays yearly).
+            sprout: parent.sprout * 0.6,
+            wounded: false,
+            cut_end: false,
             q_main: 0.0,
             q_lat: 0.0,
             s_lat: 0.0,
@@ -1139,6 +1247,77 @@ impl ShootSystem {
                 }
             }
         }
+    }
+
+    /// Drop the light-pass scratch grid (up to ~4 MB) before cloning a
+    /// simulation for a checkpoint; it is rebuilt on the next light pass.
+    pub fn strip_scratch(&mut self) {
+        self.grid = Vec::new();
+    }
+
+    /// Current index of the node with stable id `id`.
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        self.nodes.iter().position(|n| n.id == id)
+    }
+
+    /// Leaf area of the current-year leafy units (m2 of crown surface cells,
+    /// `leaf_units x voxel^2`): a size-consistent proxy of the tree's leaf
+    /// area, used by the pruning metrics.
+    pub fn leaf_area_proxy(&self) -> f32 {
+        let unit_len = 0.75 * self.voxel - 0.06;
+        let face = self.voxel * self.voxel;
+        self.nodes.iter().filter(|n| n.leafy).map(|n| leaf_units(n, unit_len) * face).sum()
+    }
+
+    /// Remove the subtree rooted at `root` (its descendants, and `root`
+    /// itself unless `keep_root`), preserving `parent < child`. Returns the
+    /// removed (leaf-area proxy, wood volume m3).
+    pub fn remove_subtree(&mut self, root: usize, keep_root: bool) -> (f32, f32) {
+        let n = self.nodes.len();
+        let unit_len = 0.75 * self.voxel - 0.06;
+        let face = self.voxel * self.voxel;
+        let mut gone = vec![false; n];
+        gone[root] = !keep_root;
+        let mut inside = vec![false; n];
+        inside[root] = true;
+        let (mut leaf, mut wood) = (0.0f32, 0.0f32);
+        for i in root..n {
+            if i > root {
+                let p = self.nodes[i].parent as usize;
+                if p == NONE as usize || !inside[p] {
+                    continue;
+                }
+                inside[i] = true;
+                gone[i] = true;
+            }
+            if gone[i] {
+                let nd = &self.nodes[i];
+                wood += nd.area * nd.length;
+                if nd.leafy {
+                    leaf += leaf_units(nd, unit_len) * face;
+                }
+            }
+        }
+        let mut remap = vec![NONE; n];
+        let mut out: Vec<Node> = Vec::with_capacity(n);
+        for (i, nd) in self.nodes.drain(..).enumerate() {
+            if gone[i] {
+                continue;
+            }
+            let mut nd = nd;
+            if nd.parent != NONE {
+                nd.parent = remap[nd.parent as usize];
+            }
+            remap[i] = out.len() as u32;
+            out.push(nd);
+        }
+        self.nodes = out;
+        (leaf, wood)
+    }
+
+    /// Wood volume (m3) of the whole shoot system.
+    pub fn wood_volume(&self) -> f32 {
+        self.nodes.iter().map(|n| n.area * n.length).sum()
     }
 
     /// Index of the trunk node spanning height `y`, following terminal children.

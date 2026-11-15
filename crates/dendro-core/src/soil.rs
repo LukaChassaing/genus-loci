@@ -8,7 +8,10 @@
 //! The simulation discretises the profile into ~10 cm layers in the top
 //! 60 cm and ~25 cm layers below ([`SoilLayerState`] exposes them). Daily
 //! water balance, in the spirit of tipping-bucket models such as BILJOU
-//! (Granier et al. 1999) and the cascade of SWAT/CERES:
+//! (Granier et al. 1999, "A lumped water balance model to evaluate duration
+//! and intensity of drought constraints in forest stands", Ecol Model
+//! 116:269-283) and the cascade of SWAT/CERES-type models (the cascade here
+//! is a generic simplification, not a port of either):
 //! * throughfall (90 % of rain) enters the top layer; water above
 //!   saturation passes on at once, water above field capacity drains to the
 //!   next layer at most at the horizon's conductivity per day;
@@ -25,7 +28,13 @@
 //! no lateral flow, no seasonal water-table fluctuation (perched water in
 //! winter on slowly draining clay does appear through the cascade).
 //! Retention values are given per horizon in the data (typical values from
-//! texture classes, e.g. Saxton & Rawls 2006 pedotransfer functions).
+//! texture classes, e.g. Saxton & Rawls 2006, "Soil water characteristic
+//! estimates by texture and organic matter for hydrologic solutions", Soil
+//! Sci Soc Am J 70:1569-1578, doi:10.2136/sssaj2005.0117). Calibration: the
+//! four preset profiles are archetypes written for the game (loam, rendzina,
+//! gley, podzol), with rounded values; they are not measurements of a real
+//! site, and the other parameters (drainage mm/day, stones, nutrient index)
+//! are stylised.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -68,7 +77,11 @@ pub struct Horizon {
     pub bulk_density_g_cm3: f32,
     /// Penetration resistance at field capacity (MPa). Root elongation
     /// halves around 1-2 MPa and stops around 2.5-3 MPa (Bengough et al.
-    /// 2011).
+    /// 2011, "Root elongation, water stress, and mechanical impedance: a
+    /// review of limiting stresses and beneficial root tip traits", J Exp
+    /// Bot 62:59-68, doi:10.1093/jxb/erq350: elongation roughly halved above
+    /// 0.8-2 MPa in repacked soils; the 2.5-3 MPa stop is the usual
+    /// rule of thumb, not a figure checked in that review).
     pub penetration_resistance_mpa: f32,
     /// Volumetric water content at field capacity (-33 kPa), m3/m3.
     pub field_capacity: f32,
@@ -82,7 +95,9 @@ pub struct Horizon {
     /// Organic matter (% mass).
     pub organic_matter_pct: f32,
     /// Relative nutrient availability 0..1 (fine roots proliferate where
-    /// it is high; Hodge 2004).
+    /// it is high; Hodge 2004, "The plastic plant: root responses to
+    /// heterogeneous supplies of nutrients", New Phytol 162:9-24,
+    /// doi:10.1111/j.1469-8137.2004.01015.x).
     pub nutrient_index: f32,
 }
 
@@ -93,8 +108,15 @@ impl Horizon {
     }
 
     /// Aeration: air-filled porosity at field capacity (m3/m3); below
-    /// ~0.10 roots suffer from poor aeration (Grable & Siemer 1968).
+    /// ~0.10 roots suffer from poor aeration (Grable & Siemer 1968, "Effects
+    /// of bulk density, aggregate size, and soil water suction on oxygen
+    /// diffusion, redox potentials, and elongation of corn roots", Soil Sci
+    /// Soc Am Proc 32:180-186, doi:10.2136/sssaj1968.03615995003200020011x;
+    /// they studied maize, the ~10 % air-porosity threshold is the usual
+    /// generalisation to trees, to be taken as approximate).
     pub fn aeration(&self) -> f32 {
+        // Total porosity from bulk density with a particle density of
+        // 2.65 g/cm3 (standard mineral-soil value).
         (self.porosity() - self.field_capacity).max(0.0)
     }
 
@@ -299,12 +321,18 @@ impl Layer {
     pub fn thick(&self) -> f32 {
         self.bottom - self.top
     }
-    /// Oxygen shortage of the layer 0..1 from its air-filled porosity
-    /// (volume fraction): 0 at >= 10 %, 1 when no air is left.
+    /// Oxygen shortage at the generic 10 % air-filled porosity threshold
+    /// (kept for callers without species context, e.g. the flux view).
     #[inline]
     pub fn hypoxia(&self) -> f32 {
+        self.hypoxia_at(0.10)
+    }
+    /// Oxygen shortage of the layer 0..1 from its air-filled porosity
+    /// (volume fraction): 0 at >= `threshold`, 1 when no air is left.
+    #[inline]
+    pub fn hypoxia_at(&self, threshold: f32) -> f32 {
         let afp = (self.sat - self.water).max(0.0) / (self.thick() * 1000.0).max(1e-3);
-        (1.0 - afp / 0.10).clamp(0.0, 1.0)
+        (1.0 - afp / threshold.max(0.01)).clamp(0.0, 1.0)
     }
 }
 
@@ -334,6 +362,13 @@ pub(crate) struct SoilColumn {
     pub root_zone_m2: f32,
     /// Compute root hypoxia (only species sensitive to it need it).
     pub track_hypoxia: bool,
+    /// Air-filled porosity (m3/m3) below which the tree's roots suffer from
+    /// hypoxia (species trait `RootTraits::hypoxia_air_porosity`).
+    pub hypoxia_afp: f32,
+    /// Critical relative extractable water REWc below which transpiration
+    /// is reduced (Granier et al. 1999: ~0.4, "quite constant" across
+    /// species; set by the simulation from the species traits).
+    pub rew_critical: f32,
     states: Vec<SoilLayerState>,
 }
 
@@ -404,6 +439,8 @@ impl SoilColumn {
             last: WaterDay { rew: 1.0, anoxic: 0.0, hypoxic: 0.0, uptake: 0.0 },
             root_zone_m2: 1.0,
             track_hypoxia: false,
+            hypoxia_afp: 0.10,
+            rew_critical: 0.4,
             states: Vec::new(),
         };
         c.refresh_states();
@@ -445,6 +482,9 @@ impl SoilColumn {
                 carry += d;
             }
         }
+        // Calibration: drainage, capillary-rise rate (~2 mm/day) and the leak
+        // through bedrock fissures (1.5 mm/day) below are stylised, chosen for
+        // plausible behaviour; there is no direct source.
         // Bottom boundary: bedrock holds the water back (perched water
         // table filling the column from below); otherwise free drainage.
         if self.bedrock.is_some() && carry > 0.0 {
@@ -472,8 +512,14 @@ impl SoilColumn {
                 l.water += deficit.min(2.0 * (1.0 - l.rew()) + 0.2);
             }
         }
-        // 3. Soil evaporation from the top ~15 cm (stage-2 decline).
-        let e_soil = pet * 0.3 * (1.0 - 0.5 * leaf);
+        // 3. Soil + understorey evaporation from the top ~15 cm. Granier et
+        // al. 1999 (BILJOU) take it proportional to the energy reaching the
+        // ground under the canopy (Beer-Lambert, k = 0.5) and decreasing
+        // linearly with the water of the upper layer. Calibration: the
+        // canopy is taken at LAI 6 when fully leafed (their r = 0.75 case);
+        // leafless winter wood shades the ground by ~30 %.
+        let lai = 6.0 * leaf;
+        let e_soil = pet * 0.7 * (-0.5 * lai).exp();
         let mut want = e_soil;
         for l in self.layers.iter_mut() {
             if l.top >= 0.15 || want <= 0.0 {
@@ -485,9 +531,12 @@ impl SoilColumn {
             want -= e;
         }
         // 4. Transpiration, shared by root length x extractable water.
+        // Granier et al. 1999: maximum stand transpiration T/PET = 0.75 at
+        // LAI >= 6 (0.125 x LAI below; here the leaf-out fraction stands for
+        // the seasonal LAI), reduced linearly below REWc (~0.4).
         let rew = self.rooted_rew();
-        let t_pot = pet * 0.7 * leaf;
-        let t_act = t_pot * (rew / 0.4).min(1.0);
+        let t_pot = pet * 0.75 * leaf;
+        let t_act = t_pot * (rew / self.rew_critical.max(0.05)).min(1.0);
         let mut wsum = 0.0;
         for l in &self.layers {
             if !l.saturated() {
@@ -511,8 +560,9 @@ impl SoilColumn {
             }
         }
         // Rooted fraction in saturated layers (anoxia), and root-weighted
-        // hypoxia: air-filled porosity below ~10 % (Grable & Siemer 1968)
-        // starves roots of oxygen even short of saturation (heavy clays).
+        // hypoxia: air-filled porosity below a species threshold (~10 %,
+        // Grable & Siemer 1968 for maize; see `RootTraits`) starves roots of
+        // oxygen even short of saturation (heavy clays).
         let total_root: f32 = self.layers.iter().map(|l| l.root_len).sum();
         let (anoxic, hypoxic) = if total_root > 0.0 && !self.track_hypoxia {
             (self.layers.iter().filter(|l| l.saturated()).map(|l| l.root_len).sum::<f32>() / total_root, 0.0)
@@ -527,7 +577,7 @@ impl SoilColumn {
                     an += l.root_len;
                     hy += l.root_len;
                 } else {
-                    hy += l.root_len * l.hypoxia();
+                    hy += l.root_len * l.hypoxia_at(self.hypoxia_afp);
                 }
             }
             (an / total_root, hy / total_root)
@@ -548,7 +598,8 @@ impl SoilColumn {
 
     /// Relative extractable water of the rooted profile: layers count by
     /// root presence (a layer with >= 10 % of the densest layer's root
-    /// length counts fully), as in BILJOU's rooted-zone REW. Saturated
+    /// length counts fully), as in BILJOU's rooted-zone REW (Granier et al.
+    /// 1999; the 10 % root-presence cutoff is a calibration). Saturated
     /// layers count as full.
     pub fn rooted_rew(&self) -> f32 {
         let max = self.layers.iter().map(|l| l.root_len / l.thick().max(1e-3)).fold(0.0, f32::max);
@@ -584,7 +635,11 @@ impl SoilColumn {
     /// Depth (m) where roots stop: bedrock, or the top of the permanently
     /// waterlogged zone plus what the species tolerates (`tolerance` 0..1
     /// lets roots enter it by up to 0.4 m; Q. robur roots survive some
-    /// waterlogging, Q. petraea much less: Parelle et al. 2006).
+    /// waterlogging, Q. petraea much less: Parelle et al. 2006, "Differences
+    /// in morphological and physiological responses to water-logging between
+    /// two sympatric oak species (Quercus petraea, Quercus robur)", Ann For
+    /// Sci 63:849-859, doi:10.1051/forest:2006068; a seedling study).
+    /// Calibration: the 0.4 m maximum entry depth is a game value.
     pub fn root_barrier(&self, tolerance: f32) -> f32 {
         let mut b = self.profile.column_depth_m();
         if let Some(r) = self.bedrock {

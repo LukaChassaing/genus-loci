@@ -50,13 +50,14 @@ uniform float clip_depth = 1000.0;
 uniform float fine_style = 0.0;
 uniform vec3 root_tint = vec3(1.40, 1.18, 0.92);
 uniform vec4 cap_color : source_color = vec4(0.36, 0.25, 0.15, 1.0);
+uniform float surface_dashes = 1.0;  // 0 on structural roots: their flux is drawn by TreeFluxView ribbons
 varying vec3 wpos;
 %s
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 vec3 flux(float path, float key, float rad) {
-	float lvl = flux_level * flux_on;
+	float lvl = flux_level * flux_on * surface_dashes;
 	if (lvl < 0.004) {
 		return vec3(0.0);
 	}
@@ -149,6 +150,8 @@ var _profile_age: float = 10.0
 var _up_n: int = 0
 var _up_bottom: PackedFloat32Array = PackedFloat32Array()
 var _up_rel: PackedFloat32Array = PackedFloat32Array()
+## Whole-tree flux (xylem, phloem, gases, mycorrhizae): see TreeFluxView.
+var view: TreeFluxView
 
 
 static func make_root_material(tex: Array[ImageTexture]) -> ShaderMaterial:
@@ -164,6 +167,7 @@ static func make_root_material(tex: Array[ImageTexture]) -> ShaderMaterial:
 func _init(bark_tex: Array[ImageTexture] = []) -> void:
 	if bark_tex.size() >= 2:
 		root_mat = make_root_material(bark_tex)
+		root_mat.set_shader_parameter("surface_dashes", 0.0)
 		fine_root_mat = make_root_material(bark_tex)
 		fine_root_mat.set_shader_parameter("fine_style", 1.0)
 	_up_bottom.resize(MAX_LAYERS)
@@ -188,12 +192,16 @@ func _ready() -> void:
 	_motes.material_override = _mote_mat
 	_motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_motes)
+	view = TreeFluxView.new()
+	view.name = "TreeFlux"
+	add_child(view)
 
 
 func set_enabled(on: bool) -> void:
 	enabled = on
 	_push("flux_on", 1.0 if on else 0.0)
 	_motes.visible = on
+	view.set_enabled(on)
 
 
 ## Fine-root mesh to take the mote targets from (call after each fine-root rebuild; sampled lazily).
@@ -224,6 +232,12 @@ func update(sim: TreeSim, delta: float, playing: bool, view_dist: float) -> void
 	_mote_refresh += delta
 	if _mote_src != null and _mote_refresh > 0.5:
 		_refresh_motes()
+	view.update(sim, delta, playing, view_dist)
+	# Fine-root dashes and soil motes are the water uptake itself: they follow the "water" kind toggle.
+	var water_on: bool = view.kind_on.get("water", true)
+	_motes.visible = enabled and water_on
+	if fine_root_mat != null:
+		fine_root_mat.set_shader_parameter("surface_dashes", 1.0 if water_on else 0.0)
 
 
 ## Jumps the smoothed level to the current uptake (start-up, screenshots, tests).
@@ -233,6 +247,7 @@ func snap(sim: TreeSim) -> void:
 	_update_profile(sim)
 	if _mote_src != null:
 		_refresh_motes()
+	view.snap(sim)
 
 
 ## Uptake per unit root length of each soil layer, relative to the best layer (dry layers fade out).
@@ -252,11 +267,22 @@ func _update_profile(sim: TreeSim) -> void:
 	if n > 0:
 		_up_bottom[n - 1] = 99.0
 	_up_n = n
+	view.set_uptake_profile(_up_n, _up_bottom, _up_rel)
 	for m: ShaderMaterial in [root_mat, fine_root_mat, _mote_mat]:
 		if m != null:
 			m.set_shader_parameter("up_n", _up_n)
 			m.set_shader_parameter("up_bottom", _up_bottom)
 			m.set_shader_parameter("up_rel", _up_rel)
+
+
+## Plug clipping (roots and their flux are cut at the soil plug).
+func set_clip(radius: float, depth: float) -> void:
+	view.set_clip(radius, depth)
+
+
+## The tree changed (wood or roots rebuilt): the flux paths are re-sampled shortly.
+func mark_geometry_dirty() -> void:
+	view.geometry_dirty = true
 
 
 ## Mote targets: deterministic sample of fine-root vertices.

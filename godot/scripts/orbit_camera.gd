@@ -10,9 +10,12 @@ const FOV_DEG: float = 40.0
 const MIN_PITCH: float = -0.62     # ~ -35 deg: look slightly from below
 const MAX_PITCH: float = 1.45
 const DEFAULT_YAW: float = 0.25
-const DEFAULT_PITCH: float = 0.10
+const DEFAULT_PITCH: float = 0.07  # slightly low: the keel under the ground reads from the default view
+const ENSEMBLE_PITCH: float = 0.28
 const ROOT_PITCH: float = 0.16
-const FILL: float = 0.97           # fraction of the free rect the framing box may occupy
+const MIN_DIST: float = 0.15       # a leaf fills the screen
+const MAX_DIST: float = 1500.0     # the whole 80 m block and then some
+const FILL: float = 0.93           # fraction of the free rect the framing box may occupy
 
 var yaw: float = DEFAULT_YAW
 var pitch: float = DEFAULT_PITCH
@@ -21,6 +24,10 @@ var target: Vector3 = Vector3(0.0, 0.5, 0.0)
 var shift_px: Vector2 = Vector2.ZERO
 var manual: bool = false           # the user zoomed/panned: auto-follow is off until reframe()
 var root_view: bool = false
+## Ensemble preset: frames the whole block (crown, full rim, keel) instead of the tree.
+var ensemble: bool = false
+## Set by main: lets the camera keep out of the solid soil (never start or end up inside the ground).
+var soil: SoilBlock
 ## Azimuth of the removed wedge (the root view looks along it).
 var wedge_dir: float = 0.45
 
@@ -38,6 +45,9 @@ var _crown_r: float = 1.0
 var _plug_r: float = 2.5
 var _plug_d: float = 2.0
 var _wedge_w: float = 1.92
+var _keel_d: float = 0.0           # keel thickness under the axis (m)
+var _fit_yaw: float = DEFAULT_YAW  # angles the framing is solved at (preset angles, not the orbiting ones)
+var _fit_pitch: float = DEFAULT_PITCH
 var _fit_key: Array = []
 var _fit_sol: Dictionary = {}
 ## Debug/preset override: look at `override_point` from `override_dist` (no HUD offset).
@@ -50,7 +60,7 @@ func _ready() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = FOV_DEG
 	_cam.near = 0.05
-	_cam.far = 800.0
+	_cam.far = 1000.0
 	add_child(_cam)
 	_apply()
 
@@ -71,40 +81,62 @@ static func _smooth(a: float, b: float, x: float) -> float:
 	return t * t * (3.0 - 2.0 * t)
 
 
-## Points that must stay inside the free rect at the preset angles: crown extremities and the plug rim
-## (top and bottom ring over the remaining arc, plus the corners of the cut faces). Young trees crop the
-## plug (the sapling would otherwise be tiny): the ring radius / depth blend into the full plug by height.
-func framing_points(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge_w: float) -> Array[Vector3]:
+## Points that must stay inside the free rect at the preset angles.
+## Tree view: trunk, crown extremities and the soil mass under the crown: a ring of the rim cropped to ~1.3
+## crown radii (an old tree's 40 m wide lens may run off-screen) at the ground and at the keel's flank, and the
+## keel apex, so the underside is perceived. Young trees crop the plug further (the sapling would otherwise be
+## tiny: ring radius / depth blend into the full plug by height). Ensemble: the whole rim and keel.
+func framing_points(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge_w: float, keel_d: float = 0.0) -> Array[Vector3]:
 	var pts: Array[Vector3] = []
 	var f: float = _smooth(2.0, 7.0, height_m)
-	var depth_c: float = lerpf(minf(plug_d, 0.30 * height_m + 0.3), plug_d, f)
 	var crown_w: float = maxf(crown_r, 0.45 * height_m) * 1.1 + 0.15
-	var rc: float = lerpf(minf(crown_w, plug_r), plug_r, f)
-	var top: float = maxf(height_m, 0.8) * 1.03 + 0.12
+	var top: float = maxf(height_m, 0.8) * 1.06 + 0.2
 	if root_view:
 		# Root zone near the trunk, seen through the wedge: the axis column and the two cut faces up to
-		# ~60 % of the radius (the plug is much wider than deep; the whole disc would be tiny).
+		# ~50 % of the radius (the plug is much wider than deep; the whole disc would be tiny).
 		for which: float in [-1.0, 1.0]:
 			var fa: float = wedge_dir + which * wedge_w * 0.5
 			var fr: float = plug_r * 0.5  # the soil body follows the root spread: frame its inner half
 			pts.append(Vector3(sin(fa) * fr, 2.0, cos(fa) * fr))
-			pts.append(Vector3(sin(fa) * fr, -plug_d, cos(fa) * fr))
+			pts.append(Vector3(sin(fa) * fr, -plug_d - 0.12 * keel_d, cos(fa) * fr))
 		pts.append(Vector3(0.0, 2.2, 0.0))
-		pts.append(Vector3(0.0, -plug_d, 0.0))
+		pts.append(Vector3(0.0, -plug_d - 0.12 * keel_d, 0.0))
 		return pts
+	var rc: float = plug_r
+	var depth_c: float = plug_d
+	if not ensemble:
+		rc = minf(plug_r, maxf(crown_w * lerpf(1.0, 1.3, f) + 0.5 * f, 0.45 * plug_r * f))
+		depth_c = lerpf(minf(plug_d, 0.30 * height_m + 0.3), plug_d, f)
+	var apex: float = plug_d + keel_d
+	var flank: float = depth_c + keel_d * SoilBlock.keel_shape(rc / maxf(plug_r, 0.01))
+	if not ensemble:
+		flank = lerpf(depth_c, flank, f)
+		apex = lerpf(depth_c, apex, f)
 	pts.append(Vector3(0.0, top, 0.0))
 	var cr: float = maxf(crown_r, 0.2 * height_m)
 	var yc: float = 0.7 * height_m
-	for a: float in [0.0, PI * 0.5, PI, PI * 1.5]:
+	# Crown shell: widest ring plus the shoulders (seen from below / above they are the silhouette).
+	for a: float in [0.0, PI * 0.25, PI * 0.5, PI * 0.75, PI, PI * 1.25, PI * 1.5, PI * 1.75]:
 		pts.append(Vector3(sin(a) * cr, yc, cos(a) * cr))
+		pts.append(Vector3(sin(a) * cr * 0.8, 0.96 * height_m, cos(a) * cr * 0.8))
+		pts.append(Vector3(sin(a) * cr * 0.8, 0.45 * height_m, cos(a) * cr * 0.8))
 	var a0: float = wedge_dir + wedge_w * 0.5
 	var a1: float = wedge_dir - wedge_w * 0.5 + TAU
 	for i: int in 13:
 		var a: float = lerpf(a0, a1, float(i) / 12.0)
 		pts.append(Vector3(sin(a) * rc, 0.0, cos(a) * rc))
-		pts.append(Vector3(sin(a) * rc, -depth_c, cos(a) * rc))
-	pts.append(Vector3(0.0, -depth_c, 0.0))
+		pts.append(Vector3(sin(a) * rc, -flank, cos(a) * rc))
+	pts.append(Vector3(0.0, -apex, 0.0))
 	return pts
+
+
+## Debug: screen rectangle (px) spanned by the framing points through the live camera.
+func projected_extent() -> Rect2:
+	var pts: Array[Vector3] = framing_points(_h, _crown_r, _plug_r, _plug_d, _wedge_w, _keel_d)
+	var r: Rect2 = Rect2(_cam.unproject_position(pts[0]), Vector2.ZERO)
+	for p: Vector3 in pts:
+		r = r.expand(_cam.unproject_position(p))
+	return r
 
 
 ## Camera basis (x right, y up, z back toward the camera) for given angles.
@@ -156,11 +188,15 @@ func solve_framing(pts: Array[Vector3], yw: float, pt: float) -> Dictionary:
 		var mid: float = (sy_min + sy_max) * 0.5
 		ty += mid * d * tan_half / maxf(b.y.y, 0.3) * 0.9
 		d = lerpf(d, maxf(need, 1.0), 0.8)
+	if not is_finite(d) or not is_finite(ty):
+		d = rad * 3.0 / tan_half  # degenerate input: a safe wide view rather than a camera inside the tree
+		ty = (ymin + ymax) * 0.5
 	return {"distance": d, "target_y": ty}
 
 
 ## Called every frame with the tree and plug size; sets the framing goals (unless the user took over).
-func fit_to(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge_w: float = 1.92) -> void:
+func fit_to(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge_w: float = 1.92, keel_d: float = 0.0) -> void:
+	_keel_d = keel_d
 	_h = height_m
 	_crown_r = crown_r
 	_plug_r = plug_r
@@ -175,16 +211,16 @@ func fit_to(height_m: float, crown_r: float, plug_r: float, plug_d: float, wedge
 	if manual:
 		return
 	if root_view:
-		goal_pitch = root_pitch()  # follows the soil body's flatness
+		_fit_pitch = root_pitch()  # follows the soil body's flatness
+		goal_pitch = _fit_pitch
 	# The solve is only redone when its inputs change (it is cheap, but runs in script every frame).
 	var key: Array = [snappedf(height_m, 0.01), snappedf(crown_r, 0.01), snappedf(plug_r, 0.01), snappedf(plug_d, 0.01),
-		wedge_w, root_view, wedge_dir, _free_rect, _view_size]
+		wedge_w, root_view, wedge_dir, _free_rect, _view_size, snappedf(keel_d, 0.01), ensemble, _fit_yaw, _fit_pitch]
 	if key != _fit_key:
 		_fit_key = key
-		var pts: Array[Vector3] = framing_points(height_m, crown_r, plug_r, plug_d, wedge_w)
-		var sol: Dictionary = solve_framing(pts, wedge_dir if root_view else DEFAULT_YAW, root_pitch() if root_view else DEFAULT_PITCH)
-		_fit_sol = sol
-	goal_distance = clampf(_fit_sol["distance"], 1.0, 600.0)
+		var pts: Array[Vector3] = framing_points(height_m, crown_r, plug_r, plug_d, wedge_w, keel_d)
+		_fit_sol = solve_framing(pts, _fit_yaw, _fit_pitch)
+	goal_distance = clampf(_fit_sol["distance"], 1.0, MAX_DIST)
 	goal_target = Vector3(0.0, _fit_sol["target_y"], 0.0)
 
 
@@ -202,17 +238,41 @@ func reset_view() -> void:
 	manual = false
 	root_view = false
 	use_override = false
-	goal_yaw = DEFAULT_YAW
-	goal_pitch = DEFAULT_PITCH
+	ensemble = false
+	_set_preset_angles(DEFAULT_YAW, DEFAULT_PITCH)
 
 
 ## F: re-frame the tree (or the root zone in root view) and return to the preset angles.
 func reframe() -> void:
 	manual = false
 	use_override = false
-	goal_yaw = wedge_dir if root_view else DEFAULT_YAW
-	goal_pitch = root_pitch() if root_view else DEFAULT_PITCH
+	if root_view:
+		_set_preset_angles(wedge_dir, root_pitch())
+	elif ensemble:
+		_set_preset_angles(DEFAULT_YAW, ENSEMBLE_PITCH)
+	else:
+		_set_preset_angles(DEFAULT_YAW, DEFAULT_PITCH)
 
+
+## Goal angles of a preset; the framing is solved at these (not at the angles of a later free orbit).
+func _set_preset_angles(yw: float, pt: float) -> void:
+	goal_yaw = yw
+	goal_pitch = pt
+	_fit_yaw = yw
+	_fit_pitch = pt
+
+
+## Preset view from arbitrary angles (e.g. the "low" view from under the ground line): re-framed at them.
+func frame_from(yw: float, pt: float) -> void:
+	reframe()
+	_set_preset_angles(yw, clampf(pt, MIN_PITCH, MAX_PITCH))
+
+
+## E: whole block (crown, full rim, keel) in view.
+func toggle_ensemble() -> void:
+	ensemble = not ensemble
+	root_view = false
+	reframe()
 
 ## Root-view pitch: the soil body follows the root system, a flat lens under an old tree (much wider than
 ## deep) is looked at from higher up so its roots spread out instead of collapsing into a thin band.
@@ -224,6 +284,7 @@ func root_pitch() -> float:
 ## R: toggle the root view (centred on the root zone, looking through the wedge).
 func toggle_root_view() -> void:
 	root_view = not root_view
+	ensemble = false
 	reframe()
 
 
@@ -250,7 +311,7 @@ func pan(dx: float, dy: float) -> void:
 
 func zoom(factor: float) -> void:
 	manual = true
-	goal_distance = clampf(goal_distance * factor, 0.5, 600.0)
+	goal_distance = clampf(goal_distance * factor, MIN_DIST, MAX_DIST)
 
 
 func _process(delta: float) -> void:
@@ -274,8 +335,40 @@ func _apply() -> void:
 	var b: Basis = _view_basis()
 	var wpp: float = 2.0 * tan(deg_to_rad(FOV_DEG) * 0.5) * distance / _view_size.y
 	var t: Vector3 = target + (-b.x * shift_px.x + b.y * shift_px.y) * wpp
+	# Never inside the trunk or the solid soil: back off along the view ray until clear.
+	var clear: float = clear_distance(t, b.z, distance)
+	if clear > distance:
+		distance = clear
+		goal_distance = maxf(goal_distance, clear)
 	_cam.global_position = t + b.z * distance
 	_cam.look_at(t, Vector3.UP)
+	# Depth range follows the zoom: centimetres for a leaf, the whole block when far away.
+	_cam.near = clampf(distance * 0.01, 0.03, 2.0)
+	_cam.far = maxf(1000.0, distance * 3.0 + _plug_r * 4.0)
+
+
+## Trunk radius estimate (m) at the base (the real girth is not passed in: ~1.2 m at 33 m / 127 cm).
+func trunk_radius() -> float:
+	return 0.25 + 0.03 * _h
+
+
+## True when `p` is inside the trunk (a generous cylinder) or in the solid soil.
+func is_blocked(p: Vector3) -> bool:
+	var hr: float = Vector2(p.x, p.z).length()
+	if hr < trunk_radius() * 1.25 + 0.2 and p.y > -0.1 and p.y < _h:
+		return true
+	return soil != null and soil.solid_at(p, 0.1)
+
+
+## Smallest distance >= `dist` along `dir` from `t` at which the camera position is outside the trunk and the
+## solid soil (marches outward; the view ray leaves any convex obstacle once).
+func clear_distance(t: Vector3, dir: Vector3, dist: float) -> float:
+	var d: float = dist
+	for i: int in 64:
+		if not is_blocked(t + dir * d):
+			return d
+		d += maxf(0.1, d * 0.06)
+	return d
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -336,7 +429,7 @@ func recentre_at(screen_pos: Vector2) -> void:
 		return
 	manual = true
 	goal_target = best_c
-	goal_distance = clampf(best_dist, 0.8, 600.0)
+	goal_distance = clampf(best_dist, 0.8, MAX_DIST)
 
 
 static func _ray_sphere(o: Vector3, d: Vector3, c: Vector3, r: float) -> float:

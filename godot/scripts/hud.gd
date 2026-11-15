@@ -13,6 +13,7 @@ signal rings_toggled(shown: bool)
 signal soil_opacity_changed(opacity: float)
 signal flux_toggled(on: bool)
 signal guides_toggled(on: bool)
+signal prune_toggled(on: bool)
 
 const MONTHS: Array[String] = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
 	"août", "septembre", "octobre", "novembre", "décembre"]
@@ -48,6 +49,9 @@ var rings_button: Button
 var soil_slider: HSlider     # soil opacity 0..1 ("Sol")
 var flux_button: Button      # water / nutrient flux on the roots ("Flux")
 var guides_button: Button
+var prune_button: Button     # pruning tool (« Taille », key T)
+## Extra right-hand panels (pruning journal...) that the 3-D view must avoid, see free_rect.
+var side_panels: Array[Control] = []
 var play_button: Button
 var speed_slider: HSlider
 
@@ -112,7 +116,7 @@ func _build_info_panel(root: Control) -> void:
 	_water.show_percentage = false
 	v.add_child(_water)
 	var hint: Label = Label.new()
-	hint.text = "F cadrer · R racines · X sol transparent · G repères"
+	hint.text = "F cadrer · R racines · X sol transparent · G repères · T taille"
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.modulate = Color(1, 1, 1, 0.7)
 	v.add_child(hint)
@@ -187,6 +191,9 @@ func _build_ring_panel(root: Control) -> void:
 	v.add_child(_ring_view)
 
 
+## Bottom bar, two rows (fits 1280 px with room to spare):
+##   1. time and tools: play, speed, drought | Taille, Repères, Cernes, Flux, Sol opacity
+##   2. the site: species, soil type, seed (these restart the simulation)
 func _build_bottom_bar(root: Control) -> void:
 	var p: PanelContainer = PanelContainer.new()
 	p.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -196,11 +203,17 @@ func _build_bottom_bar(root: Control) -> void:
 	p.offset_bottom = -14
 	_bottom_panel = p
 	root.add_child(p)
-	var h: HBoxContainer = HBoxContainer.new()
-	h.add_theme_constant_override("separation", 3)
-	var bar_theme: Theme = UiStyle.make_theme(15, 8.0, 4.0)  # a notch smaller so every control fits at 1280 px
+	var bar_theme: Theme = UiStyle.make_theme(15, 8.0, 3.0)
 	p.theme = bar_theme
-	p.add_child(h)
+	var rows: VBoxContainer = VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 5)
+	p.add_child(rows)
+	var h: HBoxContainer = HBoxContainer.new()   # row 1: time and tools
+	h.add_theme_constant_override("separation", 4)
+	rows.add_child(h)
+	var h2: HBoxContainer = HBoxContainer.new()  # row 2: the site
+	h2.add_theme_constant_override("separation", 4)
+	rows.add_child(h2)
 
 	_play = _no_focus(Button.new()) as Button
 	_play.toggle_mode = true
@@ -219,49 +232,59 @@ func _build_bottom_bar(root: Control) -> void:
 	_speed_slider.max_value = 1.0
 	_speed_slider.step = 0.001
 	_speed_slider.value = log(30.0) / log(MAX_SPEED_DAYS)
-	_speed_slider.custom_minimum_size = Vector2(110, 0)
+	_speed_slider.custom_minimum_size = Vector2(150, 0)
 	_speed_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_speed_slider.value_changed.connect(_on_speed_changed)
 	speed_slider = _speed_slider
 	h.add_child(_speed_slider)
 	_speed_label = Label.new()
-	_speed_label.custom_minimum_size = Vector2(80, 0)
+	_speed_label.custom_minimum_size = Vector2(84, 0)
 	h.add_child(_speed_label)
 
 	var drought: Button = _no_focus(Button.new()) as Button
 	drought.text = "Sécheresse"
 	drought.toggle_mode = true
+	drought.tooltip_text = "Sécheresse forcée : ni pluie, évaporation accrue"
 	drought_button = drought
 	drought.toggled.connect(func(on: bool) -> void: drought_toggled.emit(on))
 	h.add_child(drought)
 
-	var seed_btn: Button = _no_focus(Button.new()) as Button
-	seed_btn.text = "Graine"
-	seed_button = seed_btn
-	seed_btn.pressed.connect(func() -> void: new_seed_requested.emit())
-	h.add_child(seed_btn)
-	_seed_label = Label.new()
-	h.add_child(_seed_label)
-
-	soil_option = _no_focus(OptionButton.new()) as OptionButton
-	soil_option.tooltip_text = "Type de sol (relance la même graine)"
-	soil_option.clip_text = true
-	soil_option.fit_to_longest_item = false  # keeps the bar within 1280 px
-	soil_option.custom_minimum_size = Vector2(190, 0)
-	soil_option.item_selected.connect(func(i: int) -> void: soil_selected.emit(i))
-	h.add_child(soil_option)
-
-	species_option = _no_focus(OptionButton.new()) as OptionButton
-	species_option.tooltip_text = "Espèce (relance la même graine)"
-	species_option.clip_text = true
-	species_option.fit_to_longest_item = false
-	species_option.custom_minimum_size = Vector2(190, 0)
-	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(i))
-	h.add_child(species_option)
-
 	var spacer: Control = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(spacer)
+
+	prune_button = _no_focus(Button.new()) as Button
+	prune_button.text = "✂ Taille"
+	prune_button.toggle_mode = true
+	prune_button.tooltip_text = "Outil de taille (T) : survoler une branche, clic pour couper"
+	prune_button.toggled.connect(func(on: bool) -> void: prune_toggled.emit(on))
+	h.add_child(prune_button)
+
+	var guides: Button = _no_focus(Button.new()) as Button
+	guides.text = "Repères"
+	guides.toggle_mode = true
+	guides.tooltip_text = "Échelles de hauteur et de profondeur (G)"
+	guides_button = guides
+	guides.toggled.connect(func(on: bool) -> void: guides_toggled.emit(on))
+	h.add_child(guides)
+
+	var rings: Button = _no_focus(Button.new()) as Button
+	rings.text = "Cernes"
+	rings.toggle_mode = true
+	rings.tooltip_text = "Coupe du tronc à 1,3 m : cernes annuels"
+	rings_button = rings
+	rings.toggled.connect(func(on: bool) -> void:
+		_ring_panel.visible = on
+		rings_toggled.emit(on))
+	h.add_child(rings)
+
+	flux_button = _no_focus(Button.new()) as Button
+	flux_button.text = "Flux"
+	flux_button.toggle_mode = true
+	flux_button.button_pressed = true
+	flux_button.tooltip_text = "Eau et sels minéraux absorbés par les racines"
+	flux_button.toggled.connect(func(on: bool) -> void: flux_toggled.emit(on))
+	h.add_child(flux_button)
 
 	var soil_lbl: Label = Label.new()
 	soil_lbl.text = "Sol"
@@ -272,34 +295,45 @@ func _build_bottom_bar(root: Control) -> void:
 	soil_slider.step = 0.01
 	soil_slider.value = 1.0
 	soil_slider.tooltip_text = "Opacité du sol (X : opaque / transparent)"
-	soil_slider.custom_minimum_size = Vector2(80, 0)
+	soil_slider.custom_minimum_size = Vector2(90, 0)
 	soil_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	soil_slider.value_changed.connect(func(v: float) -> void: soil_opacity_changed.emit(v))
 	h.add_child(soil_slider)
 
-	flux_button = _no_focus(Button.new()) as Button
-	flux_button.text = "Flux"
-	flux_button.toggle_mode = true
-	flux_button.button_pressed = true
-	flux_button.tooltip_text = "Eau et sels minéraux absorbés par les racines"
-	flux_button.toggled.connect(func(on: bool) -> void: flux_toggled.emit(on))
-	h.add_child(flux_button)
+	# Row 2: the site (each choice restarts the same seed).
+	var sp_lbl: Label = Label.new()
+	sp_lbl.text = "Espèce"
+	sp_lbl.modulate = Color(1, 1, 1, 0.8)
+	h2.add_child(sp_lbl)
+	species_option = _no_focus(OptionButton.new()) as OptionButton
+	species_option.tooltip_text = "Espèce (relance la même graine)"
+	species_option.clip_text = true
+	species_option.fit_to_longest_item = false
+	species_option.custom_minimum_size = Vector2(190, 0)
+	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(i))
+	h2.add_child(species_option)
 
-	var guides: Button = _no_focus(Button.new()) as Button
-	guides.text = "Repères"
-	guides.toggle_mode = true
-	guides_button = guides
-	guides.toggled.connect(func(on: bool) -> void: guides_toggled.emit(on))
-	h.add_child(guides)
+	var so_lbl: Label = Label.new()
+	so_lbl.text = "Terrain"
+	so_lbl.modulate = Color(1, 1, 1, 0.8)
+	h2.add_child(so_lbl)
+	soil_option = _no_focus(OptionButton.new()) as OptionButton
+	soil_option.tooltip_text = "Type de sol (relance la même graine)"
+	soil_option.clip_text = true
+	soil_option.fit_to_longest_item = false
+	soil_option.custom_minimum_size = Vector2(200, 0)
+	soil_option.item_selected.connect(func(i: int) -> void: soil_selected.emit(i))
+	h2.add_child(soil_option)
 
-	var rings: Button = _no_focus(Button.new()) as Button
-	rings.text = "Cernes"
-	rings.toggle_mode = true
-	rings_button = rings
-	rings.toggled.connect(func(on: bool) -> void:
-		_ring_panel.visible = on
-		rings_toggled.emit(on))
-	h.add_child(rings)
+	var seed_btn: Button = _no_focus(Button.new()) as Button
+	seed_btn.text = "Nouvelle graine"
+	seed_btn.tooltip_text = "Un autre individu (autre graine, même site)"
+	seed_button = seed_btn
+	seed_btn.pressed.connect(func() -> void: new_seed_requested.emit())
+	h2.add_child(seed_btn)
+	_seed_label = Label.new()
+	_seed_label.modulate = Color(1, 1, 1, 0.8)
+	h2.add_child(_seed_label)
 	_on_speed_changed(_speed_slider.value)
 
 
@@ -327,6 +361,9 @@ func free_rect(view: Vector2) -> Rect2:
 	var right: float = view.x - 14.0
 	if _ring_panel.visible:
 		right = _ring_panel.global_position.x - 12.0
+	for sp: Control in side_panels:
+		if is_instance_valid(sp) and sp.visible:
+			right = minf(right, sp.global_position.x - 12.0)
 	var top: float = 14.0
 	var bottom: float = _bottom_panel.global_position.y - 10.0
 	return Rect2(left, top, maxf(right - left, 200.0), maxf(bottom - top, 200.0))

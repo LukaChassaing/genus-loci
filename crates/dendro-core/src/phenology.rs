@@ -1,11 +1,27 @@
 //! Leaf phenology: dormancy, budburst, leaf expansion, summer, autumn
 //! colouring and leaf fall.
 //!
-//! * Budburst: sequential/parallel chilling-forcing model (Cannell & Smith
-//!   1983 style): growing degree days from Jan 1, with the forcing
-//!   requirement raised when chilling is incomplete.
-//! * Senescence: photoperiod-gated cold-degree-day sum (after Delpierre et al.
-//!   2009, simplified).
+//! * Budburst: the chilling-forcing model of Cannell & Smith 1983, "Thermal
+//!   time, chill days and prediction of budburst in Picea sitchensis", J
+//!   Appl Ecol 20:951-963, as fitted species by species (Quercus robur and
+//!   Prunus avium among them) by Murray, Cannell & Smith 1989, "Date of
+//!   budburst of fifteen tree species in Britain following climatic
+//!   warming", J Appl Ecol 26:693-700, doi:10.2307/2404093: the thermal
+//!   time to budburst T (degC.day above 5 degC, from Feb 1 in Cannell &
+//!   Smith) falls exponentially with the number C of chill days (daily mean
+//!   <= 5 degC, from Nov 1): `T = a + b exp(r C)` (`PhenologyTraits::
+//!   budburst_requirement_gdd`). The start dates and the chill range are
+//!   genome traits. Calibration: we could not read Murray et al.'s table of
+//!   fitted a, b, r, so the species values are calibrated against observed
+//!   dates (oak leaf-out mid/late April in France, Lebourgeois et al. 2010,
+//!   Int J Biometeorol 54:563-581; wild cherry bloom early-mid April), see
+//!   the species files.
+//! * Senescence: photoperiod-gated cold-degree-day sum, structure after
+//!   Delpierre et al. 2009, "Modelling interannual and spatial variability
+//!   of leaf senescence for three deciduous tree species in France", Agric
+//!   For Meteorol 149:938-948, doi:10.1016/j.agrformet.2008.11.014 (they
+//!   fit beech and oak; the parameter values here are calibrated to give
+//!   the stated colouring dates, not taken from their fits).
 //! * Late frost on expanding leaves reduces leaf area, recovered by re-flushing.
 //! * Flowering and fruiting ([`Reproduction`]): bloom by its own forcing
 //!   sum (same chilling penalty as budburst), so a species may flower
@@ -67,7 +83,7 @@ pub(crate) enum PhenoEvent {
 pub(crate) struct Phenology {
     pub phase: Phase,
     chill: f32,
-    /// Forcing (degC.day) since Jan 1.
+    /// Forcing (degC.day) since `forcing_start_doy` of this year.
     pub gdd: f32,
     gdd_since_bb: f32,
     /// Leaf expansion 0..1.
@@ -114,10 +130,9 @@ impl Phenology {
         self
     }
 
-    /// Relative chilling deficit 0..1 (0 = requirement met). Meaningful
-    /// while dormant; chilling restarts at budburst.
-    pub fn chill_lack(&self, g: &Genome) -> f32 {
-        1.0 - (self.chill / g.phenology.chilling_requirement_days).min(1.0)
+    /// Chill days counted since the last `chill_start_doy` (Nov 1).
+    pub fn chill_days(&self) -> f32 {
+        self.chill
     }
 
     /// Live (photosynthetic) leaf area fraction 0..1.
@@ -133,17 +148,29 @@ impl Phenology {
         if doy == 0 {
             self.gdd = 0.0;
         }
+        // Chill days are counted by the calendar from Nov 1 (the leaves of
+        // old oaks may still hang then), whatever the leaf phase.
+        if doy == p.chill_start_doy {
+            self.chill = 0.0;
+        }
+        if w.temp_c >= p.chill_temp_min_c && w.temp_c <= p.chill_temp_max_c {
+            self.chill += 1.0;
+        }
         let forcing = (w.temp_c - p.gdd_base_c).max(0.0);
-        self.gdd += forcing;
+        if doy >= p.forcing_start_doy {
+            self.gdd += forcing;
+        }
+        // Calibration: frost damage recovers by 1.2 % of leaf area per day
+        // (re-flushing from reserves); no direct source.
         self.frost_damage = (self.frost_damage - 0.012).max(0.0);
         let mut ev = PhenoEvent::None;
         match self.phase {
             Phase::Dormant => {
-                if w.temp_c >= p.chill_temp_min_c && w.temp_c <= p.chill_temp_max_c {
-                    self.chill += 1.0;
-                }
-                let lack = 1.0 - (self.chill / p.chilling_requirement_days).min(1.0);
-                let req = p.gdd_budburst * (1.0 + 1.2 * lack);
+                // Cannell & Smith 1983 / Murray et al. 1989: less chilling
+                // => more thermal time needed, T = a + b exp(r C).
+                // The 40..200 day window and the doy 170 fallback are
+                // gameplay safeguards (always leaf out), not data.
+                let req = p.budburst_requirement_gdd(self.chill);
                 if ((40..200).contains(&doy) && self.gdd >= req) || doy == 170 {
                     self.phase = Phase::BudBurst;
                     self.gdd_since_bb = 0.0;
@@ -152,7 +179,6 @@ impl Phenology {
                     self.colouring = 0.0;
                     self.fallen = 0.0;
                     self.cdd = 0.0;
-                    self.chill = 0.0;
                     ev = PhenoEvent::Budburst;
                 }
             }
@@ -160,8 +186,11 @@ impl Phenology {
                 self.gdd_since_bb += forcing;
                 self.shoot_ext = smoothstep(self.gdd_since_bb / (p.leaf_expansion_gdd * 0.9));
                 self.expansion = smoothstep((self.gdd_since_bb - 10.0) / p.leaf_expansion_gdd);
-                // Daily minimum approximated as mean - 5 degC (spring diurnal range).
-                let tmin = w.temp_c - 5.0;
+                // Daily minimum from the weather generator (mean - half the
+                // diurnal range). Calibration: damage 0.3 + 0.15/degC (max
+                // 0.8) is stylised. Killing temperature of young leaves is
+                // the trait `tolerances.frost_c` (see the species file).
+                let tmin = w.tmin_c;
                 if tmin < g.tolerances.frost_c && self.expansion > 0.02 {
                     let dmg = (0.3 + (g.tolerances.frost_c - tmin) * 0.15).min(0.8);
                     self.frost_damage = self.frost_damage.max(dmg);
@@ -175,6 +204,9 @@ impl Phenology {
                 }
             }
             Phase::Mature => {
+                // Delpierre et al. 2009: senescence is driven by cold
+                // temperatures accumulated only once day length is below a
+                // threshold; here also not before the solstice (doy 172).
                 let gate = doy >= 172 && w.photoperiod_h < p.senescence_photoperiod_h;
                 if gate {
                     self.cdd += (p.senescence_temp_base_c - w.temp_c).max(0.0);
@@ -198,6 +230,7 @@ impl Phenology {
             }
             Phase::LeafFall => {
                 // Frost and wind speed up abscission.
+                // Calibration: 0.4 extra day per degC below zero, no source.
                 self.fall_days += 1.0 + (-w.temp_c).max(0.0) * 0.4;
                 self.fallen = (self.fall_days / p.leaf_fall_days).min(1.0);
                 if self.fallen >= 1.0 || doy == 364 {
@@ -227,14 +260,16 @@ pub enum ReproStage {
 
 /// Yearly flowering and fruiting state (stylised).
 ///
-/// Bloom onset follows the forcing sum since Jan 1 (`bloom_gdd`, raised by
-/// the same chilling deficit as budburst, which is captured before the
+/// Bloom onset follows the forcing sum since `forcing_start_doy`
+/// (`bloom_gdd`, plus the same chilling penalty as budburst, captured before the
 /// leaves break so that a species flowering after leaf-out is not
 /// penalised). Bloom then progresses with forcing over `bloom_duration_gdd`
 /// (opening, full bloom, petal fall). A daily minimum below
 /// `flower_frost_c` while flowers are open kills a share of them (late
 /// frost; flower buds and open flowers of Prunus are killed around -2 degC,
-/// e.g. Rodrigo 2000), which reduces that year's fruit set. Fruits swell
+/// e.g. Rodrigo 2000, "Spring frosts in deciduous fruit trees -
+/// morphological damage and flower hardiness", Sci Hortic 85:155-173),
+/// which reduces that year's fruit set. Fruits swell
 /// and ripen over `fruit_ripening_days`, then disappear over
 /// `fruit_persistence_days`.
 #[derive(Clone, Debug)]
@@ -242,8 +277,8 @@ pub(crate) struct Reproduction {
     pub stage: ReproStage,
     /// The tree flowers this year (past its juvenile phase).
     pub mature: bool,
-    /// Chilling deficit captured while dormant.
-    lack: f32,
+    /// Chill days captured while dormant (before leaf-out).
+    chill: f32,
     gdd_onset: f32,
     /// Bloom progress 0..1 (1 = petal fall complete).
     pub bloom: f32,
@@ -260,7 +295,7 @@ impl Reproduction {
         Reproduction {
             stage: ReproStage::Waiting,
             mature: false,
-            lack: 0.0,
+            chill: 0.0,
             gdd_onset: 0.0,
             bloom: 0.0,
             fruit_days: 0.0,
@@ -280,11 +315,12 @@ impl Reproduction {
             self.frost_loss = 0.0;
         }
         if phen.phase == Phase::Dormant {
-            self.lack = phen.chill_lack(g);
+            self.chill = phen.chill_days();
         }
         match self.stage {
             ReproStage::Waiting => {
-                let req = r.bloom_gdd * (1.0 + 1.2 * self.lack);
+                // Same chilling penalty (degC.day) as budburst.
+                let req = r.bloom_gdd + g.phenology.chill_penalty_gdd(self.chill);
                 if self.mature && (((40..200).contains(&doy) && phen.gdd >= req) || doy == 170) {
                     self.stage = ReproStage::Blooming;
                     self.gdd_onset = phen.gdd;
@@ -293,8 +329,11 @@ impl Reproduction {
             }
             ReproStage::Blooming => {
                 self.bloom = ((phen.gdd - self.gdd_onset) / r.bloom_duration_gdd.max(1.0)).min(1.0);
-                // Open flowers (before petal fall) are killed by late frost.
-                let tmin = w.temp_c - 5.0;
+                // Open flowers (before petal fall) are killed by late frost
+                // (Rodrigo 2000, see above). Calibration: the damage curve
+                // 0.4 + 0.25/degC below the threshold and the bloom window
+                // 0.05..0.8 are stylised.
+                let tmin = w.tmin_c;
                 if self.bloom > 0.05 && self.bloom < 0.8 && tmin < r.flower_frost_c {
                     let dmg = (0.4 + 0.25 * (r.flower_frost_c - tmin)).min(0.95);
                     self.frost_loss = self.frost_loss.max(dmg);
@@ -334,6 +373,7 @@ impl Reproduction {
     }
 
     /// Fruit size 0..1 (young fruits swell over ~12 days after petal fall).
+    /// Calibration: visual stylisation of fruit set, no source.
     pub fn fruit_swell(&self) -> f32 {
         smoothstep(self.fruit_days / 12.0)
     }
@@ -357,6 +397,11 @@ impl Reproduction {
 /// Stylised additive pigment mixing: chlorophyll masks carotenoids until it
 /// breaks down in autumn; anthocyanins peak mid-senescence; oxidised tannins
 /// give the final brown. Young leaves are pale yellow-green with a reddish tint.
+///
+/// Calibration: the qualitative sequence (chlorophyll loss unmasks
+/// carotenoids, anthocyanins are synthesised de novo late in senescence) is
+/// the textbook picture of autumn colours; the weights and RGB values are
+/// tuned by eye for the renderer and are not measured spectra.
 pub fn leaf_colour(p: &Pigments, expansion: f32, colouring: f32) -> [f32; 3] {
     const GREEN: [f32; 3] = [0.16, 0.33, 0.08];
     const YOUNG: [f32; 3] = [0.55, 0.62, 0.22];

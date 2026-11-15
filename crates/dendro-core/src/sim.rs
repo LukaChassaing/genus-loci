@@ -44,6 +44,25 @@ const P_YEAR_REF: f32 = 100.0;
 /// Productivity of an average summer (expansion complete -> senescence).
 const P_SUMMER_REF: f32 = 70.0;
 
+/// Drawn (mesh) radius of a branch of simulated radius `rs` (see
+/// `Simulation::wood_mesh`); shared with the pruning picker and wound mesh.
+pub(crate) fn draw_radius(rs: f32, r_ref: f32, e: f32, boost_max: f32) -> f32 {
+    let pipe = (r_ref / rs.max(1e-6)).powf(1.0 - 2.0 / e);
+    let fade = ((rs - 0.005) / 0.035).clamp(0.0, 1.0);
+    let cap = 1.0 + (boost_max - 1.0) * fade * fade * (3.0 - 2.0 * fade);
+    rs * pipe.min(cap).max(1.0)
+}
+
+/// Critical relative extractable water (REWc) below which transpiration and
+/// carbon gain decline linearly. Granier et al. 1999 (Ecol Model
+/// 116:269-283, Table 1) found REWc "quite constant" at ~0.4 across species
+/// (0.3 for one Douglas-fir study). Calibration: the `drought` trait moves it
+/// within 0.35-0.45 (0.45 - 0.1 x drought, i.e. 0.40 for both built-in
+/// species), a small, unsourced species effect.
+pub(crate) fn rew_critical(g: &Genome) -> f32 {
+    0.45 - 0.1 * g.tolerances.drought.clamp(0.0, 1.0)
+}
+
 /// Snapshot of the main tree dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TreeStats {
@@ -81,12 +100,12 @@ pub struct ShapeMetrics {
 /// A growing tree in its environment.
 #[derive(Clone, Debug)]
 pub struct Simulation {
-    genome: Genome,
-    seed: u64,
+    pub(crate) genome: Genome,
+    pub(crate) seed: u64,
     climate: Climate,
     soil: SoilColumn,
     /// Mean water stress of the last completed season (0..1).
-    stress_prev: f32,
+    pub(crate) stress_prev: f32,
     /// Root-weighted soil hypoxia summed since the last budburst, and its
     /// mean over the previous budburst-to-budburst year (0..1).
     hyp_sum: f32,
@@ -94,32 +113,34 @@ pub struct Simulation {
     hyp_prev: f32,
     /// Root-weighted nutrient availability of the site (0..1).
     fertility: f32,
-    phen: Phenology,
-    shoots: ShootSystem,
-    roots: RootSystem,
-    rings: Vec<Ring>,
-    day: u64,
-    drought: bool,
+    pub(crate) phen: Phenology,
+    pub(crate) shoots: ShootSystem,
+    pub(crate) roots: RootSystem,
+    pub(crate) rings: Vec<Ring>,
+    pub(crate) day: u64,
+    pub(crate) drought: bool,
     drought_in_season: bool,
     today: Weather,
     water_factor: f32,
     p_year: f32,
     p_summer: f32,
-    p_prev: f32,
+    pub(crate) p_prev: f32,
     in_summer: bool,
     stress_sum: f32,
     stress_days: f32,
     pending_early_mm: f32,
     pending_measure: f32,
     marcescent: f32,
-    wood_version: u64,
-    leaf_version: u64,
-    root_version: u64,
-    flower_version: u64,
+    pub(crate) wood_version: u64,
+    pub(crate) leaf_version: u64,
+    pub(crate) root_version: u64,
+    pub(crate) flower_version: u64,
     reported_version: u64,
     leaf_key: u64,
     flower_key: u64,
     repro: Reproduction,
+    /// Pruning state: intervention log, wounds, reserves (see `crate::pruning`).
+    pub(crate) prune: crate::pruning::PruneState,
 }
 
 impl Simulation {
@@ -136,12 +157,17 @@ impl Simulation {
 
     /// New seedling on a given site: climate and soil profile.
     pub fn with_site(genome: Genome, seed: u64, climate: ClimateParams, soil: SoilProfile) -> Self {
-        let chill = genome.phenology.chilling_requirement_days * 0.5;
+        // Chill days of a typical Nov-Dec before the first spring (the
+        // default Rennes climate has ~7 days <= 5 degC by Dec 31).
+        // Calibration: a constant, the year before germination is not simulated.
+        let chill = 7.0;
         let shoots = ShootSystem::new(&genome);
         // Individual variation of the juvenile phase: +-1 year.
         let first_age = genome.reproduction.first_flowering_age_years + 2.0 * (rng::unit(rng::hash(seed, S_FLOWER, 0, 0)) - 0.5);
         let mut soil = SoilColumn::new(soil);
         soil.track_hypoxia = genome.roots.hypoxia_sensitivity > 0.0;
+        soil.hypoxia_afp = genome.roots.hypoxia_air_porosity;
+        soil.rew_critical = rew_critical(&genome);
         Simulation {
             climate: Climate::new(climate, seed),
             soil,
@@ -176,6 +202,7 @@ impl Simulation {
             leaf_key: 0,
             flower_key: 0,
             repro: Reproduction::new(first_age),
+            prune: crate::pruning::PruneState::default(),
             genome,
             seed,
         }
@@ -202,6 +229,11 @@ impl Simulation {
     /// Force (or end) a drought: no rain and +40 % evaporative demand while
     /// active.
     pub fn set_drought(&mut self, on: bool) {
+        // Logged so that a replay of the pruning timeline (and the unpruned
+        // control tree) sees the same weather.
+        if on != self.drought {
+            self.prune.record_drought(self.day, on);
+        }
         self.drought = on;
     }
 
@@ -210,6 +242,9 @@ impl Simulation {
     }
 
     fn step_day(&mut self) {
+        if self.prune.has_pending() {
+            self.apply_due_events();
+        }
         let year = (self.day / DAYS_PER_YEAR as u64) as u32;
         let doy = (self.day % DAYS_PER_YEAR as u64) as u32;
         if doy == 0 && self.day > 0 {
@@ -222,7 +257,9 @@ impl Simulation {
         // Water balance of the layered soil.
         let leaf = self.phen.leaf_area();
         let wd = self.soil.step(w.precip_mm, w.pet_mm, leaf, leaf > 0.3);
-        let thr = 0.5 - 0.2 * self.genome.tolerances.drought; // REW of stomatal closure onset
+        // REW of stomatal closure onset (same threshold as the soil's
+        // transpiration, see `rew_critical`).
+        let thr = self.soil.rew_critical;
         // Roots in saturated (anoxic) soil stop taking up water and signal
         // stomatal closure (Kozlowski 1997); tolerant species suffer less.
         let tol = self.genome.roots.waterlogging_tolerance.clamp(0.0, 1.0);
@@ -326,7 +363,11 @@ impl Simulation {
         if decline < 1.0 {
             vigour *= decline;
         }
-        self.shoots.flush(&self.genome, year, age, vigour, self.seed);
+        if self.prune.active {
+            vigour *= self.prune_flush_vigour();
+        }
+        let fs = self.shoots.flush(&self.genome, year, age, vigour, self.seed);
+        self.prune.last_new_shoots = fs.new_shoots as u32;
         self.stress_sum = 0.0;
         self.stress_days = 0.0;
         self.drought_in_season = false;
@@ -341,6 +382,9 @@ impl Simulation {
         let hs = self.genome.roots.hypoxia_sensitivity;
         if hs > 0.0 && self.hyp_prev > 0.0 {
             f *= (1.0 - hs.min(1.0) * self.hyp_prev).max(0.3);
+        }
+        if self.prune.active {
+            f *= self.prune.capacity();
         }
         f
     }
@@ -359,7 +403,9 @@ impl Simulation {
         self.shoots.compute_light();
         let a = &self.genome.architecture;
         self.shoots.compute_foliage(a.hydraulic_path_max_m, a.hydraulic_foliage_exponent);
-        // Earlywood from reserves (last year's productivity).
+        // Earlywood from reserves (last year's productivity): ring-porous
+        // oak builds earlywood from stored starch (Barbaroux & Breda 2002,
+        // Tree Physiol 22:1201-1210); the 0.4..1.3 clamp is a calibration.
         let w = &self.genome.wood;
         let share = w.earlywood_share;
         let mut factor = share * self.p_prev.clamp(0.4, 1.3);
@@ -377,6 +423,8 @@ impl Simulation {
         let cr = self.shoots.crown_radius();
         let age = self.age_years();
         let prod = if decline < 1.0 { self.p_prev * decline } else { self.p_prev };
+        // After a heavy cut the roots stop extending (functional balance).
+        let prod = if self.prune.active { prod * self.prune.root_growth_factor() } else { prod };
         self.roots.grow(&self.genome.roots, year, age, cr, prod, self.stress_prev, &self.soil, self.seed);
         self.roots.update_layers(&self.genome.roots, &mut self.soil);
         let (mut nsum, mut lsum) = (0.0, 0.0);
@@ -407,6 +455,9 @@ impl Simulation {
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
         self.shoots.sag(&self.genome);
+        if self.prune.active {
+            self.prune_yearly(year);
+        }
         let early = self.pending_early_mm;
         let total = early + late;
         self.stress_prev = if self.stress_days > 0.0 { self.stress_sum / self.stress_days } else { 0.0 };
@@ -797,6 +848,12 @@ impl Simulation {
             }
         }
         let r_ref = nodes[0].radius().max(1e-6);
+        // Eloy 2011, Phys Rev Lett 107:258101, doi:10.1103/PhysRevLett.107.258101:
+        // Leonardo exponents of ~1.8-2.3 across species. The species
+        // `pipe_exponent` values (2.3 oak, 2.1 cherry) lie in that range;
+        // the per-species choice within it is a calibration (no Q. robur or
+        // P. avium measurement found). Values below 2 are drawn as 2, the
+        // exponent of the simulated (Pressler) areas.
         let e = self.genome.wood.pipe_exponent.max(2.0);
         let boost_max = self.genome.wood.limb_draw_boost.max(1.0);
         let bark = &self.genome.bark;
@@ -807,18 +864,15 @@ impl Simulation {
                 let age = year.saturating_sub(n.birth_year) as f32;
                 // Rendered radius. The simulated areas follow Pressler's law
                 // (a branching exponent of exactly 2); measured exponents are
-                // ~2-3 (e.g. Eloy 2011), i.e. limbs and boughs are thicker
-                // relative to the stem than area preservation gives. Drawn
+                // ~1.8-2.3 (Eloy 2011), i.e. limbs and boughs may be somewhat
+                // thicker relative to the stem than area preservation gives. Drawn
                 // radius = simulated radius x (r_collar / r)^(1 - 2/e),
                 // capped at `limb_draw_boost` and faded in from 0.5 to 4 cm
                 // so twigs keep their simulated size (otherwise the fine
                 // spray turns into a tangle of thick wires). Mesh only: DBH,
                 // rings and the simulation use the simulated areas.
                 let rs = n.radius();
-                let pipe = (r_ref / rs.max(1e-6)).powf(1.0 - 2.0 / e);
-                let fade = ((rs - 0.005) / 0.035).clamp(0.0, 1.0);
-                let cap = 1.0 + (boost_max - 1.0) * fade * fade * (3.0 - 2.0 * fade);
-                let r = rs * pipe.min(cap).max(1.0);
+                let r = draw_radius(rs, r_ref, e, boost_max);
                 // Young shoots green-brown, then grey-brown bark, darker on old trunks.
                 let t = (age / 4.0).min(1.0);
                 let dark = (r / 0.4).min(1.0);
@@ -834,10 +888,19 @@ impl Simulation {
                     start: n.start,
                     end: n.end(ext),
                     radius: r,
-                    continues: i > 0 && thickest[n.parent as usize] == i as u32,
+                    // Sprouts on a pruning cut face start their own axes, so the
+                    // cut stem keeps its girth up to the cut (see `crate::pruning`).
+                    continues: i > 0 && thickest[n.parent as usize] == i as u32 && !nodes[n.parent as usize].cut_end,
                     color: col,
                     // Dead limbs end in broken, blunt stubs.
-                    tip_taper: if n.is_snag() { 0.85 } else { 0.5 },
+                    tip_taper: if n.is_snag() {
+                        0.85
+                    } else if n.cut_end {
+                        // Pruning cut face (see `crate::pruning`): blunt end.
+                        1.0
+                    } else {
+                        0.5
+                    },
                     path0: 0.0,
                 }
             })
@@ -1328,5 +1391,20 @@ impl Simulation {
         mesh::build_leaves(&clusters, FLOWER_TRI_BUDGET)
     }
 
+}
+
+// Read-only view of the internal state for `crate::flux` (a sibling module
+// cannot read these private fields; flux.rs owns the logic).
+impl Simulation {
+    pub(crate) fn flux_view(&self) -> crate::flux::FluxView<'_> {
+        crate::flux::FluxView {
+            soil: &self.soil,
+            phen: &self.phen,
+            shoots: &self.shoots,
+            roots: &self.roots,
+            water_factor: self.water_factor,
+            fertility: self.fertility,
+        }
+    }
 }
 

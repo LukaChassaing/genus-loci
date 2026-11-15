@@ -10,6 +10,10 @@ use godot::prelude::*;
 pub use dendro_core::MeshData;
 use dendro_core::{ClimateParams, Genome, HorizonKind, Phase, Simulation, SoilProfile};
 
+/// Pruning timeline (undo, rewind, control tree).
+#[path = "prune.rs"]
+mod prune;
+
 /// Converts mesh data to an `ArrayMesh` (one surface, or none when the mesh is empty).
 /// Packed arrays are built in bulk.
 pub fn mesh_data_to_array_mesh(data: &MeshData) -> Gd<ArrayMesh> {
@@ -56,6 +60,8 @@ pub struct Backend {
     soil: usize,
     /// Index of the species (`Genome::builtin()`) used at the next reset.
     species: usize,
+    /// Pruning timeline: checkpoints and control tree (see `prune.rs`).
+    timeline: prune::Timeline,
 }
 
 impl Backend {
@@ -73,7 +79,9 @@ impl Backend {
         let species = if species < genomes.len() { species } else { 0 };
         let genome = genomes.swap_remove(species);
         let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
-        Self { sim, carry_days: 0.0, drought: false, soil, species }
+        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default() };
+        b.timeline_reset();
+        b
     }
 
     pub fn reset(&mut self, seed: u64) {
@@ -379,5 +387,67 @@ impl Backend {
 
     pub fn root_version(&self) -> i64 {
         self.sim.root_version() as i64
+    }
+
+    /// The day's flows (see `dendro_core::flux`), as named values in real units.
+    pub fn flux_values(&self) -> Vec<(&'static str, f32)> {
+        let f = self.sim.flux_snapshot();
+        let myco = match f.mycorrhiza {
+            dendro_core::MycorrhizaType::None => 0.0,
+            dendro_core::MycorrhizaType::Arbuscular => 1.0,
+            dendro_core::MycorrhizaType::Ecto => 2.0,
+        };
+        vec![
+            ("crown_area_m2", f.crown_area_m2),
+            ("uptake_l", f.uptake_l),
+            ("xylem_l", f.xylem_l),
+            ("transpiration_l", f.transpiration_l),
+            ("growth_water_l", f.growth_water_l),
+            ("storage_buffer_l", f.storage_buffer_l),
+            ("rain_l", f.rain_l),
+            ("interception_l", f.interception_l),
+            ("n_uptake_g", f.nutrient_uptake_g[0]),
+            ("p_uptake_g", f.nutrient_uptake_g[1]),
+            ("k_uptake_g", f.nutrient_uptake_g[2]),
+            ("n_xylem_g", f.nutrient_xylem_g[0]),
+            ("n_remob_g", f.nutrient_remob_g[0]),
+            ("n_resorb_g", f.nutrient_resorb_g[0]),
+            ("myco_n_g", f.myco_nutrients_g[0]),
+            ("myco_p_g", f.myco_nutrients_g[1]),
+            ("nutrient_limitation", f.nutrient_limitation),
+            ("gpp_gc", f.gpp_gc),
+            ("resp_leaf_gc", f.resp_leaf_gc),
+            ("resp_wood_gc", f.resp_wood_gc),
+            ("resp_root_gc", f.resp_root_gc),
+            ("resp_growth_gc", f.resp_growth_gc),
+            ("alloc_shoots_gc", f.alloc_shoots_gc),
+            ("alloc_wood_gc", f.alloc_wood_gc),
+            ("alloc_roots_gc", f.alloc_roots_gc),
+            ("alloc_fruits_gc", f.alloc_fruits_gc),
+            ("alloc_reserves_gc", f.alloc_reserves_gc),
+            ("alloc_myco_gc", f.alloc_myco_gc),
+            ("reserves_used_gc", f.reserves_used_gc),
+            ("phloem_down_gc", f.phloem_down_gc),
+            ("phloem_up_gc", f.phloem_up_gc),
+            ("ethanol_gc", f.ethanol_gc),
+            ("litter_gc", f.litter_gc),
+            ("co2_in_g", f.co2_in_g),
+            ("o2_out_g", f.o2_out_g),
+            ("o2_in_g", f.o2_in_g),
+            ("co2_out_g", f.co2_out_g),
+            ("co2_out_leaf_g", f.co2_out_organs_g[0]),
+            ("co2_out_wood_g", f.co2_out_organs_g[1]),
+            ("co2_out_root_g", f.co2_out_organs_g[2]),
+            ("root_hypoxia", f.root_hypoxia),
+            ("water_stress", f.water_stress),
+            ("mycorrhiza", myco),
+            ("myco_activity", f.myco_activity),
+            ("myco_water_l", f.myco_water_l),
+        ]
+    }
+
+    /// Flow path geometry (`dendro_core::flux::FluxGeometry`).
+    pub fn flux_geometry(&self) -> dendro_core::FluxGeometry {
+        self.sim.flux_geometry(dendro_core::FluxBudget::default())
     }
 }

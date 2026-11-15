@@ -1,0 +1,151 @@
+# Sources scientifiques de Dendrologia
+
+Ce document recense les références sur lesquelles s'appuie la simulation, groupées par thème. Chaque entrée indique le fichier ou le mécanisme qui l'utilise.
+
+Règles de lecture :
+
+- Toutes les références ci-dessous ont été vérifiées (existence, auteurs, année, revue) par recherche en ligne. Un DOI n'est donné que lorsqu'il a été vu.
+- Une référence qui fonde la *structure* d'un modèle ne garantit pas les *valeurs* numériques du code : celles-ci sont souvent des calibrations de gameplay, signalées par `Calibration:` ou `calibrated` dans les commentaires.
+- Les résumés ont été vérifiés, pas toujours les textes intégraux : le contenu décrit est celui des résumés.
+
+## Phénologie
+
+- **Cannell M.G.R. & Smith R.I. (1983).** Thermal time, chill days and prediction of budburst in *Picea sitchensis*. *Journal of Applied Ecology* 20(3): 951-963.
+  Utilisé par : `phenology.rs`, `genome.rs` (`PhenologyTraits::budburst_requirement_gdd`), RON `phenology`. Le code suit désormais la forme de l'article : somme thermique > 5 °C depuis le 1er février `T = a + b·exp(r·C)`, C = jours de moyenne ≤ 5 °C comptés depuis le 1er novembre (dates de départ et seuils = traits du génome). La floraison utilise la même pénalité de froid.
+- **Murray M.B., Cannell M.G.R. & Smith R.I. (1989).** Date of budburst of fifteen tree species in Britain following climatic warming. *Journal of Applied Ecology* 26(2): 693-700. DOI 10.2307/2404093.
+  Utilisé par : `phenology.rs`, RON `phenology` (même modèle ajusté espèce par espèce, dont *Q. robur* et *P. avium* ; le chêne y figure parmi les espèces dont l'exigence de forçage dépend peu du froid, d'où un `b` modeste). Le tableau des coefficients n'a pas pu être consulté : a, b et r du code sont des **calibrations** sur les dates observées ci-dessous.
+- **Lebourgeois F., Pierrat J.-C., Perez V., Piedallu C., Cecchini S. & Ulrich E. (2010).** Simulating phenological shifts in French temperate forests under two climatic change scenarios and four driving global circulation models. *International Journal of Biometeorology* 54: 563-581. DOI 10.1007/s00484-010-0305-5.
+  Utilisé par : cible de calibration du débourrement du chêne (réseau RENECOFOR : saison de végétation des chênaies de mi-avril à mi-octobre, d'après le résumé). Résultat du modèle : débourrement moyen du chêne vers le 22 avril (jour 112) dans le climat de Rennes, de début avril à fin mai selon les années.
+- **Deutscher Wetterdienst (DWD), réseau phénologique.** Début de floraison du cerisier en Allemagne : moyenne 1961-1990 le 26 avril, 1991-2020 le 17 avril (chiffres d'une présentation DWD de B. Plückhahn, vus seulement à travers un résumé de recherche, document non ouvert ; l'espèce exacte n'est pas précisée, cerisier doux vraisemblablement). Ordre de grandeur, pas une référence vérifiée.
+  Utilisé par : cible de calibration de la floraison du merisier (climat plus frais que Rennes). Résultat : floraison moyenne vers le 11 avril (jour 101), débourrement foliaire vers le 13 avril, environ 9 jours avant le chêne.
+- **Delpierre N., Dufrêne E., Soudani K., Ulrich E., Cecchini S., Boé J. & François C. (2009).** Modelling interannual and spatial variability of leaf senescence for three deciduous tree species in France. *Agricultural and Forest Meteorology* 149: 938-948. DOI 10.1016/j.agrformet.2008.11.014.
+  Utilisé par : `phenology.rs` (sénescence : somme de degrés-froid déclenchée sous un seuil de photopériode). Les paramètres du code sont calibrés sur les dates voulues, pas repris de l'article (qui traite hêtre et chêne ; les valeurs ajustées n'ont pas pu être lues). Merisier : aucune observation publiée de dates de coloration n'a été trouvée ; calibration. Mesures du modèle (climat de Rennes) : chêne, coloration de fin septembre à début-mi-novembre, chute terminée vers le 29 novembre en moyenne (seuil de photopériode 11,6 → 12,0 h et `leaf_fall_days` 28 → 21 jours ; la chute se finissait vers le 6 décembre). Un raccourcissement supplémentaire (somme de degrés-froid plus faible) faisait basculer les tests de hauteur calibrés et n'a pas été retenu ; merisier, coloration du 19 septembre environ au 16 octobre (≈ 4 semaines), chute terminée vers le 28 octobre.
+- **Alburquerque N., García-Montiel F., Carrillo A. & Burgos L. (2008).** Chilling and heat requirements of sweet cherry cultivars and the relationship between altitude and the probability of satisfying the chill requirements. *Environmental and Experimental Botany* 64(2): 162-170. DOI 10.1016/j.envexpbot.2008.01.003.
+  Utilisé par : commentaire du RON `prunus_avium`. Tableau 3 (Murcie) : 176 à 788 h sous 7 °C, 397 à 1001 unités de froid Utah selon les cultivars, la plupart 400-800 h. Les « ~1000 heures de froid » du code précédent ne correspondaient qu'au cultivar le plus tardif, en unités Utah. Aucune valeur n'a été trouvée pour le merisier forestier ; le besoin en froid du modèle (`chilling_requirement_days` = 45 jours ≤ 5 °C pour un effet résiduel de 5 %) est une calibration, satisfait pour l'essentiel par un hiver rennais typique (~30 jours ≤ 5 °C).
+
+## Croissance et architecture
+
+- **Pałubicki W., Horel K., Longay S., Runions A., Lane B., Měch R. & Prusinkiewicz P. (2009).** Self-organizing tree models for image synthesis. *ACM Transactions on Graphics* 28(3), article 58. DOI 10.1145/1531326.1531364.
+  Utilisé par : `growth.rs`, `genome.rs` (compétition des bourgeons pour la lumière, partage de la vigueur).
+- **Borchert R. & Honda H. (1984).** Control of development in the bifurcating branch system of *Tabebuia rosea*: a computer simulation. *Botanical Gazette* 145(2): 184-195. DOI 10.1086/337445.
+  Utilisé par : `growth.rs` (répartition acropète de la vigueur, paramètre lambda de dominance apicale). Les valeurs de lambda par espèce sont calibrées à l'œil.
+- **Hallé F., Oldeman R.A.A. & Tomlinson P.B. (1978).** *Tropical Trees and Forests: An Architectural Analysis.* Springer, Berlin-Heidelberg. DOI 10.1007/978-3-642-81190-6.
+  Utilisé par : vocabulaire d'architecture (excurrent/décurrent, réitération) dans `growth.rs`. Référence conceptuelle, aucune valeur n'en est tirée.
+- **Shinozaki K., Yoda K., Hozumi K. & Kira T. (1964).** A quantitative analysis of plant form: the pipe model theory. I. Basic analyses. *Japanese Journal of Ecology* 14(3): 97-105.
+  Utilisé par : `growth.rs` (accroissement de section proportionnel au feuillage porté), `roots.rs` (`thicken`, extension aux racines faite ici), `genome.rs` (`growth_coefficient`). Une revue de 2018 dans *Annals of Botany* juge que la théorie n'est pas valable comme règle générale ; nous l'utilisons comme simplification.
+- **Eloy C. (2011).** Leonardo's rule, self-similarity, and wind-induced stresses in trees. *Physical Review Letters* 107: 258101. DOI 10.1103/PhysRevLett.107.258101.
+  Utilisé par : `sim.rs` (rayon dessiné : exposant de branchement `pipe_exponent`). Exposants publiés d'environ 1,8 à 2,3 selon les espèces. Corrigé : chêne 2,6 → 2,3 (borne haute), merisier 2,3 → 2,1 ; le choix dans la plage est une calibration (pas de mesure trouvée pour ces deux espèces). Effet visuel : un rameau d'un tiers du rayon du tronc est élargi de ×1,15 au lieu de ×1,29 ; aucune compensation n'a été ajoutée, les charpentières dessinées du chêne sont donc un peu plus fines qu'avant.
+- **Minamino R. & Tateno M. (2014).** Tree branching: Leonardo da Vinci's rule versus biomechanical models. *PLoS ONE* 9(4): e93535.
+  Utilisé par : commentaire du RON du chêne (la règle de Léonard tient approximativement sur le terrain ; *Fagus crenata*, *Abies homolepis*).
+- **Digby J. & Firn R.D. (1995).** The gravitropic set-point angle (GSA): the identification of an important developmentally controlled variable governing plant architecture. *Plant, Cell & Environment* 18(12): 1434-1440. DOI 10.1111/j.1365-3040.1995.tb00205.x.
+  Utilisé par : `growth.rs`, RON `limb_setpoint_*` (concept d'angle de consigne gravitropique ; valeurs calibrées).
+- **Ryan M.G. & Yoder B.J. (1997).** Hydraulic limits to tree height and tree growth. *BioScience* 47(4): 235-242. DOI 10.2307/1313077.
+  Utilisé par : `growth.rs`, `genome.rs` (`hydraulic_path_max_m`, déclin de croissance avec la hauteur). Les tests ultérieurs de l'hypothèse sont mitigés ; les paramètres sont calibrés sur des hauteurs cibles.
+- **Sprugel D.G., Hinckley T.M. & Schaap W. (1991).** Étude sur l'autonomie des branches, *Annual Review of Ecology and Systematics*. Existence confirmée seulement par des articles qui la citent ; titre exact, volume et pages non vérifiés, donc non détaillés ici.
+  Utilisé par : `genome.rs` / `growth.rs` (élagage naturel des branches ombragées). Seuils calibrés.
+- **Alméras T. & Fournier M. (2009).** Biomechanical design and long-term stability of trees: morphological and wood traits involved in the balance between weight increase and the gravitropic reaction. *Journal of Theoretical Biology* 256: 370-381. DOI 10.1016/j.jtbi.2008.10.011.
+  Utilisé par : `genome.rs` (affaissement des branches sous leur poids, redressement), cité dans le code. Les coefficients sont stylisés.
+- **Moulia B., Coutand C. & Lenne C. (2006).** Posture control and skeletal mechanical acclimation in terrestrial plants: implications for mechanical modeling of plant architecture. *American Journal of Botany* 93(10): 1477-1489. DOI 10.3732/ajb.93.10.1477.
+- **Bastien R., Bohr T., Moulia B. & Douady S. (2013).** Unifying model of shoot gravitropism reveals proprioception as a central feature of posture control in plants. *PNAS* 110(2): 755-760. DOI 10.1073/pnas.1214301109.
+  Utilisés par : `growth.rs` (redressement autotropique des branches ; concept seulement, taux stylisés).
+- **Canham C.D., Finzi A.C., Pacala S.W. & Burbank D.H. (1994).** Causes and consequences of resource heterogeneity in forests: interspecific variation in light transmission by canopy trees. *Canadian Journal of Forest Research* 24(2): 337-349. DOI 10.1139/x94-046.
+  Utilisé par : `growth.rs` (lumière latérale, tolérance à l'ombre). L'extinction lumineuse y est corrélée à la tolérance à l'ombre des espèces ; les seuils de rejet d'ombre du code sont calibrés.
+
+## Bois et cernes
+
+- **Barbaroux C. & Bréda N. (2002).** Contrasting distribution and seasonal dynamics of carbohydrate reserves in stem wood of adult ring-porous sessile oak and diffuse-porous beech trees. *Tree Physiology* 22(17): 1201-1210. DOI 10.1093/treephys/22.17.1201.
+  Utilisé par : `rings.rs`, `sim.rs` (bois initial de chêne formé à partir de réserves, bois final portant le signal climatique), RON `ring_porous`. L'étude porte sur le chêne sessile ; la règle exacte du modèle (productivité de l'année précédente) est une stylisation.
+
+## Racines et sol
+
+- **Kutschera L. & Lichtenegger E. (2002).** *Wurzelatlas mitteleuropäischer Waldbäume und Sträucher.* Leopold Stocker Verlag, Graz.
+  Utilisé par : `roots.rs`, RON `roots` (pivot juvénile puis système « en cœur » du chêne ; système traçant du merisier). Ouvrage de dessins et morphologie ; aucune valeur chiffrée précise n'a été vérifiée.
+- **Stone E.L. & Kalisz P.J. (1991).** On the maximum extent of tree roots. *Forest Ecology and Management* 46(1-2): 59-102. DOI 10.1016/0378-1127(91)90245-Q.
+  Utilisé par : `roots.rs`, RON `max_depth_m` (profondeurs et étendues maximales d'enracinement). Les valeurs par type de sol sont un résumé, non vérifié ligne à ligne.
+- **Lucot E. & Bruckert S. (1992).** Organisation du système racinaire du chêne pédonculé (*Quercus robur*) développé en conditions édaphiques non contraignantes (sol brun lessivé colluvial). *Annales des Sciences Forestières* 49(5): 465-479. DOI 10.1051/forest:19920503.
+  Utilisé par : RON du chêne (`lateral_spread`, `max_depth_m`), test `realism.rs`. Chênes de 150 ans : système superficiel 0-60 cm, enracinement intensif dans un rayon d'environ 3 m, pivots secondaires sub-verticaux au-delà de 4 m, racines atteignant ~20 m du tronc (d'après le résumé et des citations ; texte intégral non lu). Remplace Lyford 1980 (*Quercus rubra*, chêne nord-américain), qui n'est plus cité. Correction : `lateral_spread` 2,2 → 1,4 × rayon du houppier ; un chêne de 150 ans étend ses racines à ~22 m (contre ~35 m avant) et à ~25 m à 200 ans (contre 39 m). La profondeur (~2,1-2,5 m sur le limon par défaut) est fixée par l'horizon C2 compact (3 MPa), pas par le trait (4,5 m, cohérent avec les > 4 m observés en sol meuble).
+- **Bengough A.G., McKenzie B.M., Hallett P.D. & Valentine T.A. (2011).** Root elongation, water stress, and mechanical impedance: a review of limiting stresses and beneficial root tip traits. *Journal of Experimental Botany* 62(1): 59-68. DOI 10.1093/jxb/erq350.
+  Utilisé par : `soil.rs`, `roots.rs` (résistance à la pénétration). Selon le résumé : élongation généralement divisée par deux au-delà de 0,8 à 2 MPa. L'arrêt vers 2,5-3 MPa est une règle empirique non vérifiée dans cette revue.
+- **Grable A.R. & Siemer E.G. (1968).** Effects of bulk density, aggregate size, and soil water suction on oxygen diffusion, redox potentials, and elongation of corn roots. *Soil Science Society of America Proceedings* 32(2): 180-186. DOI 10.2136/sssaj1968.03615995003200020011x.
+  Utilisé par : `soil.rs` (`aeration`, `hypoxia_at`), valeur par défaut du trait `hypoxia_air_porosity` (10 % de porosité à l'air). Étude sur le maïs : approximation pour les arbres.
+- **Morales-Olmedo M., Sellés G., Pinto M. & Ortiz M. (2021).** Full-field characterization of sweet cherry rootstocks: responses to soil with different air-filled porosities. *Plant and Soil* 469: 457-473. DOI 10.1007/s11104-021-05184-5.
+  Utilisé par : RON du merisier (`hypoxia_air_porosity` = 0,15). À 9 % de porosité à l'air contre 21 %, le porte-greffe Mazzard F12/1 (clone de *P. avium*) perd 51,5 % de croissance des pousses et 69 % de photosynthèse maximale, contrairement aux porte-greffes tolérants (porte-greffes, pas semis sauvages). Le seuil de 15 % est une calibration entre 9 et 16-21 %. Le chêne garde 10 % et une sensibilité nulle (tolérance de *Q. robur*, Parelle et al. 2006).
+- **Hodge A. (2004).** The plastic plant: root responses to heterogeneous supplies of nutrients. *New Phytologist* 162(1): 9-24. DOI 10.1111/j.1469-8137.2004.01015.x.
+  Utilisé par : `soil.rs`, `roots.rs` (`proliferation` : les racines prolifèrent dans les zones riches ; formes fonctionnelles inventées).
+- **Brunner I., Herzog C., Dawes M.A., Arend M. & Sperisen C. (2015).** How tree roots respond to drought. *Frontiers in Plant Science* 6: 547. DOI 10.3389/fpls.2015.00547.
+  Utilisé par : `roots.rs` (approfondissement après sécheresse ; gain stylisé).
+- **Poorter H., Niklas K.J., Reich P.B., Oleksyn J., Poot P. & Mommer L. (2012).** Biomass allocation to leaves, stems and roots: meta-analyses of interspecific variation and environmental control. *New Phytologist* 193(1): 30-50. DOI 10.1111/j.1469-8137.2011.03952.x.
+  Utilisé par : `roots.rs`, `sim.rs` (allocation aux racines selon le stress hydrique ; gains `root_shoot_stress_gain` calibrés).
+- **Parelle J., Brendel O., Bodénès C., Berveiller D., Dizengremel P., Jolivet Y. & Dreyer E. (2006).** Differences in morphological and physiological responses to water-logging between two sympatric oak species (*Quercus petraea* [Matt.] Liebl., *Quercus robur* L.). *Annals of Forest Science* 63(8): 849-859. DOI 10.1051/forest:2006068.
+  Utilisé par : `soil.rs` (`root_barrier`), RON `waterlogging_tolerance` (*Q. robur* tolère mieux l'engorgement, lenticelles hypertrophiées, racines adventives ; plantules seulement). La valeur 0,4 est un choix de jeu.
+- **Colin-Belgrand M., Dreyer E. & Biron P. (1991).** Sensitivity of seedlings from different oak species to waterlogging: effects on root growth and mineral nutrition. *Annales des Sciences Forestières* 48(2): 193-204.  (DOI non confirmé pour cet article précis.)
+  Cité dans le RON du chêne (tolérance à l'hypoxie).
+- **Schaffer B., Andersen P.C. & Ploetz R.C. (1992).** Responses of fruit crops to flooding. *Horticultural Reviews* 13: 257-313.
+  Cité dans le RON du merisier (sensibilité des *Prunus* à l'asphyxie racinaire). Titre sujet à de légères variantes selon les listes.
+- **Saxton K.E. & Rawls W.J. (2006).** Soil water characteristic estimates by texture and organic matter for hydrologic solutions. *Soil Science Society of America Journal* 70(5): 1569-1578. DOI 10.2136/sssaj2005.0117.
+  Utilisé par : `soil.rs` et les profils de `data/soils/` (ordres de grandeur de capacité au champ et de point de flétrissement par texture). Les quatre profils sont des archétypes de jeu, pas des mesures de site.
+
+## Eau et climat
+
+- **Granier A., Bréda N., Biron P. & Villette S. (1999).** A lumped water balance model to evaluate duration and intensity of drought constraints in forest stands. *Ecological Modelling* 116(2-3): 269-283.
+  Utilisé par : `climate.rs` (`SoilWater::step`), `soil.rs`, `sim.rs`. Texte intégral lu. Repris : transpiration maximale = 0,75 × ETP pour LAI ≥ 6 (0,125 × LAI en dessous ; le code utilisait 0,7), réduction linéaire sous REWc ≈ 0,4, valeur « assez constante » selon les espèces (tableau 1 : 0,3 à 0,4) ; évaporation du sol et du sous-bois proportionnelle à l'énergie sous le couvert (Beer-Lambert, k = 0,5) et décroissant avec l'eau de la couche supérieure. L'ancien seuil `0,5 − 0,2 × sécheresse` n'avait pas d'appui : il vaut maintenant `0,45 − 0,1 × sécheresse` (0,40 pour les deux espèces, effet d'espèce limité à 0,35-0,45 : calibration) et la même valeur sert à la transpiration du sol et à la croissance (avant : 0,4 fixe pour l'une, 0,41 pour l'autre). Restent des calibrations : 10 % d'interception, LAI 6 pour un couvert plein, ombrage hivernal de 30 %, remontée capillaire.
+  Effet mesuré (chêne, limon, 40-48 ans) : transpiration 300-460 mm/an, REW minimale estivale 0,11-0,21, 70 à 140 jours par an sous 0,4.
+- **Forsythe W.C., Rykiel E.J., Stahl R.S., Wu H. & Schoolfield R.M. (1995).** A model comparison for daylength as a function of latitude and day of year. *Ecological Modelling* 80: 87-95. DOI 10.1016/0304-3800(94)00034-f.
+  Utilisé par : `climate.rs` (`photoperiod_h`). Le code utilise l'approximation sinusoïdale usuelle de la déclinaison, de la même famille mais pas la formule exacte de l'article.
+- **Allen R.G., Pereira L.S., Raes D. & Smith M. (1998).** *Crop evapotranspiration: guidelines for computing crop water requirements.* FAO Irrigation and Drainage Paper 56, FAO, Rome.
+  Utilisé par : `climate.rs` (`extraterrestrial_radiation_mj` : rayonnement extraterrestre Ra, éq. 21, avec éq. 23-25 ; forme de Hargreaves de l'éq. 52).
+- **Hargreaves G.H. & Samani Z.A. (1985).** Reference crop evapotranspiration from temperature. *Applied Engineering in Agriculture* 1(2): 96-99.
+  Utilisé par : `climate.rs` (`hargreaves_pet_mm`) : `ET0 = 0,0023 (T + 17,8) (Tmax − Tmin)^0,5 × 0,408 Ra`. Remplace l'ancien indice ad hoc (ni Thornthwaite ni Penman-Monteith, ~650 mm/an). Penman-Monteith complet aurait demandé rayonnement, humidité et vent que le générateur ne produit pas honnêtement. Le générateur produit désormais une amplitude thermique journalière (5,9 °C en janvier, 11,1 °C en juillet ; réduite de 25 % les jours de pluie : calibration), d'où aussi Tmin pour le gel tardif (au lieu de « moyenne − 5 °C »). Résultat : 864 mm/an (janvier 18 mm, juillet 145 mm) contre 856 mm (22 et 137 mm) pour l'ETP Penman de la station.
+- **Météo-France. Fiche climatologique Rennes-St Jacques (35281001), statistiques 1991-2020.**
+  Utilisé par : `climate.rs` (`ClimateParams::default`). Normales reprises : moyenne 12,4 °C, janvier 6,2 °C, juillet 19,2 °C, 691 mm et 115 jours ≥ 1 mm, Tx − Tn, ETP Penman 856 mm. Le générateur précédent (12 °C, janvier ~4,8 °C, 750 mm) n'était ajusté sur aucune station. Les cosinus saisonniers sont ajustés à l'œil (calibration) ; le paramètre de pluie (760 mm) est réglé pour obtenir ~690 mm après les années sèches.
+
+## Reproduction
+
+- **Welk E., de Rigo D. & Caudullo G. (2016)** (voir « Traits des espèces ») : floraison dès fin mars en Europe centrale, un arbre fleurit environ une semaine.
+
+- **Rodrigo J. (2000).** Spring frosts in deciduous fruit trees: morphological damage and flower hardiness. *Scientia Horticulturae* 85: 155-173.
+  Utilisé par : `phenology.rs` (`Reproduction`, dégâts de gel tardif sur fleurs ouvertes), RON `flower_frost_c` du merisier. Valeur de −2,2 °C : ordre de grandeur, le texte intégral n'a pas été consulté ; la courbe de dommages est stylisée.
+
+## Longévité
+
+- **Lonsdale D. (dir.) (2013).** *Ancient and other veteran trees: further guidance on management.* The Tree Council, Londres.
+  Utilisé par : `growth.rs` (rétrenchement de la couronne des vieux chênes), RON `retrenchment_*`. Le concept de rétrenchement vient de cette littérature ; l'âge de début et les taux sont stylisés. L'expression « growing downwards » n'a pas pu être vérifiée dans le texte.
+- **Future Trees Trust, monographie du merisier (Wild Cherry).** Arbre à croissance rapide, vie relativement courte, individus de 100 à 150 ans, sensible à la pourriture du cœur ; « tolérant à l'ombre jeune, puis très exigeant en lumière » en citant Joyce et al. (1998) et Savill (d'après des extraits consultés par recherche ; le PDF n'était plus accessible).
+  Utilisé par : RON `longevity` du merisier (déclin à partir de 85 ans, valeur calibrée) ; trait `shade_juvenile` (voir ci-dessous).
+
+## Traits des espèces
+
+- **Jones E.W. (1959).** Biological Flora of the British Isles: *Quercus* L. *Journal of Ecology* 47(1): 169-222. DOI 10.2307/2257253.
+  Référence générale sur l'écologie de *Q. robur*. Texte non consulté : les dimensions du RON ont été recoupées avec l'Atlas européen ci-dessous, pas avec cette flore.
+- **Eaton E., Caudullo G., Oliveira S. & de Rigo D. (2016).** *Quercus robur* and *Quercus petraea* in Europe: distribution, habitat, usage and threats. In : *European Atlas of Forest Tree Species* (voir Welk et al.). Chapitre lu.
+  Utilisé par : RON du chêne. Recoupements : hauteur habituelle 30 m (jusqu'à plus de 40 m), diamètres jusqu'à 1 m habituellement, 3-4 m pour les plus vieux, plus de 1000 ans possibles (modèle : 32-34 m et 1,2-1,3 m à 200 ans en isolé : plausible) ; pétiole court de 2-7 mm (`petiole_ratio` 0,06 × 10 cm = 6 mm : conforme) ; débourrement fin avril-début mai en Europe ; feuillage nouveau tué vers −3 °C (`frost_c` −2,5 → −3,0, désormais sourcé) ; *Q. robur* plus exigeant en lumière que *Q. petraea*, tolère les sols lourds et humides et les inondations périodiques.
+- **Russell K. (2003).** *Prunus avium*: Technical guidelines for genetic conservation and use for wild cherry. EUFORGEN, Bioversity International, Rome (6 p.). ISBN 92-9043-572-0.
+  Utilisé par : RON `prunus_avium` (biologie générale, espèce exigeante en lumière, floraison dès 4 ans environ en conditions optimales ; formulation exacte non relue).
+- **Tolérance à l'ombre dépendant de l'âge** (`Tolerances::shade_juvenile`, `shade_at`, `growth.rs`). Nouveau trait générique (aucune branche par espèce) : le merisier passe de 0,55 (jeune) à 0,25 entre 8 et 20 ans ; le chêne garde 0,3 à tout âge. Appui qualitatif : Future Trees Trust (ci-dessus) ; les valeurs et âges sont des calibrations.
+- **Welk E., de Rigo D. & Caudullo G. (2016).** *Prunus avium* in Europe: distribution, habitat, usage and threats. In: San-Miguel-Ayanz J., de Rigo D., Caudullo G., Houston Durrant T., Mauri A. (dir.), *European Atlas of Forest Tree Species*, Publications Office of the EU, Luxembourg.
+  Chapitre lu. Utilisé par : RON `prunus_avium`. Recoupements : 15-32 m de haut, diamètre jusqu'à 90-120 cm, durée de vie 100-150 ans (100-120 au plus pour un individu), feuilles 5-15 × 3-8 cm, pétiole 2-3,5 cm, fructification à partir de 10-15 ans (citant Ducci et al. 2013), espèce de lumière à enracinement plutôt superficiel, ne tolérant ni argiles lourdes ni sols engorgés. Le modèle (24-25 m, 75-85 cm à 200 ans, feuille 10 × 5 cm, pétiole 3 cm) est dans ces plages. Première floraison : le RON garde 5,5 ans (arbre isolé en conditions optimales, d'après Russell 2003), en tension avec les 10-15 ans de l'Atlas (valeur plutôt forestière) : incertain.
+- **Savill P.S. (2013).** *The Silviculture of Trees Used in British Forestry*, 2e éd. CABI, Wallingford. ISBN 9781780640266.
+  Utilisé par : RON `prunus_avium` (port en pseudo-verticilles, racines traçantes). Texte non consulté : cité comme référence générale.
+- **Pryor S.N. (1988).** The silviculture and yield of wild cherry. Forestry Commission (Royaume-Uni). Numéro de bulletin et pages non vérifiés.
+  Utilisé par : RON `first_flowering_age_years` du merisier (floraison souvent avant 10 ans).
+
+## Valeurs sans source (calibrations de jeu)
+
+Les valeurs suivantes sont des calibrations déclarées comme telles dans le code : lambda de dominance apicale, `vigour_per_light`, `hydraulic_path_max_m` et exposants, `growth_coefficient` (loi de Pressler calibrée sur des diamètres cibles), angles de consigne, seuils d'ombre, taux d'affaissement et de redressement, 10 % d'interception, LAI 6 du couvert plein, anomalies du générateur météo, réduction de l'amplitude thermique les jours de pluie, coefficients a, b, r du débourrement, paramètres de sénescence, couleurs et poids de pigments d'automne.
+
+Recalibrations faites lors de l'alignement sur la littérature (le climat de Rennes, plus sec l'été avec l'ETP de Hargreaves, ralentissait la croissance) : chêne `growth_coefficient` 1,80e-5 → 2,00e-5, `hydraulic_path_max_m` 36,5 → 37,0, `leaf_fall_days` 28 → 21, `senescence_photoperiod_h` 11,6 → 12,0, `frost_c` −2,5 → −3,0 ; merisier `growth_coefficient` 3,10e-5 → 3,30e-5, `vigour_per_light` 7,0 → 7,5, `leaf_fall_days` 14 → 12.
+
+## Écarts connus
+
+Écarts à la physiologie repérés dans le cœur et laissés pour plus tard (par ordre d'importance estimée) :
+
+- **Photosynthèse et lumière.** La productivité journalière (`sim.rs`) est un indice feuillage × f(T) × eau × nutriments × photopériode, sans rayonnement incident, sans courbe de réponse à la lumière (saturation) ni effet du CO₂ ; la lumière n'agit que sur la répartition de la vigueur entre bourgeons (`growth.rs`). Un modèle de type efficience d'utilisation du rayonnement (Monteith) avec le Ra déjà calculé serait l'étape suivante.
+- **Allocation du carbone et réserves.** Pas de bilan carboné explicite (respiration, réserves pluriannuelles, coût de la reproduction) ; le bois initial dépend de la productivité de l'année précédente (stylisation de Barbaroux & Bréda 2002). La vigueur racinaire suit un ratio racines/pousses calibré.
+- **Limite hydraulique de hauteur indépendante du site.** `hydraulic_path_max_m` est un trait fixe : la hauteur finale ne dépend ni de l'eau ni de la fertilité du sol (Ryan & Yoder 1997 ; la hauteur maximale baisse sur sol sec). Conséquence visible : sur rendzine le chêne de 80 ans n'est plus que ~1,9 m plus bas que sur limon (test assoupli de 2 à 1,5 m, le diamètre étant, lui, nettement réduit à 0,66 ×).
+- **Courbes de croissance.** Hauteurs et diamètres sont calibrés sur des cibles d'arbres isolés (chêne : 9-12 m à 25 ans, 19-22 m à 60 ans, 23-26 m à 100 ans, ~32-34 m et 1,2-1,3 m à 200 ans) ; ils n'ont pas été confrontés à des tables de production (qui portent sur des peuplements) ni à des mesures d'arbres isolés publiées.
+- **Bilan hydrique.** Interception fixe de 10 % (Granier et al. 1999 utilisent une fonction d'Aussenac dépendant du LAI et de la pluie ; ~20 % sous chênaie l'été) ; le chêne sur limon passe 70 à 140 jours par an sous REW 0,4, sans doute un peu trop sec par rapport aux chênaies suivies par Bréda et Granier (non vérifié).
+- **Charpentières du vieux chêne dessinées un peu grêles.** Avec l'exposant 2,3 (au lieu de 2,6, hors plage publiée), le rapport dessiné branche/tronc des charpentières passe d'environ 0,47 à 0,42 en moyenne (0,68 → 0,64 au maximum) ; l'amincissement est surtout visible sur les branches moyennes (4-10 cm de rayon), où le plafond d'élargissement jouait avant. Vue d'hiver à 200 ans (`godot/.screenshots/real_s0_y200_crotch.png`) : couronne lisible mais moins massive qu'un vieux chêne isolé réel. Le bon levier n'est pas le dessin mais l'allocation simulée (loi de Pressler : l'accroissement des branches moyennes dépend du seul feuillage porté, sans le bois de réaction ni le renfort mécanique des charpentières chargées) ; non traité.
+- **Densité du bois et charge des branches.** `density_kg_m3` (640 chêne, 560 merisier) sert de charge au modèle d'affaissement : physiquement c'est la masse du bois vert (~1000 kg/m³ pour le chêne) qui compte ; les valeurs n'ont pas de source vérifiée et le coefficient d'affaissement compense.
+- **Sénescence du merisier** : pas de jeu d'observations de dates de coloration trouvé (PEP725 non consulté).
+- **Vue des flux** (`flux.rs`, non modifié ici) : l'hypoxie y utilise le seuil générique de 10 %, pas le trait d'espèce.
+- **Débourrement** : coefficients de Murray et al. 1989 non lus ; Tmin du gel tardif dérivée d'une amplitude thermique moyenne, sans autocorrélation propre.

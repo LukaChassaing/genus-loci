@@ -96,10 +96,22 @@ static func run(host: Node, check: Callable) -> void:
 		await tree.process_frame
 	check.call("pause: Reprendre closes it", host.get_node_or_null("PauseMenu") == null or (host.get_node("PauseMenu") as Node).is_queued_for_deletion())
 
+	# Pruning tool (« Taille »): hover, cut, undo, control tree, panel.
+	var pt: PruneTool = host.get("prune_tool") as PruneTool
+	if pt != null:
+		await pt.selftest(check)
+
 	# HUD bottom bar still fits at 1280 px.
 	var hud_node: Hud = host.get("hud") as Hud
 	var need: float = hud_node._bottom_panel.get_combined_minimum_size().x
 	check.call("hud: bottom bar fits at 1280 px", need <= 1280.0 - 28.0, "needs %.0f px" % need)
+	# Flux panel: fits beside the ring panel at 1280 x 720, readable number format.
+	var fp: FluxPanel = host.get("flux_panel") as FluxPanel
+	if fp != null:
+		var fsz: Vector2 = fp.get_combined_minimum_size()
+		check.call("flux panel: compact (< 400 x 300 px)", fsz.x < 400.0 and fsz.y < 300.0, str(fsz))
+	check.call("flux panel: number format", FluxPanel.num(2705.4) == "2705" and FluxPanel.num(3.27) == "3.3"
+		and FluxPanel.num(0.042) == "0.04" and FluxPanel.num(31400.0) == "31.4 k")
 
 
 static func _leaf_ok() -> bool:

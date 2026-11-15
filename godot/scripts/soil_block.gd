@@ -12,6 +12,13 @@ extends Node3D
 ## is rebuilt only when it moved noticeably (REBUILD_*). On a site with bedrock the body is cut flat at
 ## a rock slab under the bedrock surface.
 ##
+## Keel: below the rooted body hangs a tapered keel of UNROOTED subsoil / parent material / bedrock whose depth
+## scales with the rim radius (keel_depth = KEEL_RATIO x mean rim). It is deliberately duller and greyer, with
+## horizontal bedding: it shows that the roots (this body's real envelope, only a few metres deep even under a
+## 40 m wide system) occupy a thin skin on top of a much larger mass (tree roots are shallow and wide: Canadell
+## et al. 1996, Oecologia 108:583-595, doi:10.1007/BF00329030; Stone & Kalisz 1991, Funct Ecol 5:94-106).
+## Geometry only; roots are never exaggerated and still clip at `depth` (rooted), not at `total_depth`.
+##
 ## Opacity: 1 = opaque earth (opaque material, no discard); below 1 the same shader runs with an ordered
 ## 4x4 screen-door dither (no blending, no sorting: depth-correct with the roots inside, old-GPU friendly).
 ## Silhouette, horizon lines and the turf edge keep more coverage so the outline stays readable.
@@ -36,6 +43,12 @@ const REBUILD_MIN_INTERVAL: float = 0.25
 const ROCK_SLAB: float = 0.22        # rock shown under the bedrock surface (m)
 const DEPTH_MARGIN: float = 0.42     # earth under the deepest root of a cell (fine-root tufts reach ~0.4 m)
 const LOW_OPACITY: float = 0.2       # key X / DENDRO_XRAY
+## Unrooted subsoil under the rooted body (see "Keel" in the header): its depth is KEEL_RATIO x the mean rim
+## radius. A visual device, not simulated soil: the real data are the thin rooted skin above it.
+const KEEL_RATIO: float = 0.30
+const KEEL_RATIO_YOUNG: float = 0.10  # a sapling's clod already has its own rounded keel
+const SLAB_RATIO: float = 0.05       # flat rock sites: extra rock thickness under the slab, x mean rim radius
+const SLAB_MAX: float = 1.8
 
 ## Layer kinds (palette index in the shader and in the HUD legend).
 const KIND_LITTER: int = 0
@@ -46,11 +59,13 @@ const KIND_ROCK: int = 4
 const KIND_NAMES: Array[String] = ["Litière", "Terre arable (horizon A)", "Sous-sol (horizon B)",
 	"Roche mère altérée (horizon C)", "Roche"]
 const KIND_COLORS: Array[Color] = [Color(0.20, 0.13, 0.08), Color(0.30, 0.20, 0.12),
-	Color(0.50, 0.36, 0.21), Color(0.66, 0.60, 0.46), Color(0.55, 0.56, 0.58)]
+	Color(0.50, 0.36, 0.21), Color(0.46, 0.38, 0.25), Color(0.29, 0.30, 0.33)]
 
 ## Largest rim radius and deepest point of the shown body (m): camera framing, guides, root clipping.
 var radius: float = MIN_RADIUS
-var depth: float = MIN_DEPTH
+var depth: float = MIN_DEPTH                      # deepest ROOTED part (clips the roots)
+var total_depth: float = MIN_DEPTH                # deepest point of the whole body incl. the unrooted keel
+var keel_depth: float = 0.0                       # keel thickness under the axis (m)
 var wedge_dir: float = 0.45                       # azimuth of the wedge centre (faces the default camera)
 var wedge_width: float = deg_to_rad(WEDGE_DEFAULT_DEG)
 ## True when the soil is see-through (opacity < 1): legend, guides on hidden faces.
@@ -69,6 +84,7 @@ var _rim: PackedFloat32Array = PackedFloat32Array()
 var _keel: PackedFloat32Array = PackedFloat32Array()
 var _built_rim: PackedFloat32Array = PackedFloat32Array()
 var _built_keel: PackedFloat32Array = PackedFloat32Array()
+var _slab_k: float = 0.0
 var _since_build: float = 10.0
 var _easing: bool = false
 var _noise: FastNoiseLite
@@ -76,6 +92,9 @@ var _soil_mi: MeshInstance3D
 var _top_mi: MeshInstance3D
 var _soil_mat: ShaderMaterial
 var _soil_dither_mat: ShaderMaterial
+var _soil_a2c_mat: ShaderMaterial
+var _top_a2c_mat: ShaderMaterial
+var _a2c: bool = false
 var _top_mat: ShaderMaterial
 var _top_dither_mat: ShaderMaterial
 
@@ -107,19 +126,22 @@ float vnoise3(vec3 p) {
 ## compound into a darker moire). `cover` 0..1 = fraction of pixels kept.
 const DITHER_GLSL: String = """
 uniform float opacity = 1.0;
-float bayer4(vec2 p) {
-	ivec2 i = ivec2(mod(p, 4.0));
-	int k = i.x + i.y * 4;
-	float m[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-	return (m[k] + 0.5) / 16.0;
+// Interleaved gradient noise: Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced
+// Warfare", SIGGRAPH Advances in Real-Time Rendering. Fine, isotropic, no 4x4 grid: reads as grain, not
+// as a checkerboard, at any coverage.
+float ign(vec2 p) {
+	return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
-void screen_door(float cover, vec2 frag) {
-#ifdef DITHER
-	if (cover < bayer4(frag)) {
-		discard;
-	}
+// With MSAA, alpha-to-coverage (A2C) turns the coverage into MSAA sample masks (smooth, order-independent,
+// depth-correct); the interleaved noise added to ALPHA dithers between the 5 coverage levels so intermediate
+// opacities are not banded. Without MSAA: IGN discard. (Macros: ALPHA is only reachable from fragment().)
+#ifdef A2C
+#define SCREEN_DOOR(cover) ALPHA = clamp((cover) + (ign(floor(FRAGCOORD.xy)) - 0.5) * 0.12, 0.0, 1.0)
+#elif defined(DITHER)
+#define SCREEN_DOOR(cover) if ((cover) < ign(floor(FRAGCOORD.xy))) { discard; }
+#else
+#define SCREEN_DOOR(cover)
 #endif
-}
 """
 
 ## Horizon description. Data comes from SoilBlock.set_layers().
@@ -132,16 +154,18 @@ uniform float dry_front = 0.0;
 uniform vec4 c_litter : source_color = vec4(0.20, 0.13, 0.08, 1.0);
 uniform vec4 c_a : source_color = vec4(0.30, 0.20, 0.12, 1.0);
 uniform vec4 c_b : source_color = vec4(0.50, 0.36, 0.21, 1.0);
-uniform vec4 c_c : source_color = vec4(0.66, 0.60, 0.46, 1.0);
+uniform vec4 c_c : source_color = vec4(0.46, 0.38, 0.25, 1.0);
 varying vec3 wpos;
 varying float face_kind;   // 0 = cut face, 1 = broken underside / rim
+varying float root_d;      // depth (m) of the rooted body's underside at this vertex; below = unrooted keel
+uniform float keel_depth = 1.0;
 
 vec3 kind_col(float k) {
 	if (k < 0.5) return c_litter.rgb;
 	if (k < 1.5) return c_a.rgb;
 	if (k < 2.5) return c_b.rgb;
 	if (k < 3.5) return c_c.rgb;
-	return vec3(0.55, 0.56, 0.58); // rock
+	return vec3(0.29, 0.30, 0.33); // rock (slate grey: pale flux and roots must read on it)
 }
 // Wavy horizon boundaries, continuous across faces (a function of the world position).
 float soil_wave(vec3 p, float d) {
@@ -149,9 +173,10 @@ float soil_wave(vec3 p, float d) {
 	float n = vnoise3(vec3(p.x * 0.9, 0.0, p.z * 0.9)) * 0.65 + vnoise3(vec3(p.x * 3.1, 3.7, p.z * 3.1)) * 0.35;
 	return (n - 0.5) * 2.0 * amp;
 }
-void soil_layers(float dd, out vec3 col, out float wet) {
+void soil_layers(float dd, out vec3 col, out float wet, out float kind) {
 	col = kind_col(layer_kind[0]);
 	wet = layer_water[0];
+	kind = layer_kind[0];
 	for (int i = 1; i < 8; i++) {
 		if (i >= n_layers) break;
 		float b = layer_bottom[i - 1];
@@ -159,11 +184,13 @@ void soil_layers(float dd, out vec3 col, out float wet) {
 		float t = smoothstep(b - s, b + s, dd);
 		col = mix(col, kind_col(layer_kind[i]), t);
 		wet = mix(wet, layer_water[i], t);
+		kind = t > 0.5 ? layer_kind[i] : kind;
 	}
 }
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	face_kind = UV.y;
+	root_d = UV2.x;
 }
 """
 
@@ -183,7 +210,8 @@ void fragment() {
 	float dd = d + soil_wave(wpos, d);
 	vec3 col;
 	float wet;
-	soil_layers(dd, col, wet);
+	float lkind;
+	soil_layers(dd, col, wet, lkind);
 	// Faceted broken earth: flat per-triangle normals (no duplicated vertices needed).
 	vec3 fn = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
 	if (dot(fn, VIEW) < 0.0) fn = -fn;
@@ -210,6 +238,23 @@ void fragment() {
 	float k = abs(fract(d) - 0.5);
 	float line = (1.0 - smoothstep(0.0, fwidth(d) * 1.5 + 0.003, 0.5 - k)) * step(0.3, d) * (1.0 - face_kind);
 	col = mix(col, col * 0.62, line * 0.40);
+	// UNROOTED KEEL: below the rooted body's underside the material is dull, greyer parent material with
+	// horizontal bedding that darkens with depth. A noisy seam marks where the roots end. Rock sites
+	// (limestone slab) keep the rock look.
+	float below = d - root_d + (vnoise3(wpos * vec3(1.6, 0.0, 1.6)) - 0.5) * 0.30;
+	float notrock = 1.0 - step(3.5, lkind);
+	float ur = smoothstep(-0.02, 0.05, below) * notrock;
+	float depth_k = clamp((d - root_d) / max(keel_depth, 0.5), 0.0, 1.0);
+	float bed = d * 1.5 + vnoise3(vec3(wpos.x * 0.35, 0.0, wpos.z * 0.35)) * 1.6;
+	float bh = hash13(vec3(floor(bed), 7.0, 3.0));
+	vec3 parent = mix(vec3(0.27, 0.20, 0.14), vec3(0.17, 0.17, 0.20), smoothstep(0.1, 0.9, depth_k));
+	parent *= 0.82 + 0.34 * bh;
+	parent *= 0.88 + 0.24 * g;
+	parent *= 1.0 - 0.38 * smoothstep(0.0, 1.0, depth_k);
+	parent *= 1.0 - 0.22 * (1.0 - smoothstep(0.0, 0.06, fract(bed)));
+	parent = stones(parent, wpos * vec3(1.3, 2.4, 1.3), 0.28, 0.8);
+	col = mix(col, parent, ur);
+	col *= 1.0 - 0.30 * (1.0 - smoothstep(0.0, 0.06, abs(below))) * step(0.01, d) * notrock;
 	// See-through: horizon boundaries and the silhouette keep more coverage (the "iceberg" outline).
 	float ring = 0.0;
 	for (int i = 0; i < 7; i++) {
@@ -218,8 +263,8 @@ void fragment() {
 	}
 	float fres = pow(1.0 - abs(dot(fn, VIEW)), 3.0);
 	float see = 1.0 - opacity;
-	col = mix(col, mix(col, vec3(0.70, 0.66, 0.60), 0.35), see);
-	screen_door(opacity + see * (0.85 * fres + 0.45 * ring * (1.0 - face_kind)), FRAGCOORD.xy);
+	col = mix(col, col * 0.85, see);  // fades toward the dark background, not toward a milky veil
+	SCREEN_DOOR(opacity + see * (0.85 * fres + 0.45 * ring * (1.0 - face_kind)));
 	ALBEDO = col;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
@@ -288,7 +333,7 @@ void fragment() {
 	float edge = smoothstep(0.965, 1.0, rim_t);
 	col *= 1.0 - 0.28 * edge;
 	// See-through: the turf edge keeps a thin readable outline.
-	screen_door(opacity + (1.0 - opacity) * 0.9 * smoothstep(0.975, 0.995, rim_t), FRAGCOORD.xy);
+	SCREEN_DOOR(opacity + (1.0 - opacity) * 0.9 * smoothstep(0.975, 0.995, rim_t));
 	ALBEDO = col;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
@@ -305,6 +350,8 @@ func _ready() -> void:
 	var top: String = NOISE_GLSL + DITHER_GLSL + TOP_GLSL
 	_top_mat = _make_mat("shader_type spatial;\nrender_mode cull_disabled;\n" + top)
 	_top_dither_mat = _make_mat("shader_type spatial;\nrender_mode cull_disabled;\n#define DITHER\n" + top)
+	_soil_a2c_mat = _make_mat("shader_type spatial;\nrender_mode cull_disabled, alpha_to_coverage;\n#define A2C\n" + body)
+	_top_a2c_mat = _make_mat("shader_type spatial;\nrender_mode cull_disabled, alpha_to_coverage;\n#define A2C\n" + top)
 	_noise = FastNoiseLite.new()
 	_noise.noise_type = FastNoiseLite.TYPE_VALUE_CUBIC
 	_noise.seed = 1871
@@ -431,6 +478,36 @@ func set_envelope(env: PackedFloat32Array, bedrock: float) -> void:
 	_easing = true
 
 
+## Unit profile of the keel: 1 on the axis, 0 at the rim (t = r / rim), rounded bottom, tapering sides.
+static func keel_shape(t: float) -> float:
+	return pow(maxf(1.0 - pow(clampf(t, 0.0, 1.0), 1.7), 0.0), 1.25)
+
+
+## Keel thickness (m) under the rooted underside at t = r / rim. Flat rock sites keep a flat slab instead
+## (rounded off only at the rim), so the rock look is unchanged.
+func keel_ext(t: float) -> float:
+	if bedrock_m > 0.0:
+		return _slab_k * (1.0 - smoothstep(0.86, 1.0, t))
+	return keel_depth * keel_shape(t)
+
+
+## Depth (m) of the visible underside of the whole body (rooted underside + keel) at (r, azimuth a).
+func shell_depth_at(r: float, a: float) -> float:
+	var rim: float = rim_radius(a)
+	return depth_at(r, a) + keel_ext(r / maxf(rim, 0.01))
+
+
+## True when point `p` is inside the solid body (not in the removed wedge, not above ground).
+func solid_at(p: Vector3, margin: float = 0.0) -> bool:
+	if p.y > margin:
+		return false
+	var a: float = atan2(p.x, p.z)
+	var r: float = Vector2(p.x, p.z).length()
+	if r > 0.3 and absf(wrapf(a - wedge_dir, -PI, PI)) < wedge_width * 0.5:
+		return false
+	return r < rim_radius(a) + margin and -p.y < shell_depth_at(minf(r, rim_radius(a)), a) + margin
+
+
 ## Height (m) of the broken outer wall of the slab at the rim.
 static func _lip(rim: float) -> float:
 	return clampf(0.10 + 0.025 * rim, 0.12, 0.55)
@@ -518,9 +595,10 @@ func set_opacity(v: float) -> void:
 	xray = opacity < 0.995
 	if _soil_mi == null:
 		return
-	_soil_mi.material_override = _soil_dither_mat if xray else _soil_mat
-	_top_mi.material_override = _top_dither_mat if xray else _top_mat
-	for m: ShaderMaterial in [_soil_dither_mat, _top_dither_mat]:
+	_a2c = is_inside_tree() and get_viewport().msaa_3d != Viewport.MSAA_DISABLED and OS.get_environment("DENDRO_NOA2C") != "1"
+	_soil_mi.material_override = (_soil_a2c_mat if _a2c else _soil_dither_mat) if xray else _soil_mat
+	_top_mi.material_override = (_top_a2c_mat if _a2c else _top_dither_mat) if xray else _top_mat
+	for m: ShaderMaterial in [_soil_dither_mat, _top_dither_mat, _soil_a2c_mat, _top_a2c_mat]:
 		m.set_shader_parameter("opacity", maxf(opacity, 0.03))
 	# A see-through body must not cast a shadow (it would darken the roots inside it).
 	var cast: int = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if opacity >= 0.95 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -559,7 +637,7 @@ func set_layers(bottom_m: PackedFloat32Array, kind: PackedInt32Array, water: Pac
 		w.append(water[j])
 	layer_count = n
 	layer_bottom = b
-	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat]:
+	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat, _soil_a2c_mat]:
 		m.set_shader_parameter("n_layers", n)
 		m.set_shader_parameter("layer_bottom", b)
 		m.set_shader_parameter("layer_kind", kf)
@@ -568,14 +646,14 @@ func set_layers(bottom_m: PackedFloat32Array, kind: PackedInt32Array, water: Pac
 
 ## Depth (m) down to which the soil is visibly dry from the top (0 = no drying front).
 func set_dry_front(depth_m: float) -> void:
-	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat]:
+	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat, _soil_a2c_mat]:
 		m.set_shader_parameter("dry_front", depth_m)
 
 
 ## Seasonal look of the top: vigor 0..1 (green vs dormant), fresh 0..1 (spring vs summer green), dryness,
 ## litter and frost 0..1 each.
 func set_ground(vigor: float, fresh: float, dryness: float, litter: float, frost: float, crown_r: float) -> void:
-	for m: ShaderMaterial in [_top_mat, _top_dither_mat]:
+	for m: ShaderMaterial in [_top_mat, _top_dither_mat, _top_a2c_mat]:
 		m.set_shader_parameter("vigor", vigor)
 		m.set_shader_parameter("fresh", fresh)
 		m.set_shader_parameter("dryness", dryness)
@@ -699,7 +777,9 @@ func _build_meshes_now() -> void:
 	_noise_table(a0, a1, cols)
 	# Per column: rim point (top) and underside points (knot j = 0 axis .. N_KNOTS rim lip).
 	var top_r: PackedFloat32Array = PackedFloat32Array()
-	var under: PackedVector2Array = PackedVector2Array()  # (r, y) per column x knot
+	var under: PackedVector2Array = PackedVector2Array()  # (r, y) per column x knot: rooted underside
+	var shell: PackedVector2Array = PackedVector2Array()  # same, the visible underside incl. the keel
+	var max_s: float = 0.0
 	var max_r: float = 0.0
 	var max_d: float = 0.0
 	# The cut faces bound the roots drawn in the open wedge: near the faces the profile takes the
@@ -721,6 +801,11 @@ func _build_meshes_now() -> void:
 				dw = maxf(dw, depth_at(r, aw))
 		w_dep[j] = dw
 	var ns: int = ENV_SECTORS
+	var mean_rim: float = 0.0
+	for v_r: float in _rim:
+		mean_rim += v_r / _rim.size()
+	keel_depth = mean_rim * lerpf(KEEL_RATIO_YOUNG, KEEL_RATIO, smoothstep(2.0, 14.0, mean_rim))
+	_slab_k = minf(SLAB_RATIO * mean_rim, SLAB_MAX)
 	for c: int in cols + 1:
 		var a: float = lerpf(a0, a1, float(c) / cols)
 		var wk: float = exp(-float(mini(c, cols - c)) / 2.0)
@@ -753,11 +838,18 @@ func _build_meshes_now() -> void:
 			var y: float = -maxf(dv + jg.y, 0.06)
 			under.append(Vector2(r, y))
 			max_d = maxf(max_d, -y)
+			# The visible shell hangs below the rooted underside: unrooted keel, faceted a bit more.
+			var ext: float = keel_ext(t)
+			var ys: float = y - ext - (0.0 if bedrock_m > 0.0 else _noise_y[c * st + j] * 0.07 * ext * smoothstep(0.0, 0.3, t))
+			shell.append(Vector2(r, ys))
+			max_s = maxf(max_s, -ys)
 	radius = max_r
 	depth = max_d
+	total_depth = max_s
 	var v: PackedVector3Array = PackedVector3Array()
 	var uv: PackedVector2Array = PackedVector2Array()
 	var nrm: PackedVector3Array = PackedVector3Array()  # approximate (the shader shades flat facets)
+	var uv2: PackedVector2Array = PackedVector2Array()  # x = depth of the rooted underside at this vertex (m)
 	var idx: PackedInt32Array = PackedInt32Array()
 	# Underside + rim wall: per column, rows = [top rim, lip, knots N_KNOTS-1 .. 0]. UV.y = 1 (broken).
 	var rows: int = st + 1
@@ -766,11 +858,13 @@ func _build_meshes_now() -> void:
 		var dir: Vector3 = Vector3(sin(a), 0.0, cos(a))
 		v.append(dir * top_r[c])
 		uv.append(Vector2(1.0, 1.0))
+		uv2.append(Vector2(-under[c * st + N_KNOTS].y, 0.0))
 		nrm.append(dir)
 		for j: int in range(N_KNOTS, -1, -1):
-			var q: Vector2 = under[c * st + j]
+			var q: Vector2 = shell[c * st + j]
 			v.append(dir * q.x + Vector3(0.0, q.y, 0.0))
 			uv.append(Vector2(float(j) / N_KNOTS, 1.0))
+			uv2.append(Vector2(-under[c * st + j].y, 0.0))
 			nrm.append((dir * (float(j) / N_KNOTS) + Vector3.DOWN).normalized())
 	for c: int in cols:
 		for k: int in rows - 1:
@@ -786,9 +880,12 @@ func _build_meshes_now() -> void:
 		var fnrm: Vector3 = face_normal(which)
 		var o: int = v.size()
 		for j: int in st:
-			var q: Vector2 = under[c * st + j]
+			var q: Vector2 = shell[c * st + j]
+			var rd: Vector2 = Vector2(-under[c * st + j].y, 0.0)
 			v.append(dir * q.x)
 			v.append(dir * q.x + Vector3(0.0, q.y, 0.0))
+			uv2.append(rd)
+			uv2.append(rd)
 			uv.append(Vector2(0.0, 0.0))
 			uv.append(Vector2(0.0, 0.0))
 			nrm.append(fnrm)
@@ -801,10 +898,13 @@ func _build_meshes_now() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = v
 	arrays[Mesh.ARRAY_NORMAL] = nrm
 	arrays[Mesh.ARRAY_TEX_UV] = uv
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var mesh: ArrayMesh = ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_soil_mi.mesh = mesh
+	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat, _soil_a2c_mat]:
+		m.set_shader_parameter("keel_depth", maxf(total_depth - depth, 0.1))
 	# Top: fan from the axis over the remaining arc, out to the jagged rim. UV.x = r / rim.
 	var tv: PackedVector3Array = PackedVector3Array([Vector3.ZERO])
 	var tn: PackedVector3Array = PackedVector3Array([Vector3.UP])
