@@ -7,7 +7,10 @@ signal play_toggled(playing: bool)
 signal speed_changed(days_per_second: float)
 signal drought_toggled(active: bool)
 signal new_seed_requested
+signal soil_selected(index: int)
 signal rings_toggled(shown: bool)
+signal xray_toggled(on: bool)
+signal guides_toggled(on: bool)
 
 const MONTHS: Array[String] = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
 	"août", "septembre", "octobre", "novembre", "décembre"]
@@ -22,6 +25,9 @@ var _phase: Label
 var _height: Label
 var _diam: Label
 var _temp: Label
+var _root_depth: Label
+var _root_spread: Label
+var _legend: PanelContainer
 var _water: ProgressBar
 var _play: Button
 var _speed_slider: HSlider
@@ -36,6 +42,8 @@ var _bottom_panel: PanelContainer
 var drought_button: Button
 var seed_button: Button
 var rings_button: Button
+var xray_button: Button
+var guides_button: Button
 var play_button: Button
 var speed_slider: HSlider
 
@@ -49,6 +57,7 @@ func _ready() -> void:
 	root.theme = th
 	add_child(root)
 	_build_info_panel(root)
+	_build_legend(root)
 	_build_ring_panel(root)
 	_build_bottom_bar(root)
 
@@ -87,6 +96,8 @@ func _build_info_panel(root: Control) -> void:
 	_height = _row(v)
 	_diam = _row(v)
 	_temp = _row(v)
+	_root_depth = _row(v)
+	_root_spread = _row(v)
 	var wl: Label = Label.new()
 	wl.text = "Eau du sol"
 	v.add_child(wl)
@@ -97,12 +108,62 @@ func _build_info_panel(root: Control) -> void:
 	_water.custom_minimum_size = Vector2(0, 18)
 	_water.show_percentage = false
 	v.add_child(_water)
+	var hint: Label = Label.new()
+	hint.text = "F cadrer · R racines · X transparence · G repères"
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.modulate = Color(1, 1, 1, 0.7)
+	v.add_child(hint)
 
 
 func _row(parent: Control) -> Label:
 	var l: Label = Label.new()
 	parent.add_child(l)
 	return l
+
+
+## Soil-horizon legend (under the info panel), shown in root view / X-ray.
+func _build_legend(root: Control) -> void:
+	_legend = PanelContainer.new()
+	_legend.position = Vector2(14, 14)  # re-placed under the info panel in _process
+	_legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legend.visible = false
+	root.add_child(_legend)
+	var m: MarginContainer = MarginContainer.new()
+	for side: String in ["left", "right", "top", "bottom"]:
+		m.add_theme_constant_override("margin_" + side, 8)
+	_legend.add_child(m)
+	var v: VBoxContainer = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	m.add_child(v)
+	var t: Label = Label.new()
+	t.text = "Horizons du sol"
+	t.add_theme_font_size_override("font_size", 16)
+	v.add_child(t)
+	for i: int in SoilBlock.KIND_NAMES.size():
+		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var sw: ColorRect = ColorRect.new()
+		sw.color = SoilBlock.KIND_COLORS[i]
+		sw.custom_minimum_size = Vector2(18, 14)
+		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(sw)
+		var l: Label = Label.new()
+		l.text = SoilBlock.KIND_NAMES[i]
+		l.add_theme_font_size_override("font_size", 15)
+		row.add_child(l)
+		v.add_child(row)
+
+
+func set_legend_visible(on: bool) -> void:
+	_legend.visible = on
+
+
+func is_legend_visible() -> bool:
+	return _legend.visible
+
+
+func _process(_delta: float) -> void:
+	_legend.position = Vector2(14.0, _info_panel.position.y + _info_panel.size.y + 8.0)
 
 
 func _build_ring_panel(root: Control) -> void:
@@ -133,7 +194,7 @@ func _build_bottom_bar(root: Control) -> void:
 	_bottom_panel = p
 	root.add_child(p)
 	var h: HBoxContainer = HBoxContainer.new()
-	h.add_theme_constant_override("separation", 12)
+	h.add_theme_constant_override("separation", 6)
 	p.add_child(h)
 
 	_play = _no_focus(Button.new()) as Button
@@ -153,13 +214,13 @@ func _build_bottom_bar(root: Control) -> void:
 	_speed_slider.max_value = 1.0
 	_speed_slider.step = 0.001
 	_speed_slider.value = log(30.0) / log(MAX_SPEED_DAYS)
-	_speed_slider.custom_minimum_size = Vector2(240, 0)
+	_speed_slider.custom_minimum_size = Vector2(70, 0)
 	_speed_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_speed_slider.value_changed.connect(_on_speed_changed)
 	speed_slider = _speed_slider
 	h.add_child(_speed_slider)
 	_speed_label = Label.new()
-	_speed_label.custom_minimum_size = Vector2(110, 0)
+	_speed_label.custom_minimum_size = Vector2(88, 0)
 	h.add_child(_speed_label)
 
 	var drought: Button = _no_focus(Button.new()) as Button
@@ -177,9 +238,30 @@ func _build_bottom_bar(root: Control) -> void:
 	_seed_label = Label.new()
 	h.add_child(_seed_label)
 
+	soil_option = _no_focus(OptionButton.new()) as OptionButton
+	soil_option.tooltip_text = "Type de sol (relance la même graine)"
+	soil_option.item_selected.connect(func(i: int) -> void: soil_selected.emit(i))
+	h.add_child(soil_option)
+
 	var spacer: Control = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(spacer)
+
+	var xray: Button = _no_focus(Button.new()) as Button
+	xray.toggle_mode = true
+	xray.text = "Sous-sol : coupe"
+	xray_button = xray
+	xray.toggled.connect(func(on: bool) -> void:
+		xray.text = "Sous-sol : transparence" if on else "Sous-sol : coupe"
+		xray_toggled.emit(on))
+	h.add_child(xray)
+
+	var guides: Button = _no_focus(Button.new()) as Button
+	guides.text = "Repères"
+	guides.toggle_mode = true
+	guides_button = guides
+	guides.toggled.connect(func(on: bool) -> void: guides_toggled.emit(on))
+	h.add_child(guides)
 
 	var rings: Button = _no_focus(Button.new()) as Button
 	rings.text = "Cernes"
@@ -230,7 +312,7 @@ func is_playing() -> bool:
 
 
 func set_seed_text(seed_value: int) -> void:
-	_seed_label.text = "Graine n° %d" % seed_value
+	_seed_label.text = "n° %d" % seed_value
 
 
 func _on_play_toggled(on: bool) -> void:
@@ -278,6 +360,8 @@ func update_from(sim: TreeSim) -> void:
 	_phase.text = "Saison : " + PHASES[clampi(sim.get_phase(), 0, 5)]
 	_height.text = "Hauteur : %s m" % ("%.1f" % sim.get_height_m()).replace(".", ",")
 	_diam.text = "Diamètre du tronc : %s cm" % ("%.1f" % sim.get_trunk_diameter_cm()).replace(".", ",")
+	_root_depth.text = "Profondeur des racines : %s m" % ("%.1f" % sim.get_root_depth_m()).replace(".", ",")
+	_root_spread.text = "Étalement des racines : %s m" % ("%.1f" % sim.get_root_spread_m()).replace(".", ",")
 	_temp.text = "Température : %s °C" % ("%.1f" % sim.get_temperature_c()).replace(".", ",")
 	_water.value = sim.get_soil_water()
 	if year != _last_ring_year:
@@ -289,3 +373,20 @@ func update_from(sim: TreeSim) -> void:
 func force_ring_refresh() -> void:
 	_last_ring_year = -1
 	_ring_view.reset_view()
+
+
+var soil_option: OptionButton
+
+const SOIL_LABELS: Array[String] = ["Limon profond", "Mince sur calcaire", "Argile engorgée", "Sable sec"]
+
+
+## Fills the soil selector; presets beyond the known French labels keep the core's own name.
+func set_soil_names(names: PackedStringArray) -> void:
+	soil_option.clear()
+	for i: int in names.size():
+		soil_option.add_item(SOIL_LABELS[i] if i < SOIL_LABELS.size() else names[i])
+
+
+func select_soil(index: int) -> void:
+	if index >= 0 and index < soil_option.item_count:
+		soil_option.select(index)

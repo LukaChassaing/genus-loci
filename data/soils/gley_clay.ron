@@ -1,0 +1,24 @@
+// Heavy clay with impeded drainage and a permanent water table at 70 cm
+// (Stagnogley / Gleysol). Pedunculate oak tolerates such sites better than
+// most trees, but its roots stay above the anoxic zone (shallow plate) and
+// spring waterlogging slows growth.
+(
+    name: "Waterlogged clay (gley)",
+    description: "Clay loam topsoil over dense, mottled clay; slow drainage, water table at 70 cm.",
+    horizons: [
+        (kind: Organic, name: "O", thickness_m: 0.03, sand: 0.25, silt: 0.40, clay: 0.35,
+         bulk_density_g_cm3: 0.40, penetration_resistance_mpa: 0.2, field_capacity: 0.48, wilting_point: 0.20,
+         drainage_mm_day: 100.0, organic_matter_pct: 50.0, nutrient_index: 1.0),
+        (kind: Topsoil, name: "A", thickness_m: 0.20, sand: 0.25, silt: 0.40, clay: 0.35,
+         bulk_density_g_cm3: 1.20, penetration_resistance_mpa: 1.0, field_capacity: 0.38, wilting_point: 0.22,
+         drainage_mm_day: 6.0, organic_matter_pct: 5.0, nutrient_index: 0.8),
+        (kind: Subsoil, name: "Bg", thickness_m: 0.50, sand: 0.15, silt: 0.30, clay: 0.55,
+         bulk_density_g_cm3: 1.50, penetration_resistance_mpa: 2.0, field_capacity: 0.42, wilting_point: 0.28,
+         drainage_mm_day: 1.0, organic_matter_pct: 1.0, nutrient_index: 0.5),
+        (kind: Parent, name: "Cg", thickness_m: 2.0, sand: 0.15, silt: 0.30, clay: 0.55,
+         bulk_density_g_cm3: 1.60, penetration_resistance_mpa: 2.6, field_capacity: 0.42, wilting_point: 0.28,
+         drainage_mm_day: 1.0, organic_matter_pct: 0.5, nutrient_index: 0.3),
+    ],
+    water_table_depth_m: Some(0.7),
+    bedrock_depth_m: None,
+)

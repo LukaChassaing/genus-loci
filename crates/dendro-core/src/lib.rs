@@ -4,10 +4,12 @@
 //!
 //! A [`Simulation`] grows one tree from a [`Genome`] (species traits, see
 //! `data/species/*.ron`) in a procedural temperate-oceanic [`climate`]:
-//! daily weather, soil water, phenology and productivity; bud-based shoot
+//! daily weather, a layered [`soil`] profile with its water balance,
+//! phenology and productivity; bud-based shoot
 //! growth with light competition (after Palubicki et al. 2009), Pressler /
-//! pipe-model secondary growth recorded as annual [`Ring`]s, a stylised root
-//! system, and mesh output ([`MeshData`]) for wood, leaves and roots.
+//! pipe-model secondary growth recorded as annual [`Ring`]s, a root system
+//! that responds to the soil (stylised where noted), and mesh output
+//! ([`MeshData`]) for wood, leaves, structural and fine roots.
 //!
 //! ```no_run
 //! use dendro_core::{Genome, Simulation};
@@ -32,6 +34,7 @@ pub mod rings;
 mod rng;
 mod roots;
 mod sim;
+pub mod soil;
 
 pub use climate::{ClimateParams, Weather};
 pub use genome::{
@@ -40,4 +43,5 @@ pub use genome::{
 pub use mesh::MeshData;
 pub use phenology::{Phase, Season};
 pub use rings::Ring;
-pub use sim::{ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
+pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
+pub use sim::{ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};

@@ -8,7 +8,7 @@ use godot::classes::ArrayMesh;
 use godot::prelude::*;
 
 pub use dendro_core::MeshData;
-use dendro_core::{Genome, Phase, Simulation};
+use dendro_core::{ClimateParams, Genome, HorizonKind, Phase, Simulation, SoilProfile};
 
 /// Converts mesh data to an `ArrayMesh` (one surface, or none when the mesh is empty).
 /// Packed arrays are built in bulk.
@@ -48,15 +48,95 @@ pub struct Backend {
     /// Fraction of a day not yet simulated (the core steps in whole days).
     carry_days: f64,
     drought: bool,
+    /// Index of the soil preset used at the next reset.
+    soil: usize,
 }
 
 impl Backend {
     pub fn new(seed: u64) -> Self {
-        Self { sim: Simulation::new(Genome::quercus_robur(), seed), carry_days: 0.0, drought: false }
+        Self::with_soil(seed, 0)
+    }
+
+    /// `soil` indexes `SoilProfile::presets()`; out-of-range falls back to the first preset.
+    pub fn with_soil(seed: u64, soil: usize) -> Self {
+        let mut presets = SoilProfile::presets();
+        let soil = if soil < presets.len() { soil } else { 0 };
+        let profile = presets.swap_remove(soil);
+        let sim = Simulation::with_site(Genome::quercus_robur(), seed, ClimateParams::default(), profile);
+        Self { sim, carry_days: 0.0, drought: false, soil }
     }
 
     pub fn reset(&mut self, seed: u64) {
-        *self = Self::new(seed);
+        *self = Self::with_soil(seed, self.soil);
+    }
+
+    pub fn set_soil(&mut self, soil: usize) {
+        self.soil = soil;
+    }
+
+    pub fn soil_index(&self) -> usize {
+        self.soil
+    }
+
+    pub fn soil_names() -> Vec<String> {
+        SoilProfile::presets().into_iter().map(|p| p.name).collect()
+    }
+
+    /// Depth of rock under the current soil, or a negative value when there is none.
+    pub fn bedrock_depth_m(&self) -> f32 {
+        self.sim.soil_profile().bedrock_depth_m.unwrap_or(-1.0)
+    }
+
+    /// Depth of the permanent water table, or a negative value when there is none.
+    pub fn water_table_depth_m(&self) -> f32 {
+        self.sim.soil_profile().water_table_depth_m.unwrap_or(-1.0)
+    }
+
+    /// The simulated thin layers merged into runs of the same horizon kind, top to bottom:
+    /// (bottom depth m, kind 0 litter / 1 topsoil / 2 subsoil / 3 parent material / 4 rock, mean water 0..1).
+    pub fn soil_horizons(&self) -> Vec<(f32, i32, f32)> {
+        let mut out: Vec<(f32, i32, f32, f32)> = Vec::new(); // bottom, kind, water*thickness, thickness
+        for l in self.sim.soil_layers() {
+            let kind = match l.kind {
+                HorizonKind::Organic => 0,
+                HorizonKind::Topsoil => 1,
+                HorizonKind::Subsoil => 2,
+                HorizonKind::Parent => 3,
+            };
+            let t = (l.bottom_m - l.top_m).max(0.0);
+            match out.last_mut() {
+                Some(last) if last.1 == kind => {
+                    last.0 = l.bottom_m;
+                    last.2 += l.water * t;
+                    last.3 += t;
+                }
+                _ => out.push((l.bottom_m, kind, l.water * t, t)),
+            }
+        }
+        let mut merged: Vec<(f32, i32, f32)> =
+            out.into_iter().map(|(b, k, w, t)| (b, k, if t > 0.0 { w / t } else { 0.0 })).collect();
+        // Rock under a shallow soil is shown as its own dry layer (kind 4).
+        if let Some(rock) = self.sim.soil_profile().bedrock_depth_m {
+            merged.retain(|h| h.0 <= rock + 0.01);
+            merged.push((rock + 100.0, 4, 0.0));
+        }
+        merged
+    }
+
+    /// Depth down to which the soil is dry (water below 0.15) without interruption from the surface.
+    pub fn dry_front_m(&self) -> f32 {
+        let mut depth = 0.0;
+        for l in self.sim.soil_layers() {
+            if l.water >= 0.15 {
+                break;
+            }
+            depth = l.bottom_m;
+        }
+        depth
+    }
+
+    pub fn build_fine_root_mesh(&self) -> MeshData {
+        self.sim.fine_root_mesh()
     }
 
     pub fn advance_days(&mut self, days: f64) -> bool {

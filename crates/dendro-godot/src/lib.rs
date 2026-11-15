@@ -30,6 +30,47 @@ impl TreeSim {
     fn reset(&mut self, seed: i64) {
         self.backend.reset(seed as u64);
     }
+    /// Soil preset used from the next `reset` on.
+    #[func]
+    fn set_soil(&mut self, index: i64) {
+        self.backend.set_soil(index.max(0) as usize);
+    }
+    #[func]
+    fn get_soil(&self) -> i64 {
+        self.backend.soil_index() as i64
+    }
+    #[func]
+    fn get_soil_names(&self) -> PackedStringArray {
+        Backend::soil_names().iter().map(|n| GString::from(n.as_str())).collect()
+    }
+    #[func]
+    fn get_bedrock_depth_m(&self) -> f64 {
+        self.backend.bedrock_depth_m() as f64
+    }
+    #[func]
+    fn get_water_table_depth_m(&self) -> f64 {
+        self.backend.water_table_depth_m() as f64
+    }
+    #[func]
+    fn get_horizon_bottoms(&self) -> PackedFloat32Array {
+        self.backend.soil_horizons().iter().map(|h| h.0).collect()
+    }
+    #[func]
+    fn get_horizon_kinds(&self) -> PackedInt32Array {
+        self.backend.soil_horizons().iter().map(|h| h.1).collect()
+    }
+    #[func]
+    fn get_horizon_water(&self) -> PackedFloat32Array {
+        self.backend.soil_horizons().iter().map(|h| h.2).collect()
+    }
+    #[func]
+    fn get_dry_front_m(&self) -> f64 {
+        self.backend.dry_front_m() as f64
+    }
+    #[func]
+    fn build_fine_root_mesh(&self) -> Gd<ArrayMesh> {
+        mesh_data_to_array_mesh(&self.backend.build_fine_root_mesh())
+    }
     #[func]
     fn advance_days(&mut self, days: f64) -> bool {
         self.backend.advance_days(days)

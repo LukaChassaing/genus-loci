@@ -1,0 +1,30 @@
+// Deep, well-drained loamy brown forest soil (Cambisol / Luvisol) on loess
+// or loamy drift: the classic pedunculate oak site. Default site.
+// Retention and conductivity are typical values for the texture classes
+// (Saxton & Rawls 2006); penetration resistance rises with depth and
+// bulk density (Bengough et al. 2011). Values are representative, not a
+// measured profile.
+(
+    name: "Brown forest soil (deep loam)",
+    description: "Deep, well-drained loam over clay-enriched subsoil; mull humus, high biological activity.",
+    horizons: [
+        (kind: Organic, name: "O", thickness_m: 0.03, sand: 0.40, silt: 0.40, clay: 0.20,
+         bulk_density_g_cm3: 0.40, penetration_resistance_mpa: 0.2, field_capacity: 0.45, wilting_point: 0.15,
+         drainage_mm_day: 200.0, organic_matter_pct: 60.0, nutrient_index: 1.0),
+        (kind: Topsoil, name: "A", thickness_m: 0.25, sand: 0.40, silt: 0.40, clay: 0.20,
+         bulk_density_g_cm3: 1.25, penetration_resistance_mpa: 0.8, field_capacity: 0.30, wilting_point: 0.13,
+         drainage_mm_day: 80.0, organic_matter_pct: 4.0, nutrient_index: 0.9),
+        (kind: Subsoil, name: "Bt", thickness_m: 0.65, sand: 0.32, silt: 0.36, clay: 0.32,
+         bulk_density_g_cm3: 1.45, penetration_resistance_mpa: 1.6, field_capacity: 0.34, wilting_point: 0.19,
+         drainage_mm_day: 25.0, organic_matter_pct: 1.0, nutrient_index: 0.5),
+        (kind: Parent, name: "C", thickness_m: 1.2, sand: 0.45, silt: 0.35, clay: 0.20,
+         bulk_density_g_cm3: 1.60, penetration_resistance_mpa: 2.2, field_capacity: 0.28, wilting_point: 0.13,
+         stones: 0.2, drainage_mm_day: 20.0, organic_matter_pct: 0.3, nutrient_index: 0.25),
+        // Dense, compact substratum: few roots get through.
+        (kind: Parent, name: "C2", thickness_m: 1.5, sand: 0.45, silt: 0.35, clay: 0.20,
+         bulk_density_g_cm3: 1.75, penetration_resistance_mpa: 3.0, field_capacity: 0.26, wilting_point: 0.13,
+         stones: 0.3, drainage_mm_day: 10.0, organic_matter_pct: 0.1, nutrient_index: 0.1),
+    ],
+    water_table_depth_m: None,
+    bedrock_depth_m: None,
+)

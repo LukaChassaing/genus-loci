@@ -10,7 +10,10 @@
 //! stylisation chosen for visuals and robustness, not fitted data.
 //!
 //! * Explicit axes: taproot, first-order laterals, sinkers and side roots up
-//!   to `max_order`. Fine roots are implicit (not simulated).
+//!   to `max_order`. Fine roots are implicit: a per-soil-layer density
+//!   (see `update_layers`) used by the water balance and drawn as tufts.
+//! * The soil steers growth: penetration resistance, bedrock and
+//!   permanently waterlogged layers, moisture (see `grow`).
 //! * Tip extension each year scaled by the tree's productivity, a soil
 //!   crowding factor (coarse occupancy grid), depth/spread limits.
 //! * Thickening: pipe model. The collar receives the same cross-section
@@ -18,11 +21,18 @@
 //!   fraction of root tips it supports.
 
 use crate::genome::RootTraits;
+use crate::soil::{Layer, SoilColumn};
 use crate::math::Vec3;
 use crate::rng::{self, S_ROOT};
 use std::f32::consts::PI;
 
 pub(crate) const NONE: u32 = u32::MAX;
+
+/// Fine-root proliferation factor of a soil layer (stylised): nutrients
+/// (sqrt), last season's moisture, and avoidance of saturated soil.
+pub(crate) fn proliferation(l: &Layer, waterlog_tol: f32) -> f32 {
+    l.nutrient.max(0.0).sqrt() * (0.4 + 0.6 * l.season_rew) * (1.0 - (1.0 - waterlog_tol) * l.season_wet)
+}
 /// Soft cap on explicit root nodes (side roots stop being added above it).
 const ROOT_NODE_CAP: usize = 9_000;
 
@@ -111,15 +121,41 @@ impl RootSystem {
         self.nodes.iter().map(|n| n.end().horizontal_len()).fold(0.0, f32::max)
     }
 
-    /// Annual root growth.
-    pub fn grow(&mut self, rt: &RootTraits, year: u32, age: f32, crown_radius: f32, productivity: f32, seed: u64) {
+    /// Annual root growth in the layered soil.
+    ///
+    /// `stress` is last season's mean water stress (0..1): a dry year raises
+    /// the allocation to roots and sends sinkers and laterals deeper
+    /// (drought-deepening plasticity), a basis in e.g. Brunner et al. 2015
+    /// (fine-root responses to drought) and the functional-equilibrium
+    /// allocation theory (Poorter et al. 2012). Penetration slows with soil
+    /// strength and stops at bedrock or in permanently saturated (anoxic)
+    /// soil, with laterals deflected along the barrier: shallow "plate"
+    /// root systems on shallow or waterlogged soils, deep rooting on loose
+    /// dry sand (Stone & Kalisz 1991, maximum rooting depths; Kutschera &
+    /// Lichtenegger 2002 for oak root profiles).
+    #[allow(clippy::too_many_arguments)]
+    pub fn grow(
+        &mut self,
+        rt: &RootTraits,
+        year: u32,
+        age: f32,
+        crown_radius: f32,
+        productivity: f32,
+        stress: f32,
+        soil: &SoilColumn,
+        seed: u64,
+    ) {
         let r_new = 0.0012f32;
         let a_new = PI * r_new * r_new;
-        // Emerge first-order laterals from the taproot, a couple per year.
+        let barrier = soil.root_barrier(rt.waterlogging_tolerance).min(rt.max_depth_m);
+        let stress = stress.clamp(0.0, 1.0);
+        // Emerge first-order laterals from the root collar region, a couple
+        // per year; they leave the stem base just below the surface (where
+        // the buttresses are) and then run out at their preferred depth.
         let target = ((age + 1.0) * 2.0).min(rt.lateral_count as f32) as u32;
         while self.laterals < target {
             let k = self.laterals;
-            let want_depth = 0.05 + rt.lateral_depth_m * (k as f32 + 0.5) / rt.lateral_count as f32;
+            let want_depth = (0.04 + 0.2 * (k as f32 + 0.5) / rt.lateral_count as f32).min(0.8 * barrier);
             // Find the taproot node closest to that depth.
             let mut best = 0usize;
             let mut cur = 0usize;
@@ -137,6 +173,7 @@ impl RootSystem {
             let az = (137.5f32 * k as f32).to_radians() + 0.4 * rng::unit(rng::hash(seed, S_ROOT, k as u64, 1));
             let dir = Vec3::new(az.cos(), -0.18, az.sin()).normalize_or(Vec3::new(1.0, 0.0, 0.0));
             let start = self.nodes[best].end();
+            let pref = (0.3 + 0.7 * rng::unit(rng::hash(seed, S_ROOT, k as u64, 2))) * rt.lateral_depth_m;
             self.push(RootNode {
                 id: 0,
                 parent: best as u32,
@@ -149,7 +186,7 @@ impl RootSystem {
                 tip: true,
                 continues: false,
                 axis_len: 0.03,
-                pref_depth: (0.25 + 0.5 * rng::unit(rng::hash(seed, S_ROOT, k as u64, 2))) * rt.lateral_depth_m * 2.0,
+                pref_depth: pref,
                 tips_sub: 0.0,
             });
             self.laterals += 1;
@@ -158,7 +195,7 @@ impl RootSystem {
         // Coarse soil occupancy (0.5 m cells, horizontal x depth) for crowding.
         const CELL: f32 = 0.5;
         const HALF: i32 = 64;
-        const DEPTH_CELLS: i32 = 10;
+        const DEPTH_CELLS: i32 = 12;
         let mut occ = vec![0u16; (2 * HALF * 2 * HALF * DEPTH_CELLS) as usize];
         let cell_of = |p: Vec3| -> Option<usize> {
             let x = (p.x / CELL).floor() as i32 + HALF;
@@ -175,9 +212,17 @@ impl RootSystem {
                 occ[c] = occ[c].saturating_add(1);
             }
         }
+        // Soil queries at a depth.
+        let layer = |depth: f32| soil.layer_at(depth.max(0.0)).map(|i| &soil.layers[i]);
+        let resist = |depth: f32| layer(depth).map(|l| l.resistance).unwrap_or(10.0);
+        let moist = |depth: f32| layer(depth).map(|l| if l.season_wet > 0.5 { 0.3 } else { l.season_rew }).unwrap_or(0.0);
 
         let spread_limit = rt.lateral_spread * crown_radius.max(0.4) + 0.4;
-        let prod = (0.3 + 0.7 * productivity).clamp(0.2, 1.4);
+        // Allocation to roots rises with water stress (functional balance).
+        let alloc = 1.0 + rt.root_shoot_stress_gain * stress;
+        let prod = ((0.3 + 0.7 * productivity) * alloc).clamp(0.2, 1.8);
+        // Drought deepening of sinkers / taproot.
+        let deepen = 1.0 + rt.drought_deepening * stress * 2.0;
         // Segment length grows with the root system (level of detail).
         let max_seg = (0.3 + 0.012 * age).min(1.2);
         let allow_new_axes = self.nodes.len() < ROOT_NODE_CAP;
@@ -197,15 +242,24 @@ impl RootSystem {
                 2 => (0.25 * spread_limit).max(0.8),
                 _ => (0.08 * spread_limit).max(0.3),
             };
+            // Soil strength slows elongation (Bengough et al. 2011:
+            // halved at ~1-2 MPa, stopped at the species' maximum).
+            let r_soil = resist(depth + 0.05);
+            let f_soil = (1.0 - r_soil / rt.max_penetration_mpa.max(0.1)).clamp(0.0, 1.0).powi(2);
             let limit = match n.kind {
                 RootKind::Tap => {
-                    rt.taproot_dominance * (-age / rt.taproot_decline_years).exp().max(0.08)
-                        * (1.0 - depth / rt.max_depth_m)
+                    rt.taproot_dominance * (-age / rt.taproot_decline_years).exp().max(0.08) * (1.0 - depth / barrier) * f_soil * deepen
                 }
                 RootKind::Lateral => {
-                    (1.0 - rh / spread_limit).min(1.0 - n.axis_len / order_len) * 0.75f32.powi(n.order as i32 - 1)
+                    // Pioneer laterals keep most of their speed until close
+                    // to the spread limit (sqrt), side roots slow linearly.
+                    let reach = (1.0 - rh / spread_limit).max(0.0);
+                    let reach = if n.order == 1 { reach.sqrt() } else { reach };
+                    reach.min(1.0 - n.axis_len / order_len)
+                        * 0.75f32.powi(n.order as i32 - 1)
+                        * (0.5 + 0.5 * f_soil)
                 }
-                RootKind::Sinker => 0.5 * (1.0 - depth / rt.max_depth_m),
+                RootKind::Sinker => 0.5 * (1.0 - depth / barrier) * f_soil * deepen,
             };
             if limit <= 0.0 {
                 // Reached its limit. First-order laterals may resume when the
@@ -215,33 +269,41 @@ impl RootSystem {
                 }
                 continue;
             }
+            // Crowding slows side roots; the first-order "pioneer" laterals
+            // that explore beyond the crown are much less affected.
             let crowd = cell_of(e).map(|c| 1.0 / (1.0 + occ[c] as f32 / 6.0)).unwrap_or(1.0);
+            let crowd = if n.kind == RootKind::Lateral && n.order == 1 { crowd.powf(0.25) } else { crowd };
             let ext = base * limit.min(1.0) * crowd;
             if ext < 0.005 {
                 continue;
             }
             let h = |s: u64| rng::hash(seed, S_ROOT, n.id as u64, (year as u64) << 8 | s);
+            // Sinuous paths: soil heterogeneity (stones, old channels).
             let wig = Vec3::new(rng::normal(h(1)), rng::normal(h(2)) * 0.5, rng::normal(h(3))) * 0.25;
             let mut d = (n.dir + wig).normalize_or(n.dir);
             match n.kind {
                 RootKind::Tap | RootKind::Sinker => d = (d + Vec3::new(0.0, -1.5, 0.0)).normalize_or(n.dir),
                 RootKind::Lateral => {
-                    // Plagiotropic: steer towards the root's preferred depth.
-                    let want = ((-n.pref_depth - e.y) * 0.8).clamp(-0.35, 0.35);
+                    // Plagiotropic: steer towards the preferred depth, moved
+                    // down in dry years, and towards moister soil
+                    // (hydrotropism, stylised as a vertical moisture gradient).
+                    let pref = (n.pref_depth * (1.0 + rt.drought_deepening * stress)).min(barrier - 0.08).max(0.05);
+                    let grad = moist(depth + 0.25) - moist((depth - 0.25).max(0.02));
+                    let want = ((-pref - e.y) * 0.8 - rt.hydrotropism * grad).clamp(-0.35, 0.35);
                     let hz = Vec3::new(d.x, 0.0, d.z).normalize_or(Vec3::new(1.0, 0.0, 0.0));
                     d = (hz + Vec3::new(0.0, want + d.y * 0.2, 0.0)).normalize_or(hz);
                 }
             }
-            // Stay below the surface and above the maximum rooting depth.
+            // Stay below the surface and above the barrier (deflection).
             if e.y + d.y * ext > -0.04 {
                 d.y = d.y.min(-0.05);
                 d = d.normalize_or(n.dir);
             }
-            if depth + (-d.y) * ext > rt.max_depth_m {
+            if depth + (-d.y) * ext > barrier - 0.02 {
                 d.y = d.y.max(0.0);
                 d = d.normalize_or(n.dir);
             }
-            if n.length + ext <= max_seg * 0.6 && depth + (-n.dir.y).max(0.0) * ext <= rt.max_depth_m {
+            if n.length + ext <= max_seg * 0.6 && depth + (-n.dir.y).max(0.0) * ext <= barrier {
                 // Lengthen the current tip segment.
                 self.nodes[i].length += ext;
                 self.nodes[i].axis_len += ext;
@@ -285,15 +347,17 @@ impl RootSystem {
                     tip: true,
                     continues: false,
                     axis_len: 0.03,
-                    pref_depth: (n.pref_depth + 0.3 * (rng::unit(h(8)) - 0.3)).max(0.1),
+                    pref_depth: (n.pref_depth + 0.3 * (rng::unit(h(8)) - 0.3)).max(0.05),
                     tips_sub: 0.0,
                 });
             }
-            // Sinkers drop from laterals close to the trunk.
+            // Sinkers drop from laterals near the trunk (heart-sinker
+            // system), more often after dry years.
             if n.kind == RootKind::Lateral
                 && n.order <= 2
                 && rh < 0.35 * spread_limit
-                && rng::unit(h(7)) < rt.sinker_tendency * 0.35
+                && depth < barrier - 0.15
+                && rng::unit(h(7)) < rt.sinker_tendency * 0.35 * (1.0 + rt.drought_deepening * stress)
             {
                 self.push(RootNode {
                     id: 0,
@@ -312,6 +376,59 @@ impl RootSystem {
                 });
             }
         }
+    }
+
+    /// Root length per soil layer: structural (explicit axes) and fine roots.
+    ///
+    /// Fine roots are not simulated individually. Their length in a layer
+    /// is `fine_root_per_m` metres per metre of structural root there,
+    /// times a proliferation factor: nutrient-rich (Hodge 2004) and moist
+    /// layers get more, seasonally saturated (anoxic) layers fewer
+    /// (stylised). This density drives water uptake and is drawn as sparse
+    /// tufts (`fine_root_tufts`).
+    pub fn update_layers(&self, rt: &RootTraits, soil: &mut SoilColumn) {
+        for l in soil.layers.iter_mut() {
+            l.struct_len = 0.0;
+            l.root_len = 0.0;
+        }
+        for n in &self.nodes {
+            let mid = -(n.start.y + n.end().y) * 0.5;
+            if let Some(i) = soil.layer_at(mid.max(0.0)) {
+                soil.layers[i].struct_len += n.length;
+            }
+        }
+        let tol = rt.waterlogging_tolerance.clamp(0.0, 1.0);
+        for l in soil.layers.iter_mut() {
+            l.root_len = l.struct_len * (1.0 + rt.fine_root_per_m * proliferation(l, tol));
+        }
+        soil.root_zone_m2 = PI * self.spread().max(0.5).powi(2);
+        soil.refresh_states();
+    }
+
+    /// Fraction of root length above `depth` (m): (structural, total with
+    /// fine roots).
+    pub fn length_fraction_above(&self, soil: &SoilColumn, depth: f32) -> (f32, f32) {
+        let (mut s_up, mut s_all, mut t_up, mut t_all) = (0.0, 0.0, 0.0, 0.0);
+        for l in &soil.layers {
+            s_all += l.struct_len;
+            t_all += l.root_len;
+            let f = ((depth - l.top) / l.thick().max(1e-6)).clamp(0.0, 1.0);
+            s_up += l.struct_len * f;
+            t_up += l.root_len * f;
+        }
+        (s_up / s_all.max(1e-6), t_up / t_all.max(1e-6))
+    }
+
+    /// World azimuths (atan2(z, x)) of the `n` thickest first-order laterals.
+    pub fn main_lateral_azimuths(&self, n: usize) -> Vec<f32> {
+        let mut v: Vec<(f32, f32)> = self
+            .nodes
+            .iter()
+            .filter(|r| r.kind == RootKind::Lateral && r.order == 1 && !r.continues)
+            .map(|r| (r.area, r.dir.z.atan2(r.dir.x)))
+            .collect();
+        v.sort_by(|a, b| b.0.total_cmp(&a.0));
+        v.into_iter().take(n).map(|x| x.1).collect()
     }
 
     /// Pipe-model thickening: the collar gets `collar_da` (m2), each segment

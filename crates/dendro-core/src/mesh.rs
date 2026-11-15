@@ -10,7 +10,10 @@
 //! * Wood/roots: closed-around generalised cylinders (open ends), one seam
 //!   vertex column duplicated for UVs. `u` = around the circumference (0..1),
 //!   `v` = arc length along the axis divided by the axis base circumference
-//!   (square texels for a tiling bark texture). Vertex colour = bark tint.
+//!   (square texels for a tiling bark texture). Vertex colour = bark tint;
+//!   dead wood (retrenchment) is tinted silver-grey. Roots: alpha = 1.0 on
+//!   structural roots (`root_mesh`), 0.5 on fine-root tufts
+//!   (`fine_root_mesh`), so one material can style both.
 //! * Leaves: single-sided quads ("cards"); render with back-face culling
 //!   disabled and alpha-scissor on a leaf-cluster texture. UVs cover 0..1 on
 //!   each card (v = 0 at the card's distal end). Normals are bent outward
@@ -42,6 +45,15 @@ impl MeshData {
 
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
+    }
+
+    /// Reserve room for `verts` more vertices and `indices` more indices.
+    pub fn reserve(&mut self, verts: usize, indices: usize) {
+        self.positions.reserve(verts);
+        self.normals.reserve(verts);
+        self.uvs.reserve(verts);
+        self.colors.reserve(verts);
+        self.indices.reserve(indices);
     }
 
     /// Reverse the winding of every triangle (CW <-> CCW).
@@ -121,12 +133,104 @@ pub(crate) struct TubeStyle {
     pub root_flare_height: f32,
     /// Number of buttress lobes in the flared zone (0 = round).
     pub buttress_lobes: u32,
+    /// Azimuths (rad, atan2(z, x) in world space) of the buttress lobes;
+    /// empty = evenly spaced. Lets the lobes sit over the main lateral roots.
+    pub lobe_azimuths: [f32; 8],
+    /// Number of valid entries in `lobe_azimuths`.
+    pub lobe_count: u32,
+    /// Axes with a drawn radius above this are smoothed (Catmull-Rom); 0
+    /// disables.
+    pub smooth_min_radius: f32,
+    /// Relative cross-section irregularity of thick side axes (0 = round).
+    pub irregularity: f32,
+    /// Axes thinner than `twig_radius` (m) are simplified to rings at least
+    /// `twig_min_len` (m) apart (0 disables).
+    pub twig_radius: f32,
+    pub twig_min_len: f32,
 }
 
 const NONE: u32 = u32::MAX;
 
+/// Radial resolution: 3 sides for fine twigs (< ~4 mm), 4-6 for small
+/// branches, up to 28 on massive wood so big limbs read round.
 fn radial_segments(r: f32) -> usize {
-    (3.0 + r * 70.0).clamp(3.0, 18.0) as usize
+    if r < 0.004 {
+        3
+    } else {
+        (4.0 + r * 45.0).clamp(4.0, 24.0) as usize
+    }
+}
+
+/// Thin twig axes: drop interior rings closer than `min_len` (m) to the
+/// last kept one. Straightens the kinks between short lumped shoot units
+/// into a fine, nearly straight spray and halves the triangle cost of the
+/// twig layer. Side twigs keep their (original) attachment points, which
+/// then lie at most a few centimetres off the simplified tube.
+fn decimate_axis(rings: &mut Vec<Ring>, first: usize, min_len: f32) {
+    if rings.len() <= first + 2 {
+        return;
+    }
+    let src = std::mem::take(rings);
+    let last = src.len() - 1;
+    let mut out = Vec::with_capacity(src.len());
+    out.extend_from_slice(&src[..=first]);
+    for (k, r) in src.iter().enumerate().skip(first + 1) {
+        let prev = out[out.len() - 1].center;
+        if k == last || (r.center - prev).length() >= min_len {
+            out.push(*r);
+        }
+    }
+    // Re-aim tangents along the simplified polyline.
+    for k in first..out.len() {
+        let a = out[k.saturating_sub(1).max(first)].center;
+        let b = out[(k + 1).min(out.len() - 1)].center;
+        out[k].tangent = (b - a).normalize_or(out[k].tangent);
+    }
+    *rings = out;
+}
+
+/// Smooth thick axes: insert Catmull-Rom points between ring centres
+/// (the curve passes through the original centres, so side axes stay
+/// attached). Segments are subdivided to about 2.5 radii per span, at most
+/// 3 pieces; axes thinner than `min_r` are left as they are. Rings below
+/// `skip_below_y` (the subdivided root-flare zone) are not touched.
+fn smooth_axis(rings: &mut Vec<Ring>, first: usize, min_r: f32, skip_below_y: f32) {
+    if rings.len() < first + 3 || rings[first].radius < min_r {
+        return;
+    }
+    let src = std::mem::take(rings);
+    let n = src.len();
+    let mut out = Vec::with_capacity(n * 2);
+    out.extend_from_slice(&src[..=first]);
+    for k in first..n - 1 {
+        let (a, b) = (src[k], src[k + 1]);
+        let p0 = if k > 0 { src[k - 1].center } else { a.center * 2.0 - b.center };
+        let p3 = if k + 2 < n { src[k + 2].center } else { b.center * 2.0 - a.center };
+        let len = (b.center - a.center).length();
+        let r = a.radius.max(b.radius);
+        let m = if r >= min_r && a.center.y >= skip_below_y { ((len / (6.0 * r)).ceil() as usize).clamp(1, 3) } else { 1 };
+        for j in 1..m {
+            let t = j as f32 / m as f32;
+            let (t2, t3) = (t * t, t * t * t);
+            let c = (a.center * 2.0
+                + (b.center - p0) * t
+                + (p0 * 2.0 - a.center * 5.0 + b.center * 4.0 - p3) * t2
+                + (a.center * 3.0 - p0 - b.center * 3.0 + p3) * t3)
+                * 0.5;
+            let d = ((b.center - p0)
+                + (p0 * 2.0 - a.center * 5.0 + b.center * 4.0 - p3) * (2.0 * t)
+                + (a.center * 3.0 - p0 - b.center * 3.0 + p3) * (3.0 * t2))
+                * 0.5;
+            out.push(Ring {
+                center: c,
+                radius: a.radius + (b.radius - a.radius) * t,
+                tangent: d.normalize_or(a.tangent),
+                color: a.color,
+            });
+        }
+        out.push(b);
+    }
+    *rings = out;
 }
 
 /// Build generalised cylinders along the axes of a segment tree. Axes are
@@ -159,11 +263,18 @@ pub(crate) fn build_tubes(segs: &[TubeSeg], tri_budget: usize, min_radius: f32, 
     axes.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
 
     let mut mesh = MeshData::default();
+    mesh.reserve(tri_budget * 3 / 4, tri_budget * 3);
     let mut used = 0usize;
+    // Segments actually drawn: an axis whose parent axis was dropped for
+    // budget is dropped too (no floating fragments).
+    let mut drawn = vec![false; n];
     let mut chain: Vec<usize> = Vec::new();
     let mut rings: Vec<Ring> = Vec::new();
     for &(r0, start, count) in &axes {
         let root_axis = segs[start as usize].parent == NONE;
+        if !root_axis && !drawn[segs[start as usize].parent as usize] {
+            continue;
+        }
         let mut radial = radial_segments(r0);
         if root_axis && style.buttress_lobes > 0 {
             radial = radial.max(6 * style.buttress_lobes as usize).min(36);
@@ -190,7 +301,22 @@ pub(crate) fn build_tubes(segs: &[TubeSeg], tri_budget: usize, min_radius: f32, 
             continue;
         }
         axis_rings(segs, &chain, &style, &mut rings);
-        used += emit_rings(&mut mesh, &rings, radial, if root_axis { style } else { TubeStyle::default() });
+        let first = if !root_axis && style.collar_flare > 0.0 { 1 } else { 0 };
+        let flare_top = if root_axis { style.root_flare_height } else { f32::MIN };
+        smooth_axis(&mut rings, first, style.smooth_min_radius.max(1e-4), flare_top);
+        if style.twig_min_len > 0.0 && r0 < style.twig_radius {
+            decimate_axis(&mut rings, first, style.twig_min_len);
+        }
+        let tris = (rings.len() - 1) * radial * 2;
+        if used + tris > tri_budget {
+            continue;
+        }
+        for &c in &chain {
+            drawn[c] = true;
+        }
+        let irregular = if root_axis { 0.0 } else { style.irregularity };
+        let phase = rng::unit(rng::mix(start as u64 ^ 0xBA4C)) * std::f32::consts::TAU;
+        used += emit_rings(&mut mesh, &rings, radial, if root_axis { style } else { TubeStyle::default() }, irregular, phase);
     }
     mesh
 }
@@ -262,7 +388,7 @@ pub(crate) fn axis_rings(segs: &[TubeSeg], chain: &[usize], style: &TubeStyle, r
     }
 }
 
-fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeStyle) -> usize {
+fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeStyle, irregular: f32, phase: f32) -> usize {
     let m = rings.len() - 1;
     let base_r = rings[0].radius.max(1e-4);
     let circumference = std::f32::consts::TAU * base_r;
@@ -291,13 +417,32 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
             let dirv = normal * c + binormal * s;
             let mut r = ring.radius;
             if w > 0.0 {
-                let lobe = if flare.buttress_lobes > 0 {
+                let lobe = if flare.lobe_count > 0 {
+                    // Lobes centred on the given world azimuths.
+                    let az = dirv.z.atan2(dirv.x);
+                    let mut best = 0.0f32;
+                    for &la in &flare.lobe_azimuths[..flare.lobe_count as usize] {
+                        let mut d = (az - la).abs() % std::f32::consts::TAU;
+                        if d > std::f32::consts::PI {
+                            d = std::f32::consts::TAU - d;
+                        }
+                        let x = (1.0 - d / 0.7).max(0.0);
+                        best = best.max(x * x * (3.0 - 2.0 * x));
+                    }
+                    0.35 + 0.65 * best
+                } else if flare.buttress_lobes > 0 {
                     let x = 0.5 + 0.5 * (th * flare.buttress_lobes as f32).cos();
                     0.35 + 0.65 * x * x
                 } else {
                     1.0
                 };
                 r *= 1.0 + flare.root_flare * w * lobe;
+            }
+            if irregular > 0.0 && ring.radius > 0.03 {
+                // Fluted, slightly out-of-round old wood (low harmonics, fixed
+                // per axis so the bumps run along it as ridges).
+                let k = ((ring.radius - 0.03) / 0.1).min(1.0);
+                r *= 1.0 + irregular * k * (0.6 * (2.0 * th + phase).sin() + 0.4 * (3.0 * th + 1.7 * phase).sin());
             }
             mesh.vert(ring.center + dirv * r, dirv, [j as f32 / radial as f32, v], ring.color);
         }
@@ -324,6 +469,9 @@ pub(crate) struct LeafCluster {
     pub size: f32,
     pub color: [f32; 4],
     pub key: u64,
+    /// Centre of the foliage lobe this cluster belongs to (normals are bent
+    /// away from it).
+    pub center: Vec3,
 }
 
 /// Crossed cards per leaf cluster.
@@ -338,6 +486,8 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
     }
     let max_clusters = tri_budget / (CARDS_PER_CLUSTER * 2);
     let keep = if clusters.len() > max_clusters { max_clusters as f32 / clusters.len() as f32 } else { 1.0 };
+    let cap = clusters.len().min(max_clusters + max_clusters / 8) * CARDS_PER_CLUSTER;
+    mesh.reserve(cap * 4, cap * 6);
     let scale = 1.0 / keep.sqrt();
     let mut center = Vec3::ZERO;
     for c in clusters {
@@ -355,14 +505,22 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
             break;
         }
         let s = c.size * scale;
-        let outward = (c.pos - center).normalize_or(Vec3::Y);
+        let crown_out = (c.pos - center).normalize_or(Vec3::Y);
+        let outward = ((c.pos - c.center).normalize_or(crown_out) * 0.65 + crown_out * 0.35).normalize_or(crown_out);
         let dir = c.dir.normalize_or(Vec3::Y);
         let perp = dir.any_perpendicular();
         let perp2 = dir.cross(perp);
         let spin = rng::unit(rng::mix(c.key)) * std::f32::consts::PI;
+        // Card k is rotated by k x 180/CARDS deg: rotate (sin, cos) instead
+        // of evaluating them per card (this loop runs ~10^5 times).
+        let (mut sa, mut ca) = spin.sin_cos();
+        let (sr, cr) = (std::f32::consts::PI / CARDS_PER_CLUSTER as f32).sin_cos();
         for k in 0..CARDS_PER_CLUSTER {
-            let ang = spin + k as f32 * std::f32::consts::PI / CARDS_PER_CLUSTER as f32;
-            let (sa, ca) = ang.sin_cos();
+            if k > 0 {
+                let s2 = sa * cr + ca * sr;
+                ca = ca * cr - sa * sr;
+                sa = s2;
+            }
             let b = perp * ca + perp2 * sa; // card width axis
             // Card length axis: along the shoot, tilted by a varied per-card
             // amount so the cluster reads as a volume from all sides.
@@ -374,15 +532,15 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
             if flipped {
                 face = -face;
             }
-            let nrm = (face * 0.35 + outward * 0.65).normalize_or(face);
+            let nrm = (face * 0.35 + outward * 0.65).normalize_or(face).to_array();
             let ha = a * (s * 0.5);
             let hb = b * (s * 0.5);
             let base = mesh.positions.len() as u32;
             let q = [mid - ha - hb, mid + ha - hb, mid + ha + hb, mid - ha + hb];
-            let uv = [[0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0]];
-            for (p, t) in q.iter().zip(uv) {
-                mesh.vert(*p, nrm, t, c.color);
-            }
+            mesh.positions.extend_from_slice(&q.map(|p| p.to_array()));
+            mesh.normals.extend_from_slice(&[nrm; 4]);
+            mesh.uvs.extend_from_slice(&[[0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]);
+            mesh.colors.extend_from_slice(&[c.color; 4]);
             // q0,q1,q2 is CCW around a x b. Emit CW around the chosen face normal.
             if flipped {
                 mesh.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
@@ -403,11 +561,35 @@ mod tests {
         TubeSeg { parent, start, end, radius, continues, color: [0.5; 4], tip_taper: 0.5 }
     }
 
+    /// Buttress lobes peak at the supplied world azimuths (over the main
+    /// lateral roots).
+    #[test]
+    fn buttress_lobes_follow_roots() {
+        let mut lobe_azimuths = [0.0; 8];
+        lobe_azimuths[0] = 0.0; // +x
+        lobe_azimuths[1] = std::f32::consts::FRAC_PI_2; // +z
+        lobe_azimuths[2] = std::f32::consts::PI; // -x
+        let style = TubeStyle { root_flare: 0.8, root_flare_height: 1.0, buttress_lobes: 3, lobe_azimuths, lobe_count: 3, ..Default::default() };
+        let segs = [seg(NONE, Vec3::ZERO, Vec3::new(0.0, 4.0, 0.0), 0.5, false)];
+        let m = build_tubes(&segs, 100_000, 0.0, style);
+        // Widest ground-level vertex per direction.
+        let reach = |dx: f32, dz: f32| {
+            m.positions
+                .iter()
+                .filter(|p| p[1] < 0.05)
+                .map(|p| p[0] * dx + p[2] * dz)
+                .fold(0.0, f32::max)
+        };
+        let on_lobe = reach(1.0, 0.0).min(reach(0.0, 1.0)).min(reach(-1.0, 0.0));
+        let off_lobe = reach(0.0, -1.0);
+        assert!(on_lobe > off_lobe * 1.2, "lobes {on_lobe} vs gap {off_lobe}");
+    }
+
     /// A thin twig on a thick stem must stay thin at its collar (no wide
     /// cone/sheet hidden inside, or poking out of, the stem).
     #[test]
     fn collar_ring_bounded_by_branch_radius() {
-        let style = TubeStyle { collar_flare: 0.25, root_flare: 0.7, root_flare_height: 1.5, buttress_lobes: 5 };
+        let style = TubeStyle { collar_flare: 0.25, root_flare: 0.7, root_flare_height: 1.5, buttress_lobes: 5, ..Default::default() };
         let segs = [
             seg(NONE, Vec3::ZERO, Vec3::new(0.0, 3.0, 0.0), 0.5, false),
             seg(0, Vec3::new(0.0, 3.0, 0.0), Vec3::new(0.0, 4.0, 0.0), 0.45, true),

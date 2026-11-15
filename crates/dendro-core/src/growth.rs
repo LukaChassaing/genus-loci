@@ -47,34 +47,59 @@
 
 use crate::genome::Genome;
 use crate::math::{Quat, Vec3};
-use crate::rng::{self, S_BUD, S_SHOOT};
+use crate::rng::{self, S_BUD, S_RETRENCH, S_SHOOT};
 use std::f32::consts::PI;
 
 pub(crate) const NONE: u32 = u32::MAX;
 
-/// Shadow added by one leafy shoot to the light passing through its voxel.
-const SHADOW_A: f32 = 1.0;
+/// Optical depth added by one leafy shoot unit of reference leaf area in
+/// its voxel (Beer-Lambert: `tau = G * LAD * path`; with the level of
+/// detail a leafy unit carries leaf area proportional to a voxel face, so
+/// the per-unit value is size-independent).
+const SHADOW_A: f32 = 2.5;
 /// Weight of the shadow cast into a shoot's own voxel (side-by-side crowding).
 /// Kept small: a voxel cannot resolve the horizontal arrangement of foliage,
 /// and on old trees one voxel holds a lumped shoot cluster.
 const SHADOW_SAME: f32 = 0.2;
-/// Fraction of shadow carried from one voxel layer to the next (penumbra /
-/// scattering: shadow fades a few voxels below its source).
+/// Fraction of optical depth carried per voxel traversed (penumbra /
+/// scattering: a shadow fades a few voxels away from its source). Oblique
+/// rays traverse `path` voxels per layer and decay by `SHADOW_DECAY^path`.
 const SHADOW_DECAY: f32 = 0.82;
 /// Lateral blur weights (centre, each edge) of the separable 3-tap kernel.
 const BLUR_C: f32 = 0.5;
 const BLUR_E: f32 = 0.25;
-/// Sky directions: horizontal voxel shift per layer (x, z) and weight.
-/// The oblique ones shift 2 voxels per layer (~27 deg elevation), which lets
-/// the lower crown flanks receive light under the overhang of the upper crown.
-const SKY_DIRS: [(i64, i64, f32); 5] =
-    [(0, 0, 0.36), (2, 0, 0.16), (-2, 0, 0.16), (0, 2, 0.16), (0, -2, 0.16)];
-/// Upward component of the sky vector of an unshaded bud (sum of w * y / |dir|).
-const ISO_UP: f32 = 0.36 + 4.0 * 0.16 * 0.447_213_6;
+/// Sky hemisphere: horizontal voxel shift per layer (x, z) and weight.
+///
+/// 13 directions in three elevation bands: the zenith (90 deg), 4 at 45
+/// deg (shift 1) and 8 at ~24 deg (shift (2, 1), azimuths 26.6 deg apart
+/// from the axes). Weights are the standard
+/// overcast sky (radiance ~ (1 + 2 sin e) / 3, Moon & Spencer 1942)
+/// integrated over the bands 60-90 / 35-60 / 10-35 deg: 0.21 / 0.40 / 0.39.
+/// Open-grown trees receive most of their diffuse light from these low and
+/// middle elevations, which is what keeps their crowns deep (Canham et al.
+/// 1994 for side light in gaps; Valladares & Niinemets 2007).
+const SKY_DIRS: [(i64, i64, f32); 13] = [
+    (0, 0, 0.21),
+    (1, 0, 0.10),
+    (-1, 0, 0.10),
+    (0, 1, 0.10),
+    (0, -1, 0.10),
+    (2, 1, 0.04875),
+    (1, 2, 0.04875),
+    (-1, 2, 0.04875),
+    (-2, 1, 0.04875),
+    (-2, -1, 0.04875),
+    (-1, -2, 0.04875),
+    (1, -2, 0.04875),
+    (2, -1, 0.04875),
+];
+/// Planes are padded by this many cells (zero shadow = open sky): the
+/// largest per-layer shift plus the blur radius.
+const PAD: usize = 3;
 /// Voxel size = tree height / this (bounded): the simulation's level of detail.
-const VOXELS_PER_HEIGHT: f32 = 40.0;
+const VOXELS_PER_HEIGHT: f32 = 30.0;
 /// Soft cap on shoot nodes: above it bud break gets harder (safety valve).
-const NODE_SOFT_CAP: usize = 70_000;
+const NODE_SOFT_CAP: usize = 32_000;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Node {
@@ -105,6 +130,16 @@ pub(crate) struct Node {
     pub term_bud: bool,
     pub lat_buds: u8,
     pub birth_year: u32,
+    /// Consecutive years in which this branch's foliage was all below the
+    /// shedding light threshold (branch carbon reserves, see `mark_shed`).
+    pub starve: u8,
+    /// Year this branch died and became standing dead wood (retrenchment),
+    /// `NONE` while alive. Dead wood keeps its geometry, carries no buds or
+    /// leaves and breaks off piecewise (thin parts first).
+    pub snag_since: u32,
+    /// Year the current lateral buds were formed (epicormic buds are formed
+    /// on old wood; bud viability counts from here).
+    pub bud_year: u32,
     /// Light exposure (0..1) at the shoot tip, from the last light pass.
     pub light: f32,
     /// Direction of decreasing shadow at the tip.
@@ -123,6 +158,39 @@ pub(crate) struct Node {
     dead: bool,
 }
 
+/// Fast `exp(-x)` for `x >= 0` (relative error < 2e-4): the light pass
+/// evaluates it ~10^6 times per year. Deterministic (pure f32 arithmetic).
+#[inline]
+fn exp_neg(x: f32) -> f32 {
+    let t = -x.clamp(0.0, 80.0) * std::f32::consts::LOG2_E;
+    let fi = t.floor();
+    let f = t - fi;
+    // 2^f on [0, 1): minimax-like cubic.
+    let p = 1.0 + f * (0.695_976_1 + f * (0.224_940_4 + f * 0.079_083_5));
+    p * f32::from_bits((((fi as i32) + 127).max(0) as u32) << 23)
+}
+
+/// `x^k`, with fast paths for the small integer exponents used in genomes.
+#[inline]
+fn pow_k(x: f32, k: f32) -> f32 {
+    if k == 3.0 {
+        x * x * x
+    } else if k == 2.0 {
+        x * x
+    } else if k == 1.0 {
+        x
+    } else {
+        x.powf(k)
+    }
+}
+
+/// Leaf area of a leafy shoot unit relative to the reference (a full-length
+/// unit of about a voxel): short, weak units carry fewer leaves.
+#[inline]
+fn leaf_units(n: &Node, unit_len: f32) -> f32 {
+    0.5 + 0.5 * (n.length / unit_len.max(1e-3)).min(1.0)
+}
+
 impl Node {
     #[inline]
     pub fn end(&self, ext: f32) -> Vec3 {
@@ -133,6 +201,18 @@ impl Node {
     pub fn radius(&self) -> f32 {
         (self.area / PI).sqrt()
     }
+    #[inline]
+    pub fn is_snag(&self) -> bool {
+        self.snag_since != NONE
+    }
+}
+
+/// Years a piece of standing dead wood of radius `r` (m) persists before it
+/// breaks off: twigs within a few years, boughs in decades (stylised; oak
+/// heartwood is very durable, dead oak limbs stand for decades).
+#[inline]
+fn snag_life_years(r: f32) -> u32 {
+    (2.0 + 500.0 * r) as u32
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +233,8 @@ pub(crate) struct ShootSystem {
 pub(crate) struct FlushStats {
     pub new_shoots: usize,
     pub shed: usize,
+    /// Boughs killed by crown retrenchment this year.
+    pub retrenched: usize,
 }
 
 impl ShootSystem {
@@ -176,6 +258,9 @@ impl ShootSystem {
             term_bud: true,
             lat_buds: 0,
             birth_year: 0,
+            starve: 0,
+            snag_since: NONE,
+            bud_year: 0,
             light: 1.0,
             grad: Vec3::ZERO,
             q_main: 0.0,
@@ -197,7 +282,7 @@ impl ShootSystem {
         for n in self.nodes.iter_mut() {
             n.q_main = if n.term_bud { n.light } else { 0.0 };
             n.q_lat = n.lat_buds as f32 * n.light;
-            n.s_lat = n.lat_buds as f32 * n.light.powf(k);
+            n.s_lat = n.lat_buds as f32 * pow_k(n.light, k);
             n.leaf_q = if n.leafy { n.light } else { 0.0 };
             n.leaf_n = if n.leafy { 1.0 } else { 0.0 };
             n.leaf_max = n.leaf_q;
@@ -210,7 +295,7 @@ impl ShootSystem {
                 pn.q_main += q;
             } else {
                 pn.q_lat += q;
-                pn.s_lat += q.powf(k);
+                pn.s_lat += pow_k(q, k);
             }
             pn.leaf_q += lq;
             pn.leaf_n += ln;
@@ -219,18 +304,40 @@ impl ShootSystem {
     }
 
     /// Mark poorly lit or leafless branches for removal.
-    fn mark_shed(&mut self, threshold: f32, mean_thr: f32, year: u32, bole: (f32, f32)) -> usize {
+    ///
+    /// A branch survives `survival` years of insufficient light on its
+    /// reserves before it dies (branch autonomy, Sprugel et al. 1991;
+    /// shaded oak branches are not shed within a single season), so one
+    /// dark year or a transient neighbour does not strip the lower crown.
+    fn mark_shed(&mut self, threshold: f32, mean_thr: f32, year: u32, bole: (f32, f32), survival: u8) -> usize {
         let mut count = 0;
         self.nodes[0].dead = false;
         let mut on_stem = vec![false; self.nodes.len()];
         on_stem[0] = true;
         let (bole_h, bole_ratio) = bole;
+        // Live nodes carrying standing dead wood become dead wood themselves
+        // when they lose their last leaves (instead of vanishing with it).
+        let len = self.nodes.len();
+        let mut has_snag = vec![false; len];
+        for i in (1..len).rev() {
+            let n = &self.nodes[i];
+            if n.is_snag() || has_snag[i] {
+                has_snag[n.parent as usize] = true;
+            }
+        }
         for i in 1..self.nodes.len() {
             let p = self.nodes[i].parent as usize;
             let n = &self.nodes[i];
             on_stem[i] = on_stem[p] && n.terminal;
             let dead = if self.nodes[p].dead {
                 true
+            } else if n.is_snag() {
+                year > n.snag_since + snag_life_years(n.radius())
+            } else if n.leaf_n <= 0.0 && has_snag[i] && year > n.birth_year + 1 {
+                self.nodes[i].snag_since = year;
+                self.nodes[i].lat_buds = 0;
+                self.nodes[i].term_bud = false;
+                false
             } else if on_stem[p] && !n.terminal && n.start.y < bole_h && n.area < bole_ratio * self.nodes[p].area {
                 // Stylised natural pruning of the lower stem (clear bole).
                 true
@@ -238,7 +345,10 @@ impl ShootSystem {
                 // Hierarchical self-pruning: a branch dies when none of its
                 // foliage is adequately lit (shaded twigs go first, whole
                 // limbs only when entirely overtopped).
-                n.order > 0 && (n.leaf_max < threshold || n.leaf_q < mean_thr * n.leaf_n)
+                let starving = n.order > 0 && (n.leaf_max < threshold || n.leaf_q < mean_thr * n.leaf_n);
+                let st = if starving { n.starve.saturating_add(1) } else { 0 };
+                self.nodes[i].starve = st;
+                st >= survival.max(1)
             } else {
                 year > n.birth_year + 1
             };
@@ -283,6 +393,7 @@ impl ShootSystem {
                 && !par.leafy
                 && !par.term_bud
                 && par.lat_buds == 0
+                && par.is_snag() == node.is_snag()
                 && year >= node.birth_year + 4
                 && par.length + node.length <= max_seg
                 && {
@@ -317,6 +428,88 @@ impl ShootSystem {
         self.nodes = out;
     }
 
+    /// Late-life crown retrenchment and reiteration (stylised; concepts from
+    /// the veteran-tree literature: Lonsdale 2013 "Ancient and other
+    /// veteran trees", Read 2000; hydraulic basis: Ryan & Yoder 1997).
+    ///
+    /// * **Dieback**: each year after `retrenchment_onset_years`, every
+    ///   bough (a branch at least half as thin as its parent, 2-12 cm
+    ///   radius, based in the outer crown) whose farthest shoot lies beyond `retrenchment_reach` x
+    ///   `hydraulic_path_max_m` from the collar dies with a probability
+    ///   rising from 0 at onset to `retrenchment_rate` 100 years later. It
+    ///   becomes standing dead wood (stag-headed top, dead limbs), whose
+    ///   thin parts break off first (`snag_life_years`).
+    /// * **Reiteration**: live limbs thicker than 5 cm in the lower 65 % of
+    ///   the crown, with good light, form epicormic buds with probability
+    ///   `epicormic_rate` per year, so a lower inner crown rebuilds.
+    ///
+    /// Returns the number of boughs killed.
+    fn retrench(&mut self, g: &Genome, year: u32, age: f32, seed: u64) -> usize {
+        let a = &g.architecture;
+        let n = self.nodes.len();
+        // Farthest live shoot-tip distance from the collar in each subtree.
+        let mut reach = vec![0.0f32; n];
+        for i in (0..n).rev() {
+            let nd = &self.nodes[i];
+            if !nd.is_snag() {
+                reach[i] = reach[i].max(nd.end(1.0).length());
+            }
+            if i > 0 {
+                let p = nd.parent as usize;
+                reach[p] = reach[p].max(reach[i]);
+            }
+        }
+        let ramp = ((age - a.retrenchment_onset_years) / 100.0).clamp(0.0, 1.0);
+        let p_die = a.retrenchment_rate * ramp;
+        let limit = a.retrenchment_reach * a.hydraulic_path_max_m;
+        let h = self.height().max(1.0);
+        let mut killed = 0usize;
+        let mut kill = vec![false; n];
+        for i in 1..n {
+            let p = self.nodes[i].parent as usize;
+            if kill[p] {
+                kill[i] = true;
+                continue;
+            }
+            let nd = &self.nodes[i];
+            if nd.is_snag() {
+                continue;
+            }
+            let r = nd.radius();
+            // Boughs of the outer/upper crown only: the base itself must be
+            // far out, so dieback takes the top and the limb ends, not the
+            // scaffold limbs at their base.
+            let bough = nd.order > 0
+                && (0.02..0.12).contains(&r)
+                && self.nodes[p].area >= 2.0 * nd.area
+                && nd.start.length() > 0.6 * limit;
+            if bough && reach[i] > limit && rng::unit(rng::hash(seed, S_RETRENCH, nd.id as u64, year as u64)) < p_die {
+                kill[i] = true;
+                killed += 1;
+            }
+        }
+        for (nd, &k) in self.nodes.iter_mut().zip(&kill).skip(1) {
+            if k {
+                nd.snag_since = year;
+                nd.leafy = false;
+                nd.term_bud = false;
+                nd.lat_buds = 0;
+            } else if !nd.is_snag()
+                && a.epicormic_rate > 0.0
+                && nd.order > 0
+                && nd.lat_buds == 0
+                && nd.radius() >= 0.05
+                && nd.end(1.0).y < 0.65 * h
+                && nd.light >= 0.25
+                && rng::unit(rng::hash(seed, S_RETRENCH, nd.id as u64, (year as u64) << 20 | 1)) < a.epicormic_rate
+            {
+                nd.lat_buds = 2;
+                nd.bud_year = year;
+            }
+        }
+        killed
+    }
+
     /// Spring flush: shed, allocate vigour, break buds, create the new
     /// annual shoots (initially unextended, `ext = 0`).
     #[allow(clippy::needless_range_loop)] // index-based: nodes are mutated in the loop
@@ -324,7 +517,7 @@ impl ShootSystem {
         let a = &g.architecture;
         let mut stats = FlushStats::default();
         for n in self.nodes.iter_mut() {
-            if year > n.birth_year + a.bud_lifetime_years {
+            if year > n.birth_year.max(n.bud_year) + a.bud_lifetime_years {
                 n.lat_buds = 0;
                 n.term_bud = false;
             }
@@ -337,9 +530,12 @@ impl ShootSystem {
             let mean_thr = a.shedding_mean_threshold * (1.3 - g.tolerances.shade);
             let bole_h = (a.clear_bole_fraction * self.height()).min(a.clear_bole_max_m);
             let ratio = a.clear_bole_limb_ratio * a.clear_bole_limb_ratio;
-            stats.shed = self.mark_shed(thr, mean_thr, year, (bole_h, ratio));
+            stats.shed = self.mark_shed(thr, mean_thr, year, (bole_h, ratio), a.shade_survival_years);
             let max_seg = 0.3 + 1.2 * self.voxel;
             self.compact(year, max_seg);
+            if a.retrenchment_onset_years > 0.0 && age >= a.retrenchment_onset_years {
+                stats.retrenched = self.retrench(g, year, age, seed);
+            }
             self.accumulate(kc);
         }
 
@@ -377,7 +573,7 @@ impl ShootSystem {
                 if n.terminal {
                     if p.q_main > 0.0 { p.v_main * q / p.q_main } else { 0.0 }
                 } else if p.s_lat > 0.0 {
-                    p.v_lat * q.powf(kc) / p.s_lat
+                    p.v_lat * pow_k(q, kc) / p.s_lat
                 } else {
                     0.0
                 }
@@ -438,7 +634,7 @@ impl ShootSystem {
             // Lateral buds: equal light, acrotonic weighting (distal buds stronger).
             let n = &self.nodes[i];
             if n.lat_buds > 0 && n.s_lat > 0.0 {
-                let share = n.v_lat * n.light.powf(kc) / n.s_lat;
+                let share = n.v_lat * pow_k(n.light, kc) / n.s_lat;
                 let (nid, nbuds) = (n.id, n.lat_buds);
                 let mut broken = 0u8;
                 for k in 0..nbuds {
@@ -510,7 +706,7 @@ impl ShootSystem {
         // distance (the summed path would also count sinuosity, which keeps
         // growing even when the crown no longer expands).
         let dist = parent.end(1.0).length();
-        let hydraulic = (1.0 - dist / a.hydraulic_path_max_m).clamp(0.03, 1.0);
+        let hydraulic = (1.0 - (dist / a.hydraulic_path_max_m).max(0.0).powf(a.hydraulic_exponent)).clamp(0.03, 1.0);
         let length = (a.internode_length_m * metamers * hydraulic).max(0.015);
         // All direction changes below are per shoot; scale them with the
         // shoot length so curvature per metre stays similar when shoots get
@@ -590,6 +786,9 @@ impl ShootSystem {
             term_bud: true,
             lat_buds,
             birth_year: year,
+            starve: 0,
+            snag_since: NONE,
+            bud_year: year,
             light: parent.light,
             grad: parent.grad,
             q_main: 0.0,
@@ -605,15 +804,19 @@ impl ShootSystem {
         }
     }
 
-    /// Shadow-propagation light pass using the leafy shoots as shadow
-    /// sources. Sets `light` and `grad` on every node.
+    /// Light pass: Beer-Lambert attenuation through a voxel grid of leaf
+    /// area, swept along the 13 sky directions of [`SKY_DIRS`]. Sets `light`
+    /// (0..1, fraction of the unobstructed overcast sky) and `grad` on every
+    /// node.
     ///
-    /// Shadow is swept downward through a voxel grid along five sky
-    /// directions (zenith + four at 45 deg elevation), with attenuation and a
-    /// small lateral blur per layer. A Palubicki-style single vertical
-    /// pyramid lights only from above and kills the crown sides; the oblique
-    /// sweeps approximate diffuse side light so open-grown crowns keep foliage
-    /// down their flanks while the interior stays dark.
+    /// Each leafy unit adds optical depth to its voxel in proportion to its
+    /// leaf area (a vigorous, full-length unit carries more leaves than a
+    /// short brachyblast); along an oblique ray the depth per layer is scaled
+    /// by the path length through the layer. Nothing here depends on the
+    /// previous pass's light (no feedback loop). There is no ground/horizon
+    /// attenuation: an open-grown tree receives the full side light, and the
+    /// interior and lower inner crown are darkened only by the tree's own
+    /// foliage.
     pub fn compute_light(&mut self) {
         let mut lo = Vec3::new(f32::MAX, f32::MAX, f32::MAX);
         let mut hi = Vec3::new(f32::MIN, f32::MIN, f32::MIN);
@@ -635,8 +838,6 @@ impl ShootSystem {
             vs *= 1.15;
         }
         self.voxel = vs;
-        // Planes are padded by 3 cells on each side (zero shadow = open sky).
-        const PAD: usize = 3;
         let px = nx + 2 * PAD;
         let pz = nz + 2 * PAD;
         let plane = px * pz;
@@ -648,7 +849,8 @@ impl ShootSystem {
             let z = (((p.z - origin.z) * inv) as usize).min(nz - 1) + PAD;
             (y, z * px + x)
         };
-        // Leafy shoot density per voxel; nodes bucketed by layer.
+        // Leaf area per voxel (in reference units); nodes bucketed by layer.
+        let unit_len = 0.75 * vs;
         self.grid.clear();
         self.grid.resize(ny * plane, 0.0);
         let dens = &mut self.grid;
@@ -656,68 +858,77 @@ impl ShootSystem {
         for (i, n) in self.nodes.iter().enumerate() {
             let (y, c) = cell(n.end(1.0));
             if n.leafy {
-                dens[y * plane + c] += 1.0;
+                dens[y * plane + c] += leaf_units(n, unit_len);
             }
             node_cell.push((y as u32, c as u32, i as u32));
         }
         node_cell.sort_unstable();
-        let mut layer_start = vec![0usize; ny + 1];
-        for &(y, _, _) in &node_cell {
-            layer_start[y as usize + 1] += 1;
+        let n_nodes = self.nodes.len();
+        // Distinct occupied cells (nodes are sorted by (layer, cell)): light
+        // is evaluated once per cell, not once per node.
+        let mut ucell: Vec<u32> = Vec::with_capacity(n_nodes);
+        let mut node_u: Vec<u32> = Vec::with_capacity(n_nodes);
+        let mut layer_u = vec![0usize; ny + 1];
+        for &(y, c, _) in &node_cell {
+            let new = match ucell.last() {
+                Some(&lc) => lc != c || node_u.is_empty() || node_cell[node_u.len() - 1].0 != y,
+                None => true,
+            };
+            if new {
+                ucell.push(c);
+                layer_u[y as usize + 1] = ucell.len();
+            }
+            node_u.push(ucell.len() as u32 - 1);
         }
         for y in 0..ny {
-            layer_start[y + 1] += layer_start[y];
+            layer_u[y + 1] = layer_u[y + 1].max(layer_u[y]);
         }
-        let n_nodes = self.nodes.len();
-        let mut light = vec![0.0f32; n_nodes];
-        let mut gvec = vec![Vec3::ZERO; n_nodes];
+        let mut light = vec![0.0f32; ucell.len()];
+        let mut gvec = vec![Vec3::ZERO; ucell.len()];
         let mut above = vec![0.0f32; plane];
         let mut tmp = vec![0.0f32; plane];
         let mut cur = vec![0.0f32; plane];
+        let mut iso_up = 0.0f32;
         for &(dx, dz, w) in SKY_DIRS.iter() {
             above.iter_mut().for_each(|v| *v = 0.0);
-            let to_sky = Vec3::new(-dx as f32, 1.0, -dz as f32).normalize_or(Vec3::Y);
+            let path = ((1 + dx * dx + dz * dz) as f32).sqrt();
+            let decay = SHADOW_DECAY.powf(path);
+            let to_sky = Vec3::new(-dx as f32, 1.0, -dz as f32) * (1.0 / path);
+            iso_up += w * to_sky.y;
+            let src_off = dz as isize * px as isize + dx as isize;
             for y in (0..ny).rev() {
-                // Separable blur, shifted by (dx, dz) per layer for oblique rays.
+                // Shift by (dx, dz) per layer for oblique rays, then a
+                // separable 3-tap blur (penumbra). Written as zipped slices
+                // so the compiler can vectorise them.
                 for z in PAD..PAD + nz {
                     let row = z * px;
-                    let src = &above[(row as isize - dx as isize) as usize..];
-                    let dst = &mut tmp[row..row + px];
-                    for x in PAD..PAD + nx {
-                        dst[x] = BLUR_C * src[x] + BLUR_E * (src[x - 1] + src[x + 1]);
+                    let s0 = (row as isize - src_off) as usize + PAD;
+                    let (sl, sc, sr) = (&above[s0 - 1..s0 - 1 + nx], &above[s0..s0 + nx], &above[s0 + 1..s0 + 1 + nx]);
+                    let dst = &mut tmp[row + PAD..row + PAD + nx];
+                    for (((d, &l), &c), &r) in dst.iter_mut().zip(sl).zip(sc).zip(sr) {
+                        *d = BLUR_C * c + BLUR_E * (l + r);
                     }
                 }
                 for z in PAD..PAD + nz {
-                    let zs = (z as isize - dz as isize) as usize;
-                    let (r0, r1, r2) = ((zs - 1) * px, zs * px, (zs + 1) * px);
-                    let row = z * px;
-                    for x in PAD..PAD + nx {
-                        cur[row + x] = SHADOW_DECAY * (BLUR_C * tmp[r1 + x] + BLUR_E * (tmp[r0 + x] + tmp[r2 + x]));
+                    let row = z * px + PAD;
+                    let (t0, t1, t2) = (&tmp[row - px..row - px + nx], &tmp[row..row + nx], &tmp[row + px..row + px + nx]);
+                    let dst = &mut cur[row..row + nx];
+                    for (((d, &a), &b), &c) in dst.iter_mut().zip(t0).zip(t1).zip(t2) {
+                        *d = decay * (BLUR_C * b + BLUR_E * (a + c));
                     }
                 }
-                // Stylisation: low-elevation sky light reaching the bottom of
-                // the crown of a sizeable tree is attenuated (surrounding
-                // vegetation, horizon, the tree's own skirt not resolved by
-                // the coarse grid). This produces the clear bole of oak
-                // instead of a crown skirting the ground.
-                let wy = if dx == 0 && dz == 0 {
-                    w
-                } else {
-                    let rel = (origin.y + (y as f32 + 0.5) * vs) / height;
-                    let skirt = ((rel - 0.04) / 0.22).clamp(0.2, 1.0);
-                    let ramp = ((height - 4.0) / 8.0).clamp(0.0, 1.0);
-                    w * (1.0 - ramp * (1.0 - skirt))
-                };
-                for &(_, c, i) in &node_cell[layer_start[y]..layer_start[y + 1]] {
-                    let q = (1.0 - cur[c as usize]).clamp(0.0, 1.0) * wy;
-                    light[i as usize] += q;
-                    gvec[i as usize] += to_sky * q;
+                let (k0, k1) = (layer_u[y], layer_u[y + 1]);
+                for (k, &c) in ucell[k0..k1].iter().enumerate() {
+                    let q = exp_neg(cur[c as usize]) * w;
+                    light[k0 + k] += q;
+                    gvec[k0 + k] += to_sky * q;
                 }
                 let d = &dens[y * plane..(y + 1) * plane];
+                let a = SHADOW_A * path;
                 for z in PAD..PAD + nz {
-                    let row = z * px;
-                    for x in row + PAD..row + PAD + nx {
-                        above[x] = cur[x] + SHADOW_A * d[x];
+                    let row = z * px + PAD;
+                    for ((o, &c), &dd) in above[row..row + nx].iter_mut().zip(&cur[row..row + nx]).zip(&d[row..row + nx]) {
+                        *o = c + a * dd;
                     }
                 }
             }
@@ -742,14 +953,15 @@ impl ShootSystem {
                 k += 1;
             }
         }
-        for &(y, c, i) in &node_cell {
+        for (k, &(y, c, i)) in node_cell.iter().enumerate() {
+            let k = node_u[k] as usize;
             let n = &mut self.nodes[i as usize];
             let i = i as usize;
             let others = if n.leafy { rank[i] as f32 } else { dens[y as usize * plane + c as usize] };
-            n.light = (light[i] - SHADOW_SAME * others).clamp(0.0, 1.0);
+            n.light = (light[k] * exp_neg(SHADOW_SAME * others)).clamp(0.0, 1.0);
             // Phototropism towards the brightest sky sector, relative to an
             // isotropic (fully lit) bud whose vector would point straight up.
-            n.grad = (gvec[i] - Vec3::Y * (light[i] * ISO_UP)).normalize_or(Vec3::ZERO);
+            n.grad = (gvec[k] - Vec3::Y * (light[k] * iso_up)).normalize_or(Vec3::ZERO);
         }
     }
 
@@ -763,7 +975,7 @@ impl ShootSystem {
         let face = self.voxel * self.voxel;
         for n in self.nodes.iter_mut() {
             n.foliage = if n.leafy {
-                let eff = (1.0 - 0.75 * n.end(1.0).length() / hydraulic_path_max).max(0.1);
+                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).powf(0.65)).max(0.08);
                 n.light * face * eff
             } else {
                 0.0
@@ -806,12 +1018,32 @@ impl ShootSystem {
     /// reaction wood): it only reproduces the progressive drooping of old,
     /// long, heavy limbs while thick stems stay put. The stem (order 0) never
     /// sags.
+    ///
+    /// The same pass applies **autotropic straightening** (Moulia et al.
+    /// 2006; Bastien et al. 2013: plant organs sense their own curvature and
+    /// straighten it with reaction wood): where a thick axis is continued by
+    /// a lateral that took over (relay, or the terminal shed), the
+    /// continuation is turned back towards its parent's direction by up to
+    /// `straightening_deg_per_year`, leaving `straightening_keep_deg` of
+    /// residual bend. Big limbs thus read as sinuous axes instead of chains
+    /// of 50-degree kinks; thin twigs keep their zigzag.
     pub fn sag(&mut self, g: &Genome) {
         let a = &g.architecture;
-        if a.sag_coefficient <= 0.0 {
+        if a.sag_coefficient <= 0.0 && a.straightening_deg_per_year <= 0.0 {
             return;
         }
         let n = self.nodes.len();
+        let mut thickest = vec![NONE; n];
+        for i in 1..n {
+            let p = self.nodes[i].parent as usize;
+            let t = thickest[p];
+            if t == NONE || self.nodes[i].area > self.nodes[t as usize].area {
+                thickest[p] = i as u32;
+            }
+        }
+        let st_rate = a.straightening_deg_per_year.to_radians();
+        let st_keep = a.straightening_keep_deg.to_radians();
+        let st_min_r = a.straightening_min_radius_mm * 0.001;
         let rho = g.wood.density_kg_m3;
         let e = g.wood.elasticity_gpa * 1e9;
         // Nominal fresh foliage load: ~0.5 kg per m2 of crown surface cell.
@@ -842,13 +1074,32 @@ impl ShootSystem {
         let mut path = vec![0.0f32; n];
         for i in 1..n {
             let p = self.nodes[i].parent as usize;
-            let qp = rot[p];
+            let mut qp = rot[p];
+            if st_rate > 0.0 && p > 0 && thickest[p] == i as u32 && self.nodes[p].radius() >= st_min_r && !self.nodes[i].leafy {
+                let rd = qp.rotate(self.nodes[i].dir);
+                // Straighten the azimuth only (side-to-side kinks); the
+                // inclination stays under gravitropic control.
+                let ph = Vec3::new(self.nodes[p].dir.x, 0.0, self.nodes[p].dir.z);
+                let pd = if ph.length() > 0.2 {
+                    (ph.normalize_or(Vec3::Y) * Vec3::new(rd.x, 0.0, rd.z).length() + Vec3::Y * rd.y).normalize_or(rd)
+                } else {
+                    rd
+                };
+                let ang = rd.dot(pd).clamp(-1.0, 1.0).acos();
+                if ang > st_keep {
+                    let axis = rd.cross(pd);
+                    if axis.length() > 1e-6 {
+                        let turn = (ang - st_keep).min(st_rate);
+                        qp = Quat::from_axis_angle(axis.normalize_or(Vec3::Y), turn).mul(qp);
+                    }
+                }
+            }
             let mut q = qp;
             let nd = &self.nodes[i];
             let room = max_total - path[p] - nd.sag;
             // Upright segments are loaded mostly axially and do not sag.
             let inclined = qp.rotate(nd.dir).y <= max_up;
-            if nd.order > 0 && !nd.leafy && inclined && room > 1e-5 && nd.radius() >= min_r && nd.end(1.0).y >= 1.0 && mass[i] > 0.0 {
+            if a.sag_coefficient > 0.0 && nd.order > 0 && !nd.leafy && inclined && room > 1e-5 && nd.radius() >= min_r && nd.end(1.0).y >= 1.0 && mass[i] > 0.0 {
                 let com = moment[i] * (1.0 / mass[i]);
                 let lever = Vec3::new(com.x - nd.start.x, 0.0, com.z - nd.start.z);
                 let l = lever.length();
@@ -961,7 +1212,7 @@ impl ShootSystem {
     /// Mean over 8 azimuth sectors of the farthest leafy shoot tip (m).
     pub fn crown_radius(&self) -> f32 {
         let mut sectors = [0.0f32; 8];
-        for n in &self.nodes {
+        for n in self.nodes.iter().filter(|n| !n.is_snag()) {
             let e = n.end(self.ext);
             let r = e.horizontal_len();
             if r <= 0.0 {
@@ -972,5 +1223,19 @@ impl ShootSystem {
             sectors[s] = sectors[s].max(r);
         }
         sectors.iter().sum::<f32>() / 8.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fast_exp_is_accurate() {
+        for i in 0..2000 {
+            let x = i as f32 * 0.01;
+            let (a, b) = (exp_neg(x), (-x).exp());
+            assert!((a - b).abs() <= 2e-4 * b + 1e-7, "exp(-{x}): {a} vs {b}");
+        }
     }
 }

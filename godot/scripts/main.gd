@@ -14,7 +14,24 @@ var env: Environment
 var wood_mi: MeshInstance3D
 var leaf_mi: MeshInstance3D
 var root_mi: MeshInstance3D
+var fine_root_mi: MeshInstance3D
+var fine_root_mat: ShaderMaterial
 var soil: SoilBlock
+var backdrop: Backdrop
+var guides: Guides
+var leaf_fall: GPUParticles3D
+var leaf_fall_mat: StandardMaterial3D
+var bark_mat: StandardMaterial3D
+var root_mat: ShaderMaterial
+var _last_water_q: int = -1
+# Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
+var _stats_dirty: bool = true
+var tree_h: float = 0.0
+var tree_crown_r: float = 0.0
+var tree_root_depth: float = 0.0
+var _litter_smooth: float = 0.0
+var _fresh_smooth: float = 0.5
+var _vigor_smooth: float = 1.0
 
 var _wood_ver: int = -1
 var _leaf_ver: int = -1
@@ -36,6 +53,9 @@ var _last_phase: int = -1
 
 func _ready() -> void:
 	seed_value = randi() % 1000000
+	var soil_env: String = OS.get_environment("DENDRO_SOIL")
+	if soil_env != "":
+		sim.set_soil(int(soil_env))
 	sim.reset(seed_value)
 	_apply_window_overrides()
 	_build_environment()
@@ -49,10 +69,17 @@ func _ready() -> void:
 	hud.speed_changed.connect(func(d: float) -> void: speed_dps = d)
 	hud.drought_toggled.connect(func(on: bool) -> void: sim.set_drought(on))
 	hud.new_seed_requested.connect(_new_seed)
+	hud.set_soil_names(sim.get_soil_names())
+	hud.select_soil(sim.get_soil())
+	hud.soil_selected.connect(_on_soil_selected)
+	hud.xray_toggled.connect(_set_xray)
+	hud.guides_toggled.connect(func(on: bool) -> void: guides.set_shown(on))
+	guides.soil = soil
+	guides.cam = cam
+	cam.wedge_dir = soil.wedge_dir
 	hud.set_seed_text(seed_value)
 	_rebuild_meshes()
-	_frame_camera(0.0)
-	cam.snap()
+	_settle_view()
 	hud.update_from(sim)
 	print("[dendro] TreeSim loaded: age=%.3f y, height=%.2f m, seed=%d" % [sim.get_age_years(), sim.get_height_m(), seed_value])
 	var shot: String = OS.get_environment("DENDRO_SHOT")
@@ -68,6 +95,12 @@ func _new_seed() -> void:
 	_apply_seed(randi() % 1000000)
 
 
+## Changing the soil restarts the same seed on the new site, so the two trees can be compared.
+func _on_soil_selected(index: int) -> void:
+	sim.set_soil(index)
+	_apply_seed(seed_value)
+
+
 func _apply_seed(new_seed: int) -> void:
 	seed_value = new_seed
 	sim.reset(seed_value)
@@ -75,8 +108,12 @@ func _apply_seed(new_seed: int) -> void:
 	hud.force_ring_refresh()
 	hud.reset_drought_button()
 	accumulator = 0.0
+	_last_water_q = -1
 	soil.reset()
 	cam.reset_view()
+	_stats_dirty = true
+	_litter_smooth = 0.0
+	_last_water_q = -1
 	_wood_ver = -1
 	_leaf_ver = -1
 	_root_ver = -1
@@ -84,28 +121,21 @@ func _apply_seed(new_seed: int) -> void:
 
 
 func _build_environment() -> void:
-	var sky_mat: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.30, 0.52, 0.85)
-	sky_mat.sky_horizon_color = Color(0.70, 0.80, 0.90)
-	sky_mat.ground_horizon_color = Color(0.70, 0.80, 0.90)
-	sky_mat.ground_bottom_color = Color(0.35, 0.40, 0.45)
-	var sky: Sky = Sky.new()
-	sky.sky_material = sky_mat
+	# No sky and no ground planes: the background is a 2-D gradient canvas (Backdrop), see BG_CANVAS.
+	backdrop = Backdrop.new()
+	add_child(backdrop)
 	env = Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
+	env.background_mode = Environment.BG_CANVAS
+	env.background_canvas_max_layer = -5
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.62, 0.64, 0.64)  # neutral: a blue sky ambient tints shaded bark blue
-	env.ambient_light_energy = 0.75
+	env.ambient_light_color = Color(0.64, 0.64, 0.64)  # neutral-ish; tinted by season in _update_view_state
+	env.ambient_light_energy = 0.68
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.ssao_enabled = false
 	env.sdfgi_enabled = false
 	env.volumetric_fog_enabled = false
-	# Light distance haze so the far ground plane melts into the horizon (no hard edge against the sky).
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.70, 0.80, 0.90)
-	env.fog_density = 0.0010
-	env.fog_sky_affect = 0.0
+	env.fog_enabled = false
 	var we: WorldEnvironment = WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -116,7 +146,7 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 120.0
 	sun.shadow_normal_bias = 1.5
 	sun.light_energy = 1.2
-	sun.rotation_degrees = Vector3(-50.0, 35.0, 0.0)
+	sun.rotation_degrees = Vector3(-50.0, 62.0, 0.0)
 	add_child(sun)
 
 
@@ -134,21 +164,67 @@ func _build_tree_nodes() -> void:
 	var leaf_tex: ImageTexture = ProcTextures.make_leaf_cluster_texture()
 	print("[dendro] procedural textures generated in %d ms" % (Time.get_ticks_msec() - t0))
 	wood_mi = MeshInstance3D.new()
-	wood_mi.material_override = ProcTextures.make_bark_material(bark_tex)
+	bark_mat = ProcTextures.make_bark_material(bark_tex)
+	wood_mi.material_override = bark_mat
 	add_child(wood_mi)
 	leaf_mi = MeshInstance3D.new()
 	leaf_mi.material_override = ProcTextures.make_leaf_material(leaf_tex)
 	add_child(leaf_mi)
 	root_mi = MeshInstance3D.new()
-	root_mi.material_override = ProcTextures.make_root_material(bark_tex)
-	root_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root_mat = ProcTextures.make_root_material(bark_tex)
+	root_mi.material_override = root_mat
 	add_child(root_mi)
+	fine_root_mi = MeshInstance3D.new()
+	fine_root_mat = ProcTextures.make_root_material(bark_tex)
+	fine_root_mat.set_shader_parameter("fine_style", 1.0)
+	fine_root_mi.material_override = fine_root_mat
+	fine_root_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(fine_root_mi)
+	_build_leaf_fall()
 
 
-## Soil block occupying z < 0 only (grass top, cut face at z = 0 with horizon bands + depth ticks).
+## Diorama plug (soil cylinder with a wedge cut away) and the scale references.
 func _build_ground() -> void:
 	soil = SoilBlock.new()
 	add_child(soil)
+	guides = Guides.new()
+	add_child(guides)
+
+
+## A few falling leaves during leaf fall (GPU particles, low count).
+func _build_leaf_fall() -> void:
+	leaf_fall = GPUParticles3D.new()
+	leaf_fall.amount = 70
+	leaf_fall.lifetime = 8.0
+	leaf_fall.emitting = false
+	leaf_fall.local_coords = false
+	leaf_fall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	leaf_fall.visibility_aabb = AABB(Vector3(-60.0, -10.0, -60.0), Vector3(120.0, 90.0, 120.0))
+	var pm: ParticleProcessMaterial = ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(2.0, 0.5, 2.0)
+	pm.direction = Vector3(0.0, -1.0, 0.0)
+	pm.spread = 60.0
+	pm.initial_velocity_min = 0.0
+	pm.initial_velocity_max = 0.4
+	pm.gravity = Vector3(0.0, -1.6, 0.0)
+	pm.damping_min = 0.8
+	pm.damping_max = 1.4
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 1.3
+	pm.turbulence_noise_scale = 1.6
+	pm.scale_min = 0.8
+	pm.scale_max = 1.4
+	leaf_fall.process_material = pm
+	var q: QuadMesh = QuadMesh.new()
+	q.size = Vector2(0.16, 0.11)
+	leaf_fall_mat = StandardMaterial3D.new()
+	leaf_fall_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	leaf_fall_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	leaf_fall_mat.roughness = 1.0
+	q.material = leaf_fall_mat
+	leaf_fall.draw_pass_1 = q
+	add_child(leaf_fall)
 
 
 ## Rebuilds the meshes whose own version changed (all of them when `force`). Outside `force` at most
@@ -170,6 +246,7 @@ func _rebuild_meshes(force: bool = false) -> void:
 				_leaf_ver = vers[1]
 			_:
 				root_mi.mesh = sim.build_root_mesh()
+				fine_root_mi.mesh = sim.build_fine_root_mesh()
 				_root_ver = vers[2]
 		rebuild_counts[k] += 1
 		if not force:
@@ -187,9 +264,22 @@ func _versions_changed() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k: InputEventKey = event
-		if k.pressed and not k.echo and k.keycode == KEY_SPACE:
-			hud.set_playing(not hud.is_playing())
-			get_viewport().set_input_as_handled()
+		if not k.pressed or k.echo:
+			return
+		match k.keycode:
+			KEY_SPACE:
+				hud.set_playing(not hud.is_playing())
+			KEY_X:
+				hud.xray_button.button_pressed = not hud.xray_button.button_pressed
+			KEY_G:
+				hud.guides_button.button_pressed = not hud.guides_button.button_pressed
+			KEY_F:
+				cam.reframe()
+			KEY_R:
+				cam.toggle_root_view()
+			_:
+				return
+		get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -201,19 +291,131 @@ func _process(delta: float) -> void:
 		_simulate()
 	if since_rebuild >= REBUILD_INTERVAL / 3.0 and _versions_changed():
 		_rebuild_meshes()
-	soil.fit(sim.get_root_spread_m(), sim.get_root_depth_m(), delta)
+	_refresh_tree_stats()
+	soil.fit(tree_crown_r, tree_root_depth, delta)
+	_update_view_state(delta)
 	_frame_camera(delta)
 	hud.update_from(sim)
-	_update_sun()
+	guides.update_from(tree_h)
+	hud.set_legend_visible(soil.xray or cam.root_view)
 	var pm: float = float(Time.get_ticks_usec() - t_proc) / 1000.0
 	proc_ms_sum += pm
 	proc_ms_max = maxf(proc_ms_max, pm)
 
 
+func _refresh_tree_stats() -> void:
+	if not _stats_dirty:
+		return
+	_stats_dirty = false
+	tree_h = sim.get_height_m()
+	tree_crown_r = sim.get_crown_radius_m()
+	tree_root_depth = sim.get_root_depth_m()
+
+
 func _frame_camera(_delta: float) -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	cam.set_free_rect(hud.free_rect(view), view)
-	cam.fit_to(sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m())
+	cam.fit_to(tree_h, tree_crown_r, soil.radius, soil.depth, soil.wedge_width)
+
+
+## Snaps plug, season look and camera to the current tree (start-up, screenshots, tests).
+func _settle_view() -> void:
+	_stats_dirty = true
+	_refresh_tree_stats()
+	soil.fit(tree_crown_r, tree_root_depth, 100.0)
+	soil.snap()
+	_update_view_state(100.0)
+	_frame_camera(0.0)
+	cam.snap()
+
+
+func _set_xray(on: bool) -> void:
+	soil.set_xray(on)
+
+
+## Everything that follows the simulation state but is not geometry: backdrop, light, bark age, root
+## clipping, soil horizons / moisture, seasonal ground, falling leaves.
+func _update_view_state(delta: float) -> void:
+	var doy: int = sim.get_day_of_year()
+	backdrop.set_season(doy)
+	var warm: float = backdrop.warmth
+	env.ambient_light_color = Color(0.60, 0.64, 0.70).lerp(Color(0.68, 0.65, 0.60), warm)
+	sun.light_color = Color(0.95, 0.97, 1.0).lerp(Color(1.0, 0.95, 0.86), warm)
+	sun.light_energy = lerpf(1.0, 1.25, warm)
+	var season: float = sin(TAU * (float(doy) - 80.0) / 365.0)
+	sun.rotation_degrees.x = -(40.0 + 13.0 * season)
+
+	# Roots are clipped at the plug (radius / depth uniforms).
+	for m: ShaderMaterial in [root_mat, fine_root_mat]:
+		m.set_shader_parameter("clip_radius", soil.radius)
+		m.set_shader_parameter("clip_depth", soil.depth)
+
+	# Bark: darker and rougher with trunk diameter, so an old trunk reads massive rather than pale.
+	var age_t: float = smoothstep(8.0, 90.0, sim.get_trunk_diameter_cm())
+	bark_mat.albedo_color = Color(1.0, 1.0, 1.0).lerp(Color(0.68, 0.64, 0.60), age_t)
+	bark_mat.normal_scale = 1.0 + 1.0 * age_t
+
+	_update_soil_layers()
+
+	# Seasonal ground.
+	var phase: int = sim.get_phase()
+	var water: float = sim.get_soil_water()
+	var temp: float = sim.get_temperature_c()
+	var k: float = 1.0 - exp(-3.0 * delta)
+	var vigor_t: float = smoothstep(0.12, 0.42, warm)
+	var fresh_t: float = 1.0 if (phase == 1 or phase == 2) else (0.3 if phase == 3 else 0.1)
+	var crown_r: float = tree_crown_r
+	var litter_t: float = _litter_for_day(doy) * smoothstep(0.4, 2.5, crown_r)
+	_vigor_smooth = lerpf(_vigor_smooth, vigor_t, k)
+	_fresh_smooth = lerpf(_fresh_smooth, fresh_t, k)
+	_litter_smooth = lerpf(_litter_smooth, litter_t, k)
+	var dryness: float = smoothstep(0.25, 0.04, water) * 0.85
+	var frost: float = smoothstep(1.5, -3.0, temp)
+	soil.set_ground(_vigor_smooth, _fresh_smooth, dryness, _litter_smooth, frost, crown_r)
+
+	# Falling leaves.
+	var h: float = tree_h
+	leaf_fall.emitting = phase == 5 and crown_r > 1.5
+	leaf_fall.position = Vector3(0.0, 0.72 * h, 0.0)
+	leaf_fall.lifetime = clampf(0.72 * h / 1.0, 3.0, 25.0)
+	(leaf_fall.process_material as ParticleProcessMaterial).emission_box_extents = Vector3(crown_r * 0.85, 0.15 * h + 0.2, crown_r * 0.85)
+	leaf_fall_mat.albedo_color = sim.get_leaf_color()
+
+
+## Ground litter 0..1 over the year: builds up during leaf fall (Oct-Nov), fades through winter, almost
+## gone by summer.
+static func _litter_for_day(doy: int) -> float:
+	var d: float = float(doy)
+	if d < 110.0:
+		return lerpf(1.0, 0.12, smoothstep(0.0, 110.0, d))
+	if d < 220.0:
+		return lerpf(0.12, 0.0, smoothstep(110.0, 220.0, d))
+	return smoothstep(265.0, 325.0, d)
+
+
+## SOIL HORIZONS. Placeholder: fixed horizon depths, per-layer water derived from the single
+## `get_soil_water()` value (surface dries first, depth stays moister), plus a drying front.
+## TO USE REAL DATA (core `soil_layers`): replace the body with
+##   soil.set_layers(bottom_m, kind, water)   # PackedFloat32Array, PackedInt32Array, PackedFloat32Array
+## (one entry per layer, top to bottom; bottom depth in m; kind = SoilBlock.KIND_*; water 0..1), and call
+##   soil.set_dry_front(depth_m)              # optional: 0 = none
+func _update_soil_layers() -> void:
+	var w: float = sim.get_soil_water()
+	var q: int = int(w * 200.0) + sim.get_day_of_year() / 5 * 1000
+	if q == _last_water_q:
+		return
+	_last_water_q = q
+	var bottoms: PackedFloat32Array = sim.get_horizon_bottoms()
+	if bottoms.size() > 8:
+		bottoms.resize(8)
+	if bottoms.size() > 0:
+		bottoms[bottoms.size() - 1] = 99.0  # the last layer runs to the bottom of the plug
+	var kinds: PackedInt32Array = sim.get_horizon_kinds()
+	kinds.resize(bottoms.size())
+	var waters: PackedFloat32Array = sim.get_horizon_water()
+	waters.resize(bottoms.size())
+	soil.set_layers(bottoms, kinds, waters)
+	soil.set_dry_front(sim.get_dry_front_m())
 
 
 ## Steps the simulation in chunks, bounded by a per-frame time budget.
@@ -222,16 +424,11 @@ func _simulate() -> void:
 	while accumulator > 0.0:
 		var chunk: float = minf(accumulator, 30.0)
 		accumulator -= chunk
+		_stats_dirty = true
 		if sim.advance_days(chunk):
 			mesh_dirty = true
 		if float(Time.get_ticks_usec() - t0) / 1000.0 > FRAME_BUDGET_MS:
 			break
-
-
-func _update_sun() -> void:
-	# Gentle seasonal sun: higher in summer (day ~172), lower in winter.
-	var season: float = sin(TAU * (float(sim.get_day_of_year()) - 80.0) / 365.0)
-	sun.rotation_degrees.x = -(48.0 + 14.0 * season)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -239,7 +436,11 @@ func _update_sun() -> void:
 #   DENDRO_SHOT=path.png  fast-forward and save a screenshot, then quit
 #   DENDRO_YEARS=60       years to fast-forward (default 40)
 #   DENDRO_DOY=300        day of year to stop at (default 200 = mid-July)
-#   DENDRO_CAM=leaves|low|default   camera preset
+#   DENDRO_CAM=leaves|trunk|low|roots|default   camera preset (roots = root view through the wedge)
+#   DENDRO_YAW / DENDRO_PITCH   camera angles in degrees (override the preset)
+#   DENDRO_XRAY=1         X-ray soil;  DENDRO_GUIDES=1  scale references
+#   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
+#   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
 #   DENDRO_RINGS=0|1      ring panel visibility in the shot (default 1)
 #   DENDRO_RINGZOOM=6     ring-view zoom factor in the shot
@@ -267,6 +468,7 @@ func _apply_window_overrides() -> void:
 func _advance_days_direct(days: float) -> void:
 	while days > 0.0:
 		var c: float = minf(days, 30.0)
+		_stats_dirty = true
 		sim.advance_days(c)
 		days -= c
 
@@ -279,14 +481,24 @@ func _screenshot_and_quit(path: String) -> void:
 	var years: float = float(years_env) if years_env != "" else 40.0
 	var doy_env: String = OS.get_environment("DENDRO_DOY")
 	var doy: float = float(doy_env) if doy_env != "" else 200.0
-	_advance_days_direct(years * 365.0 + doy - 1.0)
+	var dy_env: String = OS.get_environment("DENDRO_DROUGHT_YEARS")
+	var dry_years: float = minf(float(dy_env), years) if dy_env != "" else 0.0
+	_advance_days_direct((years - dry_years) * 365.0)
+	if dry_years > 0.0:
+		sim.set_drought(true)
+		_advance_days_direct(dry_years * 365.0)
+	_advance_days_direct(doy - 1.0)
+	_apply_view_env()
 	_rebuild_meshes(true)
 	for i: int in 4:
 		await get_tree().process_frame
 	_apply_camera_preset()
-	_frame_camera(0.0)
+	_settle_view()
 	cam.snap()
 	hud.update_from(sim)
+	print("[dendro] view: h=%.1f crown_r=%.1f root_depth=%.1f spread=%.1f plug r=%.1f d=%.1f cam dist=%.1f target=%s" % [
+		sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m(),
+		soil.radius, soil.depth, cam.distance, str(cam.target)])
 	var rz: String = OS.get_environment("DENDRO_RINGZOOM")
 	if rz != "":
 		var rv: RingView = hud.get_ring_view()
@@ -303,6 +515,13 @@ func _screenshot_and_quit(path: String) -> void:
 	get_tree().quit()
 
 
+func _apply_view_env() -> void:
+	if OS.get_environment("DENDRO_XRAY") == "1":
+		hud.xray_button.button_pressed = true
+	if OS.get_environment("DENDRO_GUIDES") == "1":
+		hud.guides_button.button_pressed = true
+
+
 func _apply_camera_preset() -> void:
 	var preset: String = OS.get_environment("DENDRO_CAM")
 	if preset == "leaves" and leaf_mi.mesh != null:
@@ -312,24 +531,37 @@ func _apply_camera_preset() -> void:
 			bb.end.z - bb.size.z * 0.3)
 		var d: String = OS.get_environment("DENDRO_CAMDIST")
 		cam.override_dist = float(d) if d != "" else 1.6
-		cam.yaw = 0.0
-		cam.pitch = 0.1
+		cam.set_angles(0.0, 0.1)
 	elif preset == "trunk":
 		cam.use_override = true
 		cam.override_point = Vector3(0.0, 1.3, 0.0)
 		cam.override_dist = 1.4
-		cam.yaw = 0.0
-		cam.pitch = 0.05
+		cam.set_angles(0.0, 0.05)
 	elif preset == "low":
-		cam.pitch = -0.5  # clamped by the ground-level rule
-		cam.yaw = 0.5
+		cam.set_angles(0.5, -0.3)
+	elif preset == "roots":
+		cam.toggle_root_view()
+	var yw: String = OS.get_environment("DENDRO_YAW")
+	var pt: String = OS.get_environment("DENDRO_PITCH")
+	if yw != "" or pt != "":
+		cam.set_angles(deg_to_rad(float(yw)) if yw != "" else cam.goal_yaw,
+			deg_to_rad(float(pt)) if pt != "" else cam.goal_pitch)
 
 
 ## Fast-forward at max speed (10 years/s) through the normal _process path and report frame times.
 func _run_bench(seconds: float, shot: String) -> void:
 	hud.set_rings_visible(true)
-	hud.speed_slider.value = 1.0
-	hud.set_playing(true)
+	var static_bench: bool = OS.get_environment("DENDRO_STATIC") == "1"
+	if static_bench:
+		var by: String = OS.get_environment("DENDRO_YEARS")
+		_advance_days_direct((float(by) if by != "" else 200.0) * 365.0 + 199.0)
+		_apply_view_env()
+		_rebuild_meshes(true)
+		hud.set_playing(false)
+		_settle_view()
+	else:
+		hud.speed_slider.value = 1.0
+		hud.set_playing(true)
 	var vp_rid: RID = get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(vp_rid, true)
 	for i: int in 30:
@@ -346,6 +578,8 @@ func _run_bench(seconds: float, shot: String) -> void:
 	proc_ms_max = 0.0
 	while float(Time.get_ticks_usec() - t_start) / 1.0e6 < seconds:
 		await get_tree().process_frame
+		if static_bench:
+			cam.set_angles(cam.yaw + 0.02, 0.1 + 0.4 * sin(float(n) * 0.01))
 		var now: int = Time.get_ticks_usec()
 		var ft: float = float(now - last) / 1000.0
 		last = now
@@ -380,6 +614,15 @@ func _check(name: String, ok: bool, detail: String = "") -> void:
 		print("[selftest] FAIL  %s %s" % [name, detail])
 
 
+func _press_key(code: Key) -> void:
+	for pressed: bool in [true, false]:
+		var ev: InputEventKey = InputEventKey.new()
+		ev.keycode = code
+		ev.physical_keycode = code
+		ev.pressed = pressed
+		Input.parse_input_event(ev)
+
+
 func _run_days_ui(days: float) -> void:
 	accumulator = days
 	while accumulator > 0.0:
@@ -395,6 +638,7 @@ func _run_until_rings(count: int, max_days: int = 4000) -> void:
 
 func _run_selftest() -> void:
 	print("[selftest] start (display driver: %s)" % DisplayServer.get_name())
+	get_window().size = Vector2i(1600, 1000)  # the performance-target window (headless defaults to a square one)
 	for i: int in 3:
 		await get_tree().process_frame
 
@@ -507,44 +751,161 @@ func _run_selftest() -> void:
 	_run_days_ui(1.0)
 	_check("versions reported", sim.get_wood_version() >= 0 and sim.get_leaf_version() >= 0 and sim.get_root_version() >= 0)
 
-	# 7. Framing: crown and root zone stay inside the free area, at several ages.
-	hud.rings_button.button_pressed = true
-	for years: int in [3, 40, 120]:
+	# 7. Framing at default angles: crown + plug inside the free area, tree fills >= 55 % of its height.
+	hud.rings_button.button_pressed = false  # default layout (the ring panel narrows the free area)
+	await get_tree().process_frame
+	for years: int in [3, 40, 120, 200]:
 		_apply_seed(7)
 		_advance_days_direct(float(years) * 365.0 + 200.0)
 		_rebuild_meshes(true)
 		for i: int in 3:
 			await get_tree().process_frame
-		soil.fit(sim.get_root_spread_m(), sim.get_root_depth_m(), 100.0)
-		_frame_camera(0.0)
-		cam.snap()
+		cam.reset_view()
+		_settle_view()
 		var vsize: Vector2 = get_viewport().get_visible_rect().size
-		var free: Rect2 = hud.free_rect(vsize).grow(4.0)
+		var free_raw: Rect2 = hud.free_rect(vsize)
+		var free: Rect2 = free_raw.grow(4.0)
 		var camera: Camera3D = cam.get_camera()
 		var h: float = sim.get_height_m()
 		var cr: float = sim.get_crown_radius_m()
-		var rd: float = sim.get_root_depth_m()
-		var sp: float = sim.get_root_spread_m()
-		var pts: Array[Vector3] = [Vector3(0, h, 0), Vector3(cr, h * 0.7, 0), Vector3(-cr, h * 0.7, 0),
-			Vector3(0, -rd, 0), Vector3(sp, -rd * 0.5, 0), Vector3(-sp, -rd * 0.5, 0)]
+		var detail: String = "age %d h=%.1f cr=%.1f plug r=%.1f d=%.1f dist=%.1f view=%s free=%s" % [years, h, cr, soil.radius, soil.depth, cam.distance, str(vsize), str(free_raw)]
 		var all_in: bool = true
-		var detail: String = "age %d h=%.1f cr=%.1f rd=%.1f sp=%.1f soil %.1fx%.1f free=%s" % [years, h, cr, rd, sp, soil.half_width * 2.0, soil.depth, str(free)]
-		for p: Vector3 in pts:
+		var ymin_s: float = INF
+		var ymax_s: float = -INF
+		for p: Vector3 in cam.framing_points(h, cr, soil.radius, soil.depth, soil.wedge_width):
 			var sp2: Vector2 = camera.unproject_position(p)
+			ymin_s = minf(ymin_s, sp2.y)
+			ymax_s = maxf(ymax_s, sp2.y)
 			if not free.has_point(sp2):
 				all_in = false
 				detail += " OUT(%s->%s)" % [str(p), str(sp2)]
-		_check("framing: crown+roots inside free area", all_in, detail)
-		_check("soil block holds roots", soil.half_width >= 1.15 * sp and soil.depth >= rd + 0.5,
-			"hw %.2f vs 1.15*spread %.2f, depth %.2f vs root %.2f" % [soil.half_width, 1.15 * sp, soil.depth, rd])
-	# Soil never shrinks within one tree's life.
+		_check("framing: crown+plug inside free area", all_in, detail + " ys=[%.0f..%.0f] free=[%.0f..%.0f]" % [ymin_s, ymax_s, free_raw.position.y, free_raw.end.y])
+		var y_base: float = camera.unproject_position(Vector3.ZERO).y
+		var y_top: float = camera.unproject_position(Vector3(0.0, h, 0.0)).y
+		var frac: float = (y_base - y_top) / free_raw.size.y
+		_check("framing: tree fills >= 55 % of free height", frac >= 0.55, "age %d: %.0f %%" % [years, frac * 100.0])
+		# Plug follow rules (the camera/plug were just snapped to this tree).
+		_check("plug radius follows 1.25 x crown (min 2.5 m)", soil.radius >= maxf(1.25 * cr, 2.5) - 0.01, "r=%.2f crown=%.2f" % [soil.radius, cr])
+		_check("plug depth = root depth + margin (min 2 m)", soil.depth >= maxf(sim.get_root_depth_m() + 0.5, 2.0) - 0.01, "d=%.2f root=%.2f" % [soil.depth, sim.get_root_depth_m()])
+		_check("root clip uniform equals plug radius", is_equal_approx(root_mat.get_shader_parameter("clip_radius") as float, soil.radius),
+			"%.3f vs %.3f" % [root_mat.get_shader_parameter("clip_radius") as float, soil.radius])
+		_check("root clip depth equals plug depth", is_equal_approx(root_mat.get_shader_parameter("clip_depth") as float, soil.depth))
+	# Plug never shrinks within one tree's life, nor eases below goals.
 	_apply_seed(9)
 	_advance_days_direct(60.0 * 365.0)
-	soil.fit(sim.get_root_spread_m(), sim.get_root_depth_m(), 10.0)
+	soil.fit(sim.get_crown_radius_m(), sim.get_root_depth_m(), 10.0)
+	var r_big: float = soil.radius
 	var d_big: float = soil.depth
-	_advance_days_direct(1.0)
 	soil.fit(0.0, 0.0, 1.0)
-	_check("soil never shrinks", soil.depth >= d_big)
+	soil.fit(0.0, 0.0, 100.0)
+	_check("plug never shrinks", soil.radius >= r_big and soil.depth >= d_big, "r %.2f -> %.2f, d %.2f -> %.2f" % [r_big, soil.radius, d_big, soil.depth])
+	soil.reset()
+	_check("plug reset on new seed", is_equal_approx(soil.radius, SoilBlock.MIN_RADIUS) and is_equal_approx(soil.depth, SoilBlock.MIN_DEPTH))
+	_check("wedge opens 110 degrees", is_equal_approx(rad_to_deg(soil.wedge_width), 110.0))
+
+	# 8. Camera: free 360-degree orbit (no yaw limit), pitch below the horizon, screen-space pan, zoom.
+	_apply_seed(5)
+	_advance_days_direct(40.0 * 365.0 + 200.0)
+	_rebuild_meshes(true)
+	_settle_view()
+	var yaw0: float = cam.yaw
+	var mm: InputEventMouseMotion = InputEventMouseMotion.new()
+	mm.position = Vector2(700.0, 400.0)
+	mm.relative = Vector2(-700.0, 0.0)
+	mm.button_mask = MOUSE_BUTTON_MASK_LEFT
+	Input.parse_input_event(mm)
+	await get_tree().process_frame
+	_check("orbit: yaw is unlimited (way past the old +-1.15 rad)", cam.yaw - yaw0 > 3.0 and cam.goal_yaw == cam.yaw, "%.2f -> %.2f" % [yaw0, cam.yaw])
+	cam.orbit(0.0, -300.0)
+	_check("orbit: pitch can go below the horizon", cam.pitch < -0.3 and cam.pitch >= OrbitCamera.MIN_PITCH - 0.001, "%.2f" % cam.pitch)
+	cam.orbit(0.0, 3000.0)
+	_check("orbit: pitch clamped from above", cam.pitch <= OrbitCamera.MAX_PITCH + 0.001)
+	cam.reset_view()
+	cam.snap()
+	var cam_before: Vector3 = cam.get_camera().global_position
+	cam.zoom(0.5)
+	_check("zoom takes manual control", cam.manual and cam.goal_distance < cam.distance)
+	var gd: float = cam.goal_distance
+	_frame_camera(0.0)
+	_check("manual: auto-framing no longer overrides the zoom", is_equal_approx(cam.goal_distance, gd))
+	cam.reframe()
+	_frame_camera(0.0)
+	_check("F re-frames (manual off, distance restored)", not cam.manual and cam.goal_distance > gd)
+	cam.snap()
+	var right: Vector3 = cam.get_camera().global_transform.basis.x
+	var tgt0: Vector3 = cam.goal_target
+	cam.pan(100.0, 0.0)
+	var moved: Vector3 = cam.goal_target - tgt0
+	_check("pan works in screen space (along camera right)", cam.manual and moved.length() > 0.1 and absf(moved.normalized().dot(-right)) > 0.99,
+		"dot=%.3f" % moved.normalized().dot(-right))
+	cam.reframe()
+	_frame_camera(0.0)
+	cam.snap()
+	var tr: Vector2 = cam.get_camera().unproject_position(Vector3(0.0, sim.get_height_m() * 0.3, 0.0))
+	cam.recentre_at(tr)
+	_check("double-click on the trunk re-centres on the axis", cam.manual and absf(cam.goal_target.x) < 0.01 and absf(cam.goal_target.z) < 0.01 and cam.goal_target.y > 0.5,
+		str(cam.goal_target))
+	cam.reframe()
+	_frame_camera(0.0)
+	cam.snap()
+	_check("camera position sane after re-frame", cam.get_camera().global_position.distance_to(cam_before) < 1.0)
+
+	# 9. Keys and buttons: X (X-ray), G (Repères), R (root view), F (re-frame) through the real input path.
+	var xray_text0: String = hud.xray_button.text
+	_press_key(KEY_X)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("key X: X-ray on", hud.xray_button.button_pressed and soil.xray, hud.xray_button.text)
+	_check("X-ray button label", hud.xray_button.text == "Sous-sol : transparence" and xray_text0 == "Sous-sol : coupe")
+	_check("legend shown in X-ray", hud.is_legend_visible())
+	_press_key(KEY_X)
+	await get_tree().process_frame
+	_check("key X: X-ray off", not hud.xray_button.button_pressed and not soil.xray)
+	hud.xray_button.button_pressed = true
+	await get_tree().process_frame
+	_check("X-ray button toggles the soil", soil.xray)
+	hud.xray_button.button_pressed = false
+	await get_tree().process_frame
+	_check("legend hidden again", not hud.is_legend_visible())
+	_press_key(KEY_G)
+	await get_tree().process_frame
+	_check("key G: Repères on", hud.guides_button.button_pressed and guides.shown)
+	hud.guides_button.button_pressed = false
+	await get_tree().process_frame
+	_check("Repères button off", not guides.shown)
+	var steps_small: Vector2 = Guides.scale_steps(5.0)
+	var steps_mid: Vector2 = Guides.scale_steps(20.0)
+	var steps_big: Vector2 = Guides.scale_steps(45.0)
+	_check("height scale adapts (1 / 5 / 10 m)", steps_small.y == 1.0 and steps_mid.y == 5.0 and steps_big.y == 10.0)
+	_press_key(KEY_R)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("key R: root view on, legend shown", cam.root_view and hud.is_legend_visible())
+	_check("root view looks through the wedge", absf(wrapf(cam.goal_yaw - soil.wedge_dir, -PI, PI)) < 0.01)
+	_press_key(KEY_R)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("key R again: back to the tree view", not cam.root_view and not hud.is_legend_visible())
+	cam.zoom(0.7)
+	_press_key(KEY_F)
+	await get_tree().process_frame
+	_check("key F: re-frame", not cam.manual)
+
+	# 10. Season look: backdrop warm in summer / cool in winter, litter in autumn, soil layer defaults.
+	_check("backdrop: summer warm, winter cool", Backdrop.warmth_for_day(172) > 0.95 and Backdrop.warmth_for_day(355) < 0.15)
+	_check("litter: autumn heavy, summer gone", _litter_for_day(310) > 0.8 and _litter_for_day(200) < 0.02)
+	var hb: PackedFloat32Array = sim.get_horizon_bottoms()
+	var increasing: bool = hb.size() >= 2
+	for i: int in range(1, hb.size()):
+		increasing = increasing and hb[i] > hb[i - 1]
+	_check("soil layers: horizons come from the simulation, top to bottom",
+		increasing and soil.layer_count == mini(hb.size(), 8) and sim.get_horizon_kinds().size() == hb.size(), "%d horizons" % hb.size())
+	sim.set_soil(1)
+	_apply_seed(seed_value)
+	_check("soil choice: shallow soil has rock, default has none", sim.get_bedrock_depth_m() > 0.0, "%.2f m" % sim.get_bedrock_depth_m())
+	sim.set_soil(0)
+	_apply_seed(seed_value)
+	_check("soil choice: back to deep loam", sim.get_bedrock_depth_m() < 0.0 and sim.get_age_years() < 0.1)
 
 	print("[selftest] %s (%d failure%s)" % ["ALL PASSED" if _failures == 0 else "FAILED", _failures, "" if _failures == 1 else "s"])
 	get_tree().quit(0 if _failures == 0 else 1)

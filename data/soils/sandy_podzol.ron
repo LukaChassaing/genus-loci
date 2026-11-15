@@ -1,0 +1,22 @@
+// Deep, coarse, acid sand (Podzol / Arenosol). Little water held per metre,
+// nutrient-poor, but loose: roots go deep after the water.
+(
+    name: "Dry sandy soil",
+    description: "Mor humus over bleached sand (E) and iron-enriched sand (Bs); deep, loose, droughty.",
+    horizons: [
+        (kind: Organic, name: "O", thickness_m: 0.05, sand: 0.80, silt: 0.12, clay: 0.08,
+         bulk_density_g_cm3: 0.30, penetration_resistance_mpa: 0.2, field_capacity: 0.35, wilting_point: 0.12,
+         drainage_mm_day: 400.0, organic_matter_pct: 70.0, nutrient_index: 0.5),
+        (kind: Topsoil, name: "E", thickness_m: 0.15, sand: 0.88, silt: 0.08, clay: 0.04,
+         bulk_density_g_cm3: 1.35, penetration_resistance_mpa: 0.6, field_capacity: 0.10, wilting_point: 0.04,
+         drainage_mm_day: 600.0, organic_matter_pct: 2.0, nutrient_index: 0.3),
+        (kind: Subsoil, name: "Bs", thickness_m: 0.45, sand: 0.86, silt: 0.09, clay: 0.05,
+         bulk_density_g_cm3: 1.45, penetration_resistance_mpa: 1.0, field_capacity: 0.11, wilting_point: 0.05,
+         drainage_mm_day: 500.0, organic_matter_pct: 1.0, nutrient_index: 0.25),
+        (kind: Parent, name: "C", thickness_m: 3.0, sand: 0.92, silt: 0.05, clay: 0.03,
+         bulk_density_g_cm3: 1.55, penetration_resistance_mpa: 1.2, field_capacity: 0.08, wilting_point: 0.03,
+         drainage_mm_day: 600.0, organic_matter_pct: 0.2, nutrient_index: 0.1),
+    ],
+    water_table_depth_m: None,
+    bedrock_depth_m: None,
+)

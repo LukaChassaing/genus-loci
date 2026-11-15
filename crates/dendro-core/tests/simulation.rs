@@ -1,6 +1,9 @@
 //! Integration tests for dendro-core.
 
-use dendro_core::{Genome, MeshData, Phase, ShapeMetrics, Simulation, TreeStats, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET};
+use dendro_core::{
+    ClimateParams, Genome, HorizonKind, MeshData, Phase, ShapeMetrics, Simulation, SoilProfile, TreeStats, FINE_ROOT_TRI_BUDGET,
+    LEAF_TRI_BUDGET, ROOT_TRI_BUDGET, WOOD_TRI_BUDGET,
+};
 use std::sync::OnceLock;
 
 const SEED: u64 = 42;
@@ -18,6 +21,7 @@ struct LongRun {
     shape_200: ShapeMetrics,
     summer_200: Simulation,
     winter_10: Simulation,
+    at_60: Simulation,
 }
 
 fn long_run() -> &'static LongRun {
@@ -26,12 +30,16 @@ fn long_run() -> &'static LongRun {
         let mut sim = oak(SEED);
         let mut yearly = vec![sim.stats()];
         let mut winter_10 = None;
+        let mut at_60 = None;
         let mut shapes = Vec::new();
         for y in 1..=200 {
             sim.advance_years(1);
             yearly.push(sim.stats());
             if y == 15 || y == 80 || y == 100 {
                 shapes.push(sim.shape_metrics());
+            }
+            if y == 60 {
+                at_60 = Some(sim.clone());
             }
             if y == 10 {
                 let mut w = sim.clone();
@@ -49,6 +57,7 @@ fn long_run() -> &'static LongRun {
             shape_200: sim.shape_metrics(),
             summer_200: summer,
             winter_10: winter_10.unwrap(),
+            at_60: at_60.unwrap(),
         }
     })
 }
@@ -86,6 +95,11 @@ fn assert_same(a: &Simulation, b: &Simulation) {
     assert_eq!(mesh_bits(&a.wood_mesh()), mesh_bits(&b.wood_mesh()));
     assert_eq!(mesh_bits(&a.leaf_mesh()), mesh_bits(&b.leaf_mesh()));
     assert_eq!(mesh_bits(&a.root_mesh()), mesh_bits(&b.root_mesh()));
+    assert_eq!(mesh_bits(&a.fine_root_mesh()), mesh_bits(&b.fine_root_mesh()));
+    for (la, lb) in a.soil_layers().iter().zip(b.soil_layers()) {
+        assert_eq!(la.water.to_bits(), lb.water.to_bits());
+        assert_eq!(la.root_density.to_bits(), lb.root_density.to_bits());
+    }
 }
 
 #[test]
@@ -152,18 +166,21 @@ fn calibration_open_grown_oak() {
     let check = |age: usize, what: &str, v: f32, lo: f32, hi: f32| {
         assert!(v >= lo && v <= hi, "{what} at {age} y = {v:.2}, expected {lo}..{hi}");
     };
-    // Loose bounds around the targets 1.5-3 m @5, 8-12 m @25, 18-25 m @100,
-    // 25-35 m @200; DBH 30-50 cm @60, 80-120 cm @200.
+    // Open-grown oak on deep loam: 9-12 m @25, 19-22 m @60, 23-26 m @100,
+    // 28-34 m @200; DBH 32-45 cm @60, 60-75 cm @100, 100-130 cm @200
+    // (small tolerance for seed-to-seed variation).
     check(5, "height", y[5].height_m, 1.0, 3.5);
-    check(25, "height", y[25].height_m, 7.0, 14.0);
-    check(100, "height", y[100].height_m, 17.0, 28.0);
-    check(200, "height", y[200].height_m, 24.0, 38.0);
-    check(60, "dbh", y[60].dbh_cm, 25.0, 55.0);
-    check(200, "dbh", y[200].dbh_cm, 75.0, 130.0);
+    check(25, "height", y[25].height_m, 9.0, 12.0);
+    check(60, "height", y[60].height_m, 19.0, 22.0);
+    check(100, "height", y[100].height_m, 23.0, 26.0);
+    check(200, "height", y[200].height_m, 28.0, 34.0);
+    check(60, "dbh", y[60].dbh_cm, 32.0, 45.0);
+    check(100, "dbh", y[100].dbh_cm, 60.0, 75.0);
+    check(200, "dbh", y[200].dbh_cm, 100.0, 130.0);
     check(200, "crown radius", y[200].crown_radius_m, 8.0, 22.0);
     // Deep taproot early, then laterals spread much wider than deep.
     check(5, "root depth", y[5].root_depth_m, 0.6, 2.5);
-    check(100, "root depth", y[100].root_depth_m, 1.5, 3.6);
+    check(100, "root depth", y[100].root_depth_m, 1.5, 3.0);
     assert!(y[100].root_spread_m > 2.0 * y[100].root_depth_m);
     // Bounded structure (level of detail keeps the model fast).
     assert!(y[200].shoot_nodes < 80_000, "{} nodes", y[200].shoot_nodes);
@@ -186,9 +203,10 @@ fn oak_architecture() {
         assert!(s.max_limb_ratio >= 0.35 && s.max_limb_ratio <= 0.9, "limb/stem ratio: {s:?}");
         assert!(s.mean_limb_ratio >= 0.25, "limb/stem ratio: {s:?}");
     }
-    // Broad crown about as wide as tall at maturity.
-    assert!((0.8..1.3).contains(&s100.crown_width_to_height), "crown W/H at 100 y: {s100:?}");
-    assert!((0.8..1.3).contains(&s200.crown_width_to_height), "crown W/H at 200 y: {s200:?}");
+    // Broad crown about as wide as tall from 80 years (0.9-1.2).
+    for s in [s80, s100, s200] {
+        assert!((0.9..=1.2).contains(&s.crown_width_to_height), "crown W/H: {s:?}");
+    }
     // A young tree has a single dominant stem: no basal co-dominant fork.
     let s15 = run.shape_15;
     assert!(s15.max_limb_ratio < 0.75, "juvenile stem not dominant: {s15:?}");
@@ -205,18 +223,20 @@ fn other_seeds_do_not_collapse() {
                 assert!(s.leafy_shoots > 1000, "seed {seed}: canopy collapsed at {y} y ({} shoots)", s.leafy_shoots);
             }
             if y == 25 {
-                assert!((7.0..14.0).contains(&s.height_m), "seed {seed}: H25 {}", s.height_m);
+                assert!((9.0..12.0).contains(&s.height_m), "seed {seed}: H25 {}", s.height_m);
             }
             if y == 60 {
-                assert!((25.0..55.0).contains(&s.dbh_cm), "seed {seed}: DBH60 {}", s.dbh_cm);
+                assert!((32.0..45.0).contains(&s.dbh_cm), "seed {seed}: DBH60 {}", s.dbh_cm);
+                assert!((19.0..22.0).contains(&s.height_m), "seed {seed}: H60 {}", s.height_m);
             }
             if y == 100 {
-                assert!((17.0..28.0).contains(&s.height_m), "seed {seed}: H100 {}", s.height_m);
+                assert!((23.0..26.0).contains(&s.height_m), "seed {seed}: H100 {}", s.height_m);
+                assert!((60.0..75.0).contains(&s.dbh_cm), "seed {seed}: DBH100 {}", s.dbh_cm);
                 // Distinct individuals, same species architecture.
                 let m = sim.shape_metrics();
                 assert!((2.0..5.0).contains(&m.clear_bole_m), "seed {seed}: {m:?}");
                 assert!((3..=10).contains(&m.scaffold_limbs), "seed {seed}: {m:?}");
-                assert!((0.8..1.35).contains(&m.crown_width_to_height), "seed {seed}: {m:?}");
+                assert!((0.9..=1.2).contains(&m.crown_width_to_height), "seed {seed}: {m:?}");
             }
         }
     }
@@ -372,11 +392,13 @@ fn mesh_sanity_old_tree() {
     check_mesh(&wood, "wood", WOOD_TRI_BUDGET, true);
     check_mesh(&leaves, "leaves", LEAF_TRI_BUDGET, true);
     check_mesh(&roots, "roots", ROOT_TRI_BUDGET, true);
-    assert!(wood.triangle_count() + roots.triangle_count() <= 300_000);
+    let fine = sim.fine_root_mesh();
+    check_mesh(&fine, "fine roots", FINE_ROOT_TRI_BUDGET, true);
+    assert!(wood.triangle_count() + roots.triangle_count() + fine.triangle_count() <= 290_000);
     assert!(leaves.triangle_count() <= 400_000);
     assert!(!leaves.is_empty(), "summer canopy must have leaves");
     // Roots below ground, wood above (allow a small overlap at the collar).
-    let root_max_y = roots.positions.iter().map(|p| p[1]).fold(f32::MIN, f32::max);
+    let root_max_y = roots.positions.iter().chain(&fine.positions).map(|p| p[1]).fold(f32::MIN, f32::max);
     assert!(root_max_y < 0.05, "roots reach y = {root_max_y}");
     let wood_min_y = wood.positions.iter().map(|p| p[1]).fold(f32::MAX, f32::min);
     assert!(wood_min_y > -0.6, "wood reaches y = {wood_min_y}");
@@ -435,8 +457,206 @@ fn performance_200_years() {
     let w = sim.wood_mesh();
     let l = sim.leaf_mesh();
     let r = sim.root_mesh();
+    let f = sim.fine_root_mesh();
     let mesh_s = t.elapsed().as_secs_f64();
-    println!("200 years: {sim_s:.2} s; meshes {:.1} ms ({} + {} + {} tris)", mesh_s * 1e3, w.triangle_count(), l.triangle_count(), r.triangle_count());
-    assert!(sim_s < 6.0);
-    assert!(mesh_s < 0.2);
+    println!(
+        "200 years: {sim_s:.2} s; meshes {:.1} ms ({} wood + {} leaves + {} roots + {} fine roots tris)",
+        mesh_s * 1e3,
+        w.triangle_count(),
+        l.triangle_count(),
+        r.triangle_count(),
+        f.triangle_count()
+    );
+    assert!(sim_s < 2.5);
+    assert!(mesh_s < 0.06);
+    let t = std::time::Instant::now();
+    sim.advance_years(100);
+    let total = sim_s + t.elapsed().as_secs_f64();
+    println!("300 years: {total:.2} s");
+    assert!(total < 4.5);
+}
+
+/// One shared 300-year run on the default site (old tree, retrenchment).
+struct OldRun {
+    yearly: Vec<TreeStats>,
+    shape_300: ShapeMetrics,
+    winter_300: Simulation,
+}
+
+fn old_run() -> &'static OldRun {
+    static RUN: OnceLock<OldRun> = OnceLock::new();
+    RUN.get_or_init(|| {
+        let mut sim = long_run().summer_200.clone();
+        sim.advance_days(165); // Jan 1, year 201
+        let mut yearly = Vec::new();
+        for _ in 201..=300 {
+            sim.advance_years(1);
+            yearly.push(sim.stats());
+        }
+        let shape_300 = sim.shape_metrics();
+        sim.advance_days(20);
+        OldRun { yearly, shape_300, winter_300: sim }
+    })
+}
+
+/// Veteran oak: height plateaus (a small dip through crown retrenchment is
+/// allowed), girth keeps growing slowly, dead wood appears, crown stays
+/// broad and the meshes stay within budget.
+#[test]
+fn old_tree_300_years() {
+    let run = old_run();
+    let y = &run.yearly;
+    let h200 = long_run().yearly[200].height_m;
+    let peak = y.iter().map(|s| s.height_m).fold(h200, f32::max);
+    let last = y.last().unwrap();
+    // Plateau: at most a few metres gained in the last century.
+    assert!(peak - h200 < 4.0, "height still rising fast: {h200} -> {peak}");
+    // Allowed dip through retrenchment: 2.5 m below the peak, never a collapse.
+    assert!(last.height_m > peak - 2.5, "height collapsed: peak {peak}, 300 y {}", last.height_m);
+    // Girth still slowly positive.
+    for w in y.windows(2) {
+        assert!(w[1].dbh_cm >= w[0].dbh_cm);
+    }
+    let gain = last.dbh_cm - y[y.len() - 51].dbh_cm;
+    assert!(gain > 5.0 && gain < 40.0, "DBH gain over the last 50 y: {gain}");
+    // Retrenchment leaves standing dead wood.
+    assert!(y.iter().any(|s| s.dead_wood_nodes > 0), "no dead wood in a 300-year-old oak");
+    // The crown keeps widening while height plateaus (1.24-1.30 at 300 y for
+    // seeds 42/1/1234; the 0.9-1.2 target holds for 80-200 y only).
+    assert!((0.9..1.35).contains(&run.shape_300.crown_width_to_height), "{:?}", run.shape_300);
+    let w = run.winter_300.wood_mesh();
+    check_mesh(&w, "wood 300 y", WOOD_TRI_BUDGET, true);
+}
+
+/// The lower crown is full: in summer, foliage reaches down to the bole.
+#[test]
+fn deep_crown_in_leaf() {
+    let sim = &long_run().summer_200;
+    let leaves = sim.leaf_mesh();
+    let h = sim.height_m();
+    let bole = sim.shape_metrics().clear_bole_m;
+    let n = leaves.positions.len() as f32;
+    let low = leaves.positions.iter().filter(|p| p[1] < bole + 0.35 * (h - bole)).count() as f32;
+    // A shell-only "wineglass" crown has almost nothing in its lower third
+    // (lower crown = clear bole + 35 % of the crown length). Measured on the
+    // previous model at 200 y: 0.02 / 0.10 / 0.11 (seeds 42 / 1 / 1234);
+    // now 0.14 / 0.13 / 0.19.
+    assert!(low / n > 0.12, "only {:.1} % of foliage in the lower crown third", 100.0 * low / n);
+}
+
+fn site_run(soil: SoilProfile, years: u32) -> Simulation {
+    let mut sim = Simulation::with_site(Genome::quercus_robur(), SEED, ClimateParams::default(), soil);
+    sim.advance_years(years);
+    sim
+}
+
+/// 80-year runs on every preset soil (same seed), shared by the soil tests.
+fn sites_80() -> &'static [(String, TreeStats); 4] {
+    static RUN: OnceLock<[(String, TreeStats); 4]> = OnceLock::new();
+    RUN.get_or_init(|| {
+        let presets = SoilProfile::presets();
+        let handles: Vec<_> = presets
+            .into_iter()
+            .map(|p| std::thread::spawn(move || (p.name.clone(), site_run(p, 80).stats())))
+            .collect();
+        let v: Vec<(String, TreeStats)> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        [v[0].clone(), v[1].clone(), v[2].clone(), v[3].clone()]
+    })
+}
+
+#[test]
+fn soil_shapes_the_tree() {
+    let s = sites_80();
+    let (loam, shallow, gley, sand) = (&s[0].1, &s[1].1, &s[2].1, &s[3].1);
+    // Shallow soil over rock: shallow plate, smaller tree.
+    assert!(shallow.root_depth_m < 0.5, "rendzina root depth {}", shallow.root_depth_m);
+    assert!(loam.root_depth_m > 1.5, "loam root depth {}", loam.root_depth_m);
+    assert!(shallow.height_m < loam.height_m - 2.0, "height rendzina {} vs loam {}", shallow.height_m, loam.height_m);
+    assert!(shallow.dbh_cm < 0.8 * loam.dbh_cm);
+    // Waterlogged clay: roots stop above the anoxic zone, smaller tree.
+    assert!(gley.root_depth_m < 1.0, "gley root depth {}", gley.root_depth_m);
+    assert!(gley.height_m < loam.height_m - 1.0, "gley height {} vs loam {}", gley.height_m, loam.height_m);
+    assert!(gley.dbh_cm < 0.95 * loam.dbh_cm, "gley DBH {} vs loam {}", gley.dbh_cm, loam.dbh_cm);
+    // Dry sand: deeper rooting than on loam.
+    assert!(sand.root_depth_m > loam.root_depth_m + 0.5, "sand {} vs loam {}", sand.root_depth_m, loam.root_depth_m);
+    assert!(sand.height_m < loam.height_m);
+    // Laterals reach 1.5-3x the crown radius on every soil.
+    for (name, t) in s.iter() {
+        let ratio = t.root_spread_m / t.crown_radius_m;
+        assert!((1.5..3.0).contains(&ratio), "{name}: root spread / crown radius = {ratio}");
+    }
+    for age in [80, 100, 200] {
+        let t = &long_run().yearly[age];
+        let ratio = t.root_spread_m / t.crown_radius_m;
+        assert!((1.5..3.0).contains(&ratio), "loam {age} y: root spread / crown radius = {ratio}");
+    }
+}
+
+/// A dry season shifts growth below ground and deeper (drought-deepening
+/// plasticity and functional-balance allocation), compared with a control.
+#[test]
+fn drought_shifts_roots_deeper() {
+    let base = &long_run().at_60;
+    let mut ctrl = base.clone();
+    let mut dry = base.clone();
+    dry.set_drought(true);
+    dry.advance_years(1);
+    dry.set_drought(false);
+    ctrl.advance_years(1);
+    assert!(dry.last_season_water_stress() > ctrl.last_season_water_stress() + 0.1);
+    // The season after the drought: fine roots have shifted out of the
+    // dried topsoil into deeper, moister layers (Brunner et al. 2015) and
+    // the root:shoot balance has moved towards roots.
+    ctrl.advance_years(1);
+    dry.advance_years(1);
+    let (_, tc) = ctrl.root_length_fraction_above(0.6);
+    let (_, td) = dry.root_length_fraction_above(0.6);
+    assert!(td < tc, "after drought {td:.4} of root length in the top 0.6 m vs control {tc:.4}");
+    let rs = |s: &Simulation| s.stats().root_nodes as f32 / s.stats().shoot_nodes as f32;
+    assert!(rs(&dry) > rs(&ctrl), "root:shoot after drought {} vs control {}", rs(&dry), rs(&ctrl));
+}
+
+#[test]
+fn roots_on_loam_at_60_years() {
+    let sim = &long_run().at_60;
+    // >80 % of root length (fine roots included) in the top 60 cm; most of
+    // the structural length too.
+    let (structural, total) = sim.root_length_fraction_above(0.6);
+    assert!(total > 0.8, "only {:.0} % of root length in the top 0.6 m", total * 100.0);
+    assert!(structural > 0.6, "only {:.0} % of structural root length in the top 0.6 m", structural * 100.0);
+    // Laterals reach 1.5-3x the crown radius.
+    let ratio = sim.root_spread_m() / sim.crown_radius_m();
+    assert!((1.5..3.0).contains(&ratio), "root spread / crown radius = {ratio}");
+}
+
+#[test]
+fn soil_layers_api() {
+    let sim = &long_run().at_60;
+    let layers = sim.soil_layers();
+    assert!(layers.len() >= 8);
+    assert_eq!(layers[0].top_m, 0.0);
+    assert_eq!(layers[0].kind, HorizonKind::Organic);
+    for w in layers.windows(2) {
+        assert!((w[0].bottom_m - w[1].top_m).abs() < 1e-5);
+    }
+    let max = layers.iter().map(|l| l.root_density).fold(0.0, f32::max);
+    assert!((max - 1.0).abs() < 1e-6);
+    for l in layers {
+        assert!((0.0..=1.0).contains(&l.water) && (0.0..=1.0).contains(&l.saturation));
+        assert!(l.root_length_km_m3.is_finite() && l.root_length_km_m3 >= 0.0);
+    }
+    // The densest rooting is in the top 30 cm.
+    let densest = layers.iter().max_by(|a, b| a.root_density.total_cmp(&b.root_density)).unwrap();
+    assert!(densest.top_m < 0.3, "densest root layer at {} m", densest.top_m);
+    assert!((0.0..=1.0).contains(&sim.soil_water()));
+    assert_eq!(sim.soil_profile().name, SoilProfile::brown_forest_soil().name);
+    // Root length density of the topsoil is of the order of km per m3
+    // (measured for oak: ~1-10 km/m3 in the top 30 cm).
+    let top = layers.iter().filter(|l| l.top_m < 0.3).map(|l| l.root_length_km_m3).fold(0.0, f32::max);
+    assert!((0.3..30.0).contains(&top), "topsoil root length density {top} km/m3");
+    // Horizon helpers.
+    let a = &SoilProfile::brown_forest_soil().horizons[1];
+    assert!(a.aeration() > 0.1, "loam topsoil aeration {}", a.aeration());
+    let g = &SoilProfile::gley_clay().horizons[2];
+    assert!(g.aeration() < a.aeration());
 }

@@ -122,8 +122,22 @@ pub struct Architecture {
     /// Only segments inclined at least this much from the vertical (deg)
     /// sag; ascending limbs carry their load mostly axially.
     pub sag_min_inclination_deg: f32,
+    /// Autotropic straightening (deg/year) of the main continuation of an
+    /// axis thicker than `straightening_min_radius_mm` back towards its
+    /// parent's direction, down to a residual bend of
+    /// `straightening_keep_deg` (0 disables).
+    #[serde(default)]
+    pub straightening_deg_per_year: f32,
+    #[serde(default)]
+    pub straightening_keep_deg: f32,
+    #[serde(default)]
+    pub straightening_min_radius_mm: f32,
     /// Branches whose foliage mean light exposure (0..1) is below this are shed.
     pub shedding_threshold: f32,
+    /// Years a branch whose foliage is all below `shedding_threshold`
+    /// survives on its reserves before it is shed (1 = shed at once).
+    #[serde(default = "one_u8")]
+    pub shade_survival_years: u8,
     /// Branches whose foliage *mean* light exposure (0..1) is below this are
     /// shed too, even if some of their shoots are well lit: a branch that is
     /// mostly shaded is a net carbon sink (branch autonomy, Sprugel et al.
@@ -138,11 +152,48 @@ pub struct Architecture {
     pub clear_bole_fraction: f32,
     pub clear_bole_max_m: f32,
     pub clear_bole_limb_ratio: f32,
+    /// Age (years) from which the crown retrenches (dieback of the farthest
+    /// boughs, epicormic reiteration lower down; see `growth.rs`). 0 = never.
+    #[serde(default)]
+    pub retrenchment_onset_years: f32,
+    /// Yearly probability that an eligible bough dies, reached 100 years
+    /// after onset (linear ramp from 0).
+    #[serde(default)]
+    pub retrenchment_rate: f32,
+    /// Boughs whose farthest shoot is beyond this fraction of
+    /// `hydraulic_path_max_m` from the collar are eligible for dieback.
+    #[serde(default = "one_f32")]
+    pub retrenchment_reach: f32,
+    /// Yearly probability that a thick, well-lit limb in the lower crown
+    /// forms epicormic buds after retrenchment onset.
+    #[serde(default)]
+    pub epicormic_rate: f32,
     /// Transport distance (m, straight line collar -> bud) at which shoot
     /// extension stops; foliage photosynthetic efficiency also declines with
     /// it. Models the size limitation of water transport (Ryan & Yoder 1997)
     /// and sets the asymptotic height and crown size.
     pub hydraulic_path_max_m: f32,
+    /// Shape of that decline: extension is scaled by
+    /// `1 - (d / hydraulic_path_max_m)^hydraulic_exponent` (1 = linear;
+    /// larger = vigorous height growth in mid-life, then a sharper plateau).
+    #[serde(default = "one_f32")]
+    pub hydraulic_exponent: f32,
+}
+
+fn three_f32() -> f32 {
+    3.0
+}
+
+fn quarter_f32() -> f32 {
+    0.25
+}
+
+fn one_f32() -> f32 {
+    1.0
+}
+
+fn one_u8() -> u8 {
+    1
 }
 
 /// Leaf traits.
@@ -228,6 +279,14 @@ pub struct WoodTraits {
     /// preserving (what the simulated Pressler areas give); larger = thicker
     /// limbs. Mesh only.
     pub pipe_exponent: f32,
+    /// Mesh only: the largest factor by which the pipe exponent may widen a
+    /// branch over its simulated radius (twigs below ~5 mm are never
+    /// widened).
+    #[serde(default = "one_f32")]
+    pub limb_draw_boost: f32,
+    /// Mesh only: out-of-roundness (fluting) of thick wood, relative.
+    #[serde(default)]
+    pub bark_irregularity: f32,
     /// Mesh stylisation: widening of a branch base ring where it leaves its
     /// parent (branch collar), as a fraction of the branch radius.
     pub collar_flare: f32,
@@ -264,6 +323,36 @@ pub struct RootTraits {
     pub max_order: u8,
     /// Maximum annual extension of a root tip (m).
     pub annual_extension_m: f32,
+    /// Soil penetration resistance (MPa) at which root elongation stops.
+    #[serde(default = "three_f32")]
+    pub max_penetration_mpa: f32,
+    /// Waterlogging tolerance 0..1: how far roots enter permanently
+    /// saturated soil (x 0.4 m), and how much anoxia hurts growth.
+    #[serde(default)]
+    pub waterlogging_tolerance: f32,
+    /// Drought-deepening plasticity: relative deepening of laterals and
+    /// boost of sinker/taproot growth per unit of last year's water stress.
+    #[serde(default)]
+    pub drought_deepening: f32,
+    /// Strength of growth towards moister soil (laterals).
+    #[serde(default)]
+    pub hydrotropism: f32,
+    /// Baseline fraction of growth allocated below ground (root:shoot
+    /// partition, informational baseline of the allocation below).
+    #[serde(default = "quarter_f32")]
+    pub root_shoot_ratio: f32,
+    /// Increase of root allocation per unit water stress (root growth x
+    /// (1 + gain x stress); shoot vigour reduced accordingly).
+    #[serde(default)]
+    pub root_shoot_stress_gain: f32,
+    /// Fine-root length (m) per metre of structural root in a layer of
+    /// proliferation factor 1.
+    #[serde(default)]
+    pub fine_root_per_m: f32,
+    /// Mesh only: thickening of structural laterals near the stem ("zone of
+    /// rapid taper"): drawn radius x (1 + k exp(-distance / 1 m)).
+    #[serde(default)]
+    pub rapid_taper: f32,
 }
 
 /// Environmental tolerances.

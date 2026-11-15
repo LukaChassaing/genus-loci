@@ -199,27 +199,41 @@ static func make_bark_material(tex: Array[ImageTexture]) -> StandardMaterial3D:
 	return m
 
 
-## Roots are drawn as a flattened relief in front of the soil cut face (profile illustration):
-## z is squeezed to a thin sheet just in front of z = 0, so the whole root system reads on the cut.
+## Roots: real 3-D geometry, clipped at the plug radius / depth (discard). The inside of a clipped tube
+## (back faces) is painted with `cap_color`, so cut root ends read as darker discs. `fine_style` (0..1)
+## switches to a thinner/paler look for fine roots once the mesh carries per-vertex root class info.
 static func make_root_material(tex: Array[ImageTexture]) -> ShaderMaterial:
 	var sh: Shader = Shader.new()
 	sh.code = """
 shader_type spatial;
-render_mode cull_back;
+render_mode cull_disabled;
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform float flatten = 0.012;
-uniform float lift = 0.10;
+uniform float clip_radius = 1000.0;
+uniform float clip_depth = 1000.0;
+uniform float fine_style = 0.0;
+uniform vec3 root_tint = vec3(1.40, 1.18, 0.92);
+uniform vec4 cap_color : source_color = vec4(0.36, 0.25, 0.15, 1.0);
+varying vec3 wpos;
 void vertex() {
-	VERTEX.z = lift + clamp(VERTEX.z, -12.0, 12.0) * flatten;
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
-	vec3 a = texture(albedo_tex, UV).rgb;
-	ALBEDO = a * COLOR.rgb * 1.15;
-	NORMAL_MAP = texture(normal_tex, UV).xyz;
-	NORMAL_MAP_DEPTH = 0.8;
-	ROUGHNESS = 0.95;
-	SPECULAR = 0.1;
+	if (length(wpos.xz) > clip_radius || -wpos.y > clip_depth) {
+		discard;
+	}
+	if (!FRONT_FACING) {
+		ALBEDO = cap_color.rgb;
+		ROUGHNESS = 1.0;
+		SPECULAR = 0.0;
+	} else {
+		vec3 a = texture(albedo_tex, UV).rgb * COLOR.rgb * root_tint;
+		ALBEDO = mix(a, mix(a, vec3(0.80, 0.70, 0.52), 0.55), fine_style);
+		NORMAL_MAP = texture(normal_tex, UV).xyz;
+		NORMAL_MAP_DEPTH = 0.7;
+		ROUGHNESS = 0.88;
+		SPECULAR = 0.12;
+	}
 }
 """
 	var m: ShaderMaterial = ShaderMaterial.new()

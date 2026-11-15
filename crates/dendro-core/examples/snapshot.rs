@@ -4,7 +4,7 @@
 //! cargo run -p dendro-core --release --example snapshot -- --years 60 --doy 200 --out tree.png
 //!     [--seed N] [--no-leaves] [--no-roots] [--side] [--genome FILE.ron]
 
-use dendro_core::{Genome, MeshData, Simulation};
+use dendro_core::{ClimateParams, Genome, HorizonKind, MeshData, Simulation, SoilProfile};
 
 fn main() {
     let mut years = 60u32;
@@ -14,7 +14,10 @@ fn main() {
     let mut leaves_on = true;
     let mut roots_on = true;
     let mut side_only = false;
+    let mut size = 3200usize;
+    let mut underground: Option<f32> = None;
     let mut genome = Genome::quercus_robur();
+    let mut soil = SoilProfile::default();
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -25,6 +28,19 @@ fn main() {
             "--no-leaves" => leaves_on = false,
             "--no-roots" => roots_on = false,
             "--side" => side_only = true,
+            "--size" => size = args.next().unwrap().parse().unwrap(),
+            "--underground" => underground = Some(8.0),
+            "--half-width" => underground = Some(args.next().unwrap().parse().unwrap()),
+            "--soil" => {
+                let v = args.next().unwrap();
+                soil = match v.as_str() {
+                    "loam" => SoilProfile::brown_forest_soil(),
+                    "rendzina" | "shallow" => SoilProfile::shallow_rendzina(),
+                    "gley" | "clay" => SoilProfile::gley_clay(),
+                    "sand" => SoilProfile::sandy_podzol(),
+                    path => SoilProfile::from_ron(&std::fs::read_to_string(path).expect("read soil")).expect("parse soil"),
+                };
+            }
             "--genome" => {
                 let path = args.next().unwrap();
                 genome = Genome::from_ron(&std::fs::read_to_string(&path).expect("read genome")).expect("parse genome");
@@ -32,7 +48,7 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
-    let mut sim = Simulation::new(genome.clone(), seed);
+    let mut sim = Simulation::with_site(genome.clone(), seed, ClimateParams::default(), soil.clone());
     sim.advance_days(years * 365 + doy);
     let wood = sim.wood_mesh();
     let leaves = sim.leaf_mesh();
@@ -47,6 +63,10 @@ fn main() {
         leaves.triangle_count(),
         roots.triangle_count()
     );
+    if let Some(half) = underground {
+        render_underground(&sim, &wood, &roots, half, size, &out);
+        return;
+    }
     let mut all = MeshData::default();
     all.append(&wood);
     if leaves_on {
@@ -57,7 +77,7 @@ fn main() {
     }
 
     // Two panels (side + top), or one large side view with --side.
-    let (w, h) = if side_only { (3200usize, 1600usize) } else { (1400usize, 800usize) };
+    let (w, h) = if side_only { (size, size / 2) } else { (size * 7 / 16, size / 4) };
     let mut img = vec![[235u8, 240, 245]; w * h];
     let mut zbuf = vec![f32::MAX; w * h];
     // Extents.
@@ -108,6 +128,86 @@ fn main() {
     }
     write_png(&out, w, h, &img);
     println!("wrote {out}");
+}
+
+/// Soil cut-away: horizons as bands, roots projected on the x-y plane.
+fn render_underground(sim: &Simulation, wood: &MeshData, roots: &MeshData, half: f32, size: usize, out: &str) {
+    let fine = sim.fine_root_mesh();
+    let layers = sim.soil_layers();
+    let depth = (sim.root_depth_m() + 0.4).max(1.0).min(layers.last().map(|l| l.bottom_m + 0.3).unwrap_or(4.0));
+    let (y_top, y_bot) = (1.2f32, -depth);
+    let w = size;
+    let h = ((size as f32) * (y_top - y_bot) / (2.0 * half)).max(240.0) as usize;
+    let scale = w as f32 / (2.0 * half);
+    let mut img = vec![[205u8, 220, 235]; w * h];
+    let mut zbuf = vec![f32::MAX; w * h];
+    let bedrock = sim.soil_profile().bedrock_depth_m;
+    for py in 0..h {
+        let y = y_top - (py as f32 + 0.5) / scale;
+        if y >= 0.0 {
+            continue;
+        }
+        let d = -y;
+        let mut col = match layers.iter().find(|l| d < l.bottom_m) {
+            Some(l) => {
+                let base = match l.kind {
+                    HorizonKind::Organic => [62.0, 46.0, 32.0],
+                    HorizonKind::Topsoil => [104.0, 80.0, 56.0],
+                    HorizonKind::Subsoil => [150.0, 114.0, 74.0],
+                    HorizonKind::Parent => [178.0, 158.0, 122.0],
+                };
+                // Wetter = darker; waterlogged = blue-grey (gley colours).
+                let k = 1.0 - 0.18 * l.water;
+                let mut c = [base[0] * k, base[1] * k, base[2] * k];
+                if l.waterlogged {
+                    c = [c[0] * 0.7 + 30.0, c[1] * 0.75 + 40.0, c[2] * 0.8 + 60.0];
+                }
+                c
+            }
+            None => [120.0, 120.0, 125.0],
+        };
+        if bedrock.is_some_and(|b| d >= b) {
+            col = [128.0, 128.0, 134.0];
+        }
+        for px in 0..w {
+            img[py * w + px] = [col[0] as u8, col[1] as u8, col[2] as u8];
+        }
+    }
+    let proj = |p: [f32; 3]| [(p[0] + half) * scale, (y_top - p[1]) * scale, p[2]];
+    let light = norm([0.4, 0.8, 0.45]);
+    let draw = |m: &MeshData, tint: Option<[f32; 3]>, img: &mut Vec<[u8; 3]>, zbuf: &mut Vec<f32>| {
+        for t in m.indices.as_chunks::<3>().0 {
+            let ps = [t[0], t[1], t[2]].map(|i| m.positions[i as usize]);
+            if ps.iter().all(|p| p[1] > y_top) {
+                continue;
+            }
+            let pts = ps.map(proj);
+            let n = m.normals[t[0] as usize];
+            let c = tint.unwrap_or([m.colors[t[0] as usize][0], m.colors[t[0] as usize][1], m.colors[t[0] as usize][2]]);
+            let lam = (n[0] * light[0] + n[1] * light[1] + n[2] * light[2]).abs() * 0.6 + 0.4;
+            let col = [(c[0] * lam * 255.0).min(255.0) as u8, (c[1] * lam * 255.0).min(255.0) as u8, (c[2] * lam * 255.0).min(255.0) as u8];
+            raster(img, zbuf, w, h, &pts, col, w, 0.0);
+        }
+    };
+    draw(wood, None, &mut img, &mut zbuf);
+    draw(roots, Some([0.36, 0.24, 0.15]), &mut img, &mut zbuf);
+    draw(&fine, Some([0.93, 0.86, 0.70]), &mut img, &mut zbuf);
+    // Ground line.
+    let gy = (y_top * scale) as usize;
+    for px in 0..w {
+        img[gy.min(h - 1) * w + px] = [70, 90, 50];
+    }
+    write_png(out, w, h, &img);
+    let (s, t) = sim.root_length_fraction_above(0.6);
+    println!(
+        "{}: root depth {:.2} m, spread {:.1} m (crown radius {:.1}), top 0.6 m holds {:.0} % structural / {:.0} % total root length; wrote {out}",
+        sim.soil_profile().name,
+        sim.root_depth_m(),
+        sim.root_spread_m(),
+        sim.crown_radius_m(),
+        s * 100.0,
+        t * 100.0
+    );
 }
 
 fn norm(v: [f32; 3]) -> [f32; 3] {

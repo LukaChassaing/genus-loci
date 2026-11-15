@@ -1,0 +1,20 @@
+// Shallow, stony soil over hard limestone at 45 cm (Rendzina / Leptosol).
+// Little water storage: oak grows slowly and roots form a shallow plate
+// that spreads over the rock.
+(
+    name: "Shallow soil over limestone",
+    description: "Humus-rich, stony silty clay loam over limestone rubble; hard rock at 45 cm.",
+    horizons: [
+        (kind: Organic, name: "O", thickness_m: 0.03, sand: 0.20, silt: 0.50, clay: 0.30,
+         bulk_density_g_cm3: 0.40, penetration_resistance_mpa: 0.2, field_capacity: 0.45, wilting_point: 0.18,
+         drainage_mm_day: 200.0, organic_matter_pct: 50.0, nutrient_index: 0.9),
+        (kind: Topsoil, name: "A", thickness_m: 0.20, sand: 0.15, silt: 0.50, clay: 0.35,
+         bulk_density_g_cm3: 1.10, penetration_resistance_mpa: 1.0, field_capacity: 0.38, wilting_point: 0.20,
+         stones: 0.25, drainage_mm_day: 60.0, organic_matter_pct: 8.0, nutrient_index: 0.8),
+        (kind: Parent, name: "C", thickness_m: 0.22, sand: 0.20, silt: 0.45, clay: 0.35,
+         bulk_density_g_cm3: 1.40, penetration_resistance_mpa: 2.0, field_capacity: 0.32, wilting_point: 0.18,
+         stones: 0.6, drainage_mm_day: 100.0, organic_matter_pct: 1.0, nutrient_index: 0.4),
+    ],
+    water_table_depth_m: None,
+    bedrock_depth_m: Some(0.45),
+)
