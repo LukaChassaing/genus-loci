@@ -459,11 +459,9 @@ impl SoilColumn {
     /// area 0..1 of full summer canopy. Returns rooted-profile REW and
     /// anoxic root fraction.
     pub fn step(&mut self, precip: f32, pet: f32, leaf: f32, season: bool) -> WaterDay {
-        let n = self.layers.len();
         // 1. Infiltration and drainage cascade (one pass, top-down).
         let mut carry = precip * 0.9; // ~10 % interception loss
-        for i in 0..n {
-            let l = &mut self.layers[i];
+        for l in self.layers.iter_mut() {
             if l.below_table {
                 // Water reaching the table is lost to groundwater flow.
                 carry = 0.0;

@@ -44,6 +44,7 @@ func _ready() -> void:
 ## Redraw only happens when new data is pushed (once per completed year).
 func set_data(widths: PackedFloat32Array, stress: PackedFloat32Array,
 		early_frac: PackedFloat32Array = PackedFloat32Array(), forced: PackedByteArray = PackedByteArray()) -> void:
+	var t0: int = Time.get_ticks_usec()
 	_widths = widths
 	_stress = stress
 	_early_frac = early_frac
@@ -67,6 +68,7 @@ func set_data(widths: PackedFloat32Array, stress: PackedFloat32Array,
 		_avg_col.append(ec.lerp(lc, 1.0 - _ef(i)))
 	_hover = -1
 	queue_redraw()
+	Prof.add("gd.ring_set_data", t0)
 
 
 func reset_view() -> void:
@@ -192,6 +194,12 @@ func _arc_segments(r: float) -> int:
 
 
 func _draw() -> void:
+	var t0: int = Time.get_ticks_usec()
+	_draw_rings()
+	Prof.add("gd.ring_draw", t0)
+
+
+func _draw_rings() -> void:
 	var font: Font = UiStyle.font()
 	var area_h: float = size.y - TEXT_H
 	var c0: Vector2 = Vector2(size.x * 0.5, area_h * 0.5) + _pan

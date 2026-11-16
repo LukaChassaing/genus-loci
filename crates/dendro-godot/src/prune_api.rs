@@ -2,7 +2,7 @@
 //! metrics and the "what if" control tree. Coordinates are the tree's (Y up, metres, collar at the
 //! origin); days are days since germination; cut types are `dendro_core::CutKind` codes.
 
-use crate::backend::mesh_data_to_array_mesh;
+use crate::backend::{mesh_data_to_array_mesh, mesh_data_to_array_mesh_named, prof};
 use crate::TreeSim;
 use dendro_core::{CutKind, PruneMetrics, Simulation};
 use godot::classes::ArrayMesh;
@@ -92,12 +92,13 @@ impl TreeSim {
     /// Cut faces, woundwood, decay, stubs and pollard knobs (vertex colours; render double-sided).
     #[func]
     fn build_wound_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.live().wound_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("wound.build", || self.backend.live().wound_mesh()), "wound")
     }
 
     /// Cut now (logged). Returns the cut type code, -1 if nothing was cut.
     #[func]
     fn prune_cut(&mut self, node_id: i64, t: f64, flush: bool) -> i64 {
+        self.meshes.invalidate();
         self.backend.prune_cut(node_id as u32, t as f32, flush) as i64
     }
 
@@ -105,18 +106,21 @@ impl TreeSim {
     /// fraction), expanded into logged cuts. Returns the number of cuts.
     #[func]
     fn prune_op(&mut self, op: GString, arg: f64) -> i64 {
+        self.meshes.invalidate();
         self.backend.prune_op(&op.to_string(), arg as f32) as i64
     }
 
     /// Undo the last cut (re-simulates from its day to now).
     #[func]
     fn prune_undo(&mut self) -> bool {
+        self.meshes.invalidate();
         self.backend.prune_undo()
     }
 
     /// Jump to a day (backwards replays the timeline; later cuts come back when their day comes).
     #[func]
     fn prune_seek_day(&mut self, day: i64) {
+        self.meshes.invalidate();
         self.backend.prune_seek_day(day.max(0) as u64);
     }
 
@@ -225,7 +229,7 @@ impl TreeSim {
     #[func]
     fn build_control_wood_mesh(&self) -> Gd<ArrayMesh> {
         match self.backend.control_mesh() {
-            Some(m) => mesh_data_to_array_mesh(m),
+            Some(m) => mesh_data_to_array_mesh_named(m, "control"),
             None => ArrayMesh::new_gd(),
         }
     }

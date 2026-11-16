@@ -356,6 +356,28 @@ func get_ring_view() -> RingView:
 
 ## Part of the viewport (canvas units) not covered by HUD panels: between the info panel and the
 ## ring panel (when shown), above the control bar. The 3D camera frames the tree inside it.
+## free_rect for the per-frame camera framing: the side-column layout (several ms of Control minimum-size
+## queries) is redone at once when the view size, the interface scale or a panel's visibility changes, and
+## otherwise at most every FREE_RECT_REFRESH_MS (panel contents grow or shrink slowly: text updates).
+const FREE_RECT_REFRESH_MS: int = 200
+var _free_cache: Rect2
+var _free_key: Array = []
+var _free_time: int = -1000000
+
+
+func free_rect_cached(view: Vector2) -> Rect2:
+	var key: Array = [view, get_window().content_scale_factor, _ring_panel.visible, _info_panel.size,
+		_bottom_panel.global_position.y]
+	for sp: Control in side_panels:
+		key.append(is_instance_valid(sp) and sp.visible)
+	var now: int = Time.get_ticks_msec()
+	if key != _free_key or now - _free_time >= FREE_RECT_REFRESH_MS:
+		_free_key = key
+		_free_time = now
+		_free_cache = free_rect(view)
+	return _free_cache
+
+
 func free_rect(view: Vector2) -> Rect2:
 	var left: float = _info_panel.position.x + _info_panel.size.x + 12.0
 	var top: float = 14.0

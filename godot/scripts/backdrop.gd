@@ -76,6 +76,12 @@ func set_season(day_of_year: int) -> void:
 
 
 func _process(_delta: float) -> void:
+	var t0: int = Time.get_ticks_usec()
+	_follow_horizon()
+	Prof.add("gd.backdrop", t0)
+
+
+func _follow_horizon() -> void:
 	# Follow the camera so the sky/ground split sits on the true world horizon.
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null:

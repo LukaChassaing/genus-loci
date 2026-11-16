@@ -369,6 +369,12 @@ func snap(sim: TreeSim) -> void:
 
 
 func rebuild_geometry(sim: TreeSim) -> void:
+	var t0: int = Time.get_ticks_usec()
+	_rebuild_geometry(sim)
+	Prof.add("gd.flux_geometry", t0)
+
+
+func _rebuild_geometry(sim: TreeSim) -> void:
 	geometry_dirty = false
 	_geo_age = 0.0
 	var g: Array = sim.build_flux_geometry()

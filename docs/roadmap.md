@@ -194,13 +194,13 @@ Ensuite : **M1, physique du milieu**, en commençant par la mécanique statique 
 - Relecture externe : proposer la suite de validation à un forestier ou un écophysiologiste avant 1.0 (INRAE, ONF, universités ; le code ouvert facilite la relecture).
 
 ### 5.2 Budget de performance (machine cible)
-| Mesure | Budget |
-|---|---|
-| Accéléré 10 ans/s, chêne 150 ans | ≥ 30 FPS |
-| Vue libre, saison figée | ≥ 60 FPS |
-| Croissance 200 ans sans rendu (`performance_200_years`) | ≤ 2 s |
-| Rejeu au chargement | ≤ 3 s par siècle |
-| Parcelle de 5 arbres (M5) | ≥ 30 FPS |
+| Mesure | Budget | Mesuré (2026-11-16, machine cible, 1600×900, MSAA 4×) |
+|---|---|---|
+| Accéléré 10 ans/s, chêne 150 ans | ≥ 30 FPS | 60 FPS en vsync (132 sans), 10 ans/s tenus, p99 ≈ 42 ms (avant : 12 à 16 FPS, 7,6 à 9,2 ans/s). Chêne à 1 an/s et merisier 100 ans à 10 ans/s : 60 FPS (214 et 221 sans vsync) |
+| Vue libre, saison figée | ≥ 60 FPS | 60 FPS en vsync (166 sans), chêne 200 ans ; script 2,3 ms par image (avant 7,8), GPU 5,6 ms (inchangé) |
+| Croissance 200 ans sans rendu (`performance_200_years`) | ≤ 2 s | 1,91 s |
+| Rejeu au chargement | ≤ 3 s par siècle | 0,7 s (chêne de 100 ans) |
+| Parcelle de 5 arbres (M5) | ≥ 30 FPS | — |
 Les tests `#[ignore]` deviennent des tests de CI en release ; une régression de plus de 20 % bloque la fusion.
 
 ### 5.3 Direction artistique

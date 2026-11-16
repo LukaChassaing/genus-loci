@@ -278,11 +278,35 @@ uniform float summer_gain = 1.12;
 uniform float autumn_gamma = 1.5;
 uniform float autumn_gain = 1.45;
 uniform float mip_alpha_boost = 0.22;
+// Fast time-lapse (main.gd _update_foliage_season): the mesh is a summer crown and the season is drawn here,
+// every frame: a share of the cards (whole cards, by a hash of the card index) folds away, the colour is
+// tinted from the summer green to today's leaf colour. tl_on = 0: the mesh is drawn exactly as built.
+uniform float tl_on = 0.0;
+uniform float tl_keep = 1.0;
+uniform vec3 tl_tint = vec3(1.0);
+uniform float tl_sen = 0.0;
+void vertex() {
+	if (tl_on > 0.5) {
+		uint h = uint(VERTEX_ID) / 4u;  // 4 vertices per card (mesh.rs build_leaves)
+		h ^= h >> 16u;
+		h *= 0x7feb352du;
+		h ^= h >> 15u;
+		h *= 0x846ca68bu;
+		h ^= h >> 16u;
+		if (float(h & 0xFFFFu) / 65535.0 >= tl_keep) {
+			VERTEX = vec3(0.0);  // zero-area card: not drawn, casts no shadow
+		}
+	}
+}
 void fragment() {
 	vec2 tsize = vec2(textureSize(leaf_tex, 0));
 	vec4 t = texture(leaf_tex, UV);
 	float sen = smoothstep(0.0, 0.5, COLOR.a);
 	vec3 c = COLOR.rgb;
+	if (tl_on > 0.5) {
+		sen = tl_sen;
+		c *= tl_tint;
+	}
 	c = mix(c * summer_gain, pow(c, vec3(autumn_gamma)) * autumn_gain, sen);
 	ALBEDO = t.rgb * c;
 	BACKLIGHT = mix(summer_backlight, c * autumn_backlight, sen);

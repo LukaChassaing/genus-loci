@@ -154,6 +154,12 @@ static func num(v: float) -> String:
 
 
 func _process(delta: float) -> void:
+	var t0: int = Time.get_ticks_usec()
+	_process_panel(delta)
+	Prof.add("gd.flux_panel", t0)
+
+
+func _process_panel(delta: float) -> void:
 	_age += delta
 	if _age < 0.25 or not visible:
 		return

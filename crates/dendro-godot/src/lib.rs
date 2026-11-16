@@ -4,8 +4,11 @@ mod backend;
 mod prune_api;
 /// Save / load (« Sauvegarder », « Charger ») functions of `TreeSim`.
 mod save_api;
+/// Godot surfaces encoded in Rust; mesh worker thread.
+mod surface;
 
-use backend::{mesh_data_to_array_mesh, Backend};
+use backend::{mesh_data_to_array_mesh_godot, mesh_data_to_array_mesh_named, prof, Backend};
+use surface::MeshWorker;
 use godot::classes::ArrayMesh;
 use godot::prelude::*;
 
@@ -18,13 +21,17 @@ unsafe impl ExtensionLibrary for DendroExtension {}
 #[class(base=RefCounted)]
 pub struct TreeSim {
     backend: Backend,
+    /// Background mesh builds (`mesh_request` / `mesh_poll` / `mesh_take`).
+    meshes: MeshWorker,
     base: Base<RefCounted>,
 }
 
 #[godot_api]
 impl IRefCounted for TreeSim {
     fn init(base: Base<RefCounted>) -> Self {
-        Self { backend: Backend::new(1), base }
+        static INDEX_THRESHOLD: std::sync::Once = std::sync::Once::new();
+        INDEX_THRESHOLD.call_once(surface::init_index_threshold);
+        Self { backend: Backend::new(1), meshes: MeshWorker::default(), base }
     }
 }
 
@@ -33,6 +40,7 @@ impl TreeSim {
     #[func]
     fn reset(&mut self, seed: i64) {
         self.backend.reset(seed as u64);
+        self.meshes.invalidate();
     }
     /// Soil preset used from the next `reset` on.
     #[func]
@@ -92,11 +100,11 @@ impl TreeSim {
     }
     #[func]
     fn build_fine_root_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.build_fine_root_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("fine_root.build", || self.backend.build_fine_root_mesh()), "fine_root")
     }
     #[func]
     fn advance_days(&mut self, days: f64) -> bool {
-        self.backend.advance_days(days)
+        prof::time("sim", || self.backend.advance_days(days))
     }
     #[func]
     fn set_drought(&mut self, active: bool) {
@@ -149,20 +157,20 @@ impl TreeSim {
     }
     #[func]
     fn build_wood_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.build_wood_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("wood.build", || self.backend.build_wood_mesh()), "wood")
     }
     #[func]
     fn build_leaf_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.build_leaf_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("leaf.build", || self.backend.build_leaf_mesh()), "leaf")
     }
     #[func]
     fn build_root_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.build_root_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("root.build", || self.backend.build_root_mesh()), "root")
     }
     /// Flower and fruit cards (alpha 1.0 = flower, 0.5 = fruit); empty when nothing shows.
     #[func]
     fn build_flower_mesh(&self) -> Gd<ArrayMesh> {
-        mesh_data_to_array_mesh(&self.backend.build_flower_mesh())
+        mesh_data_to_array_mesh_named(&prof::time("flower.build", || self.backend.build_flower_mesh()), "flower")
     }
     #[func]
     fn get_flower_version(&self) -> i64 {
@@ -311,11 +319,11 @@ impl TreeSim {
     #[func]
     fn build_flux_geometry(&self) -> VarArray {
         use dendro_core::{FluxGeometry, GasSiteKind};
-        let g = self.backend.flux_geometry();
+        let g = prof::time("flux.build", || self.backend.flux_geometry());
         let mut a = VarArray::new();
-        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.shoot_paths, 0.0)).to_variant());
-        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.root_paths, 0.5)).to_variant());
-        a.push(&mesh_data_to_array_mesh(&FluxGeometry::ribbon_mesh(&g.hyphae, 1.0)).to_variant());
+        a.push(&mesh_data_to_array_mesh_named(&FluxGeometry::ribbon_mesh(&g.shoot_paths, 0.0), "flux").to_variant());
+        a.push(&mesh_data_to_array_mesh_named(&FluxGeometry::ribbon_mesh(&g.root_paths, 0.5), "flux").to_variant());
+        a.push(&mesh_data_to_array_mesh_named(&FluxGeometry::ribbon_mesh(&g.hyphae, 1.0), "flux").to_variant());
         let pos: PackedVector3Array = g.gas_sites.iter().map(|s| Vector3::new(s.pos[0], s.pos[1], s.pos[2])).collect();
         let info: PackedFloat32Array = g
             .gas_sites
@@ -332,5 +340,134 @@ impl TreeSim {
         a.push(&pos.to_variant());
         a.push(&info.to_variant());
         a
+    }
+    /// Profiler of the binding (bench, `DENDRO_PROFILE=1`): `{key: Vector3(total ms, calls, longest call ms)}` accumulated
+    /// since the last call (sim stepping, `<mesh>.build` / `.convert` / `.upload`, `flux.build`).
+    #[func]
+    fn prof_take(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        for (k, ms, n, max) in prof::take() {
+            d.set(&k.to_variant(), &Vector3::new(ms as f32, n as f32, max as f32).to_variant());
+        }
+        d
+    }
+
+    /// Starts building the meshes of `kinds` (bit mask: 1 wood, 2 leaves, 4 roots + fine roots, 8 flowers)
+    /// on the worker thread, from a copy of the tree as it is now. Returns false (nothing started) while a
+    /// build is running or its result has not been taken yet.
+    #[func]
+    fn mesh_request(&mut self, kinds: i64) -> bool {
+        let b = &self.backend;
+        let versions = [b.wood_version(), b.leaf_version(), b.root_version(), b.flower_version()];
+        let sim = self.backend.live();
+        prof::time("async.request", || self.meshes.request(sim, kinds as u32, versions))
+    }
+
+    /// Mask of the kinds of a finished build waiting to be taken (0 = none yet).
+    #[func]
+    fn mesh_poll(&mut self) -> i64 {
+        self.meshes.poll() as i64
+    }
+
+    /// True while a build runs on the worker thread.
+    #[func]
+    fn mesh_busy(&self) -> bool {
+        self.meshes.busy()
+    }
+
+    /// The kinds of `mask` from the finished build (the others stay waiting, see `mesh_poll`): `[kinds mask,
+    /// versions (PackedInt64Array: wood, leaf, root, flower, of the snapshot), wood, leaf, roots, fine roots,
+    /// flowers]`, the meshes as `ArrayMesh` (null for kinds not taken). Empty when none.
+    #[func]
+    fn mesh_take(&mut self, mask: i64) -> VarArray {
+        let mut a = VarArray::new();
+        let Some(b) = self.meshes.take(mask as u32) else { return a };
+        if b.millis > 0.0 {
+            prof::add_ms("async.worker", b.millis);
+        }
+        a.push(&(b.kinds as i64).to_variant());
+        a.push(&PackedInt64Array::from(&b.versions[..]).to_variant());
+        let t0 = std::time::Instant::now();
+        let built = |k: usize| b.kinds & (1 << k) != 0;
+        let kind_of_slot = [surface::WOOD, surface::LEAF, surface::ROOT, surface::ROOT, surface::FLOWER];
+        let slot_surface = [surface::WOOD, surface::LEAF, surface::ROOT, surface::KINDS, surface::FLOWER];
+        const KEYS: [&str; 5] = ["install.wood", "install.leaf", "install.root", "install.fine_root", "install.flower"];
+        for (slot, &k) in kind_of_slot.iter().enumerate() {
+            if built(k) {
+                let m = prof::time(KEYS[slot], || surface::to_array_mesh(b.surfaces[slot_surface[slot]].as_ref()));
+                a.push(&m.to_variant());
+            } else {
+                a.push(&Variant::nil());
+            }
+        }
+        prof::add("async.install", t0);
+        a
+    }
+
+    /// Drops the build in flight and any build waiting (call when the shown tree is replaced).
+    #[func]
+    fn mesh_invalidate(&mut self) {
+        self.meshes.invalidate();
+    }
+
+    /// Self-test: encodes the current wood, leaf, root, fine-root and flower meshes and the flux ribbons
+    /// both in Rust and through Godot's `add_surface_from_arrays`, and compares the stored surfaces
+    /// (format, vertex / attribute / index bytes, counts, AABB). Returns "" when identical, else what
+    /// differs; "skipped" when the rendering server keeps no surface data (headless).
+    #[func]
+    fn debug_compare_surfaces(&self) -> GString {
+        use godot::classes::RenderingServer;
+        let live = self.backend.live();
+        let g = live.flux_geometry(dendro_core::FluxBudget::default());
+        let meshes = [
+            ("wood", live.wood_mesh()),
+            ("leaf", live.leaf_mesh()),
+            ("root", live.root_mesh()),
+            ("fine_root", live.fine_root_mesh()),
+            ("flower", live.flower_mesh()),
+            ("wound", live.wound_mesh()),
+            ("flux", dendro_core::FluxGeometry::ribbon_mesh(&g.root_paths, 0.5)),
+            // Layouts without normals (no normal / tangent block), without UVs, without colours.
+            ("bare", dendro_core::MeshData {
+                positions: vec![[0.0, 0.0, 0.0], [1.0, 0.5, -2.0], [0.25, 3.0, 1.0]],
+                colors: vec![[1.0, 0.6, 0.2, 0.5]; 3],
+                indices: vec![0, 1, 2],
+                ..Default::default()
+            }),
+            ("normals_only", dendro_core::MeshData {
+                positions: vec![[0.0, 0.0, 0.0], [1.0, 0.5, -2.0], [0.25, 3.0, 1.0]],
+                normals: vec![[0.0, 0.0, -1.0], [-0.6, -0.8, 0.0], [0.0, -1.0, 0.0]],
+                indices: vec![0, 2, 1],
+                ..Default::default()
+            }),
+        ];
+        let mut rs = RenderingServer::singleton();
+        let mut report = Vec::new();
+        let mut compared = 0;
+        for (name, m) in meshes.iter() {
+            if m.is_empty() {
+                continue;
+            }
+            let ours = surface::to_array_mesh(Some(&surface::encode(m)));
+            let godot = mesh_data_to_array_mesh_godot(m);
+            let a = rs.mesh_get_surface(ours.get_rid(), 0);
+            let b = rs.mesh_get_surface(godot.get_rid(), 0);
+            if b.is_empty() || b.get("vertex_data").is_none() {
+                continue;
+            }
+            compared += 1;
+            for key in ["format", "primitive", "vertex_count", "index_count", "vertex_data", "attribute_data", "index_data"] {
+                if a.get(key) != b.get(key) {
+                    report.push(format!("{name}.{key}"));
+                }
+            }
+            if ours.get_aabb() != godot.get_aabb() {
+                report.push(format!("{name}.aabb {:?} vs {:?}", ours.get_aabb(), godot.get_aabb()));
+            }
+        }
+        if compared == 0 {
+            return GString::from("skipped");
+        }
+        GString::from(report.join(", ").as_str())
     }
 }

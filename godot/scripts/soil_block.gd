@@ -763,6 +763,7 @@ func _build_meshes() -> void:
 	var t0: int = Time.get_ticks_usec()
 	_build_meshes_now()
 	build_ms += float(Time.get_ticks_usec() - t0) / 1000.0
+	Prof.add("gd.soil_build", t0)
 
 
 func _build_meshes_now() -> void:

@@ -57,6 +57,7 @@ impl TreeSim {
     /// current tree is kept on error).
     #[func]
     fn begin_load(&mut self, path: GString) -> GString {
+        self.meshes.invalidate();
         match self.backend.begin_load(Path::new(&path.to_string())) {
             Ok(()) => GString::new(),
             Err(e) => GString::from(e.to_string().as_str()),
@@ -66,7 +67,12 @@ impl TreeSim {
     /// Progress 0..1 of the load in progress; the loaded tree is adopted when it returns 1.
     #[func]
     fn load_poll(&mut self) -> f64 {
-        self.backend.load_poll()
+        let was_loading = self.backend.is_loading();
+        let p = self.backend.load_poll();
+        if was_loading && p >= 1.0 {
+            self.meshes.invalidate(); // the replayed tree replaces the seedling
+        }
+        p
     }
 
     #[func]

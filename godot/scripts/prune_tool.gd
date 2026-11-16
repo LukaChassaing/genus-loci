@@ -560,6 +560,12 @@ func _show_toast(t: String) -> void:
 # ------------------------------------------------------------------------------------------- per frame
 
 func _process(delta: float) -> void:
+	var t0: int = Time.get_ticks_usec()
+	_process_tool(delta)
+	Prof.add("gd.prune_tool", t0)
+
+
+func _process_tool(delta: float) -> void:
 	# Wounds follow the wood mesh: rebuilt in the frame the host rebuilt the wood (not on every version bump).
 	var wv: int = int(host.get("_wood_ver"))
 	if wv != _wound_ver and wv >= 0:

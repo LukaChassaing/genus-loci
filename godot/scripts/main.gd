@@ -36,6 +36,8 @@ var flux: RootFlux               # root material + water / nutrient flux (dashes
 var _last_water_q: int = -1
 # Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
 var _stats_dirty: bool = true
+const STATS_INTERVAL: float = 0.1  # while playing, the stats (crown and root walks in the core) at most 10 times a second
+var _stats_age: float = 0.0
 var tree_h: float = 0.0
 var tree_crown_r: float = 0.0
 var tree_root_depth: float = 0.0
@@ -49,6 +51,18 @@ var _flower_ver: int = -1
 var _bark_fissures: float = 0.85
 var _root_ver: int = -1
 var _rr: int = 0
+# Fast time-lapse foliage: above TL_SPEED_DPS the leaf mesh is only rebuilt from a summer snapshot (a full
+# crown that grows) and the season is drawn per frame by the leaf shader (_update_foliage_season): at
+# several years per second a rebuilt-per-phase crown would strobe between bare and leafy.
+const TL_SPEED_DPS: float = 1.5 * 365.0
+const TL_SMOOTH_S: float = 0.1  # the seasonal look is low-passed: at 10 years/s it settles on the yearly mean
+var _req_tl: bool = false       # the background build in flight was asked for in time-lapse mode
+var _req_tl_base: Color = Color.WHITE
+var _leaf_tl: bool = false      # the leaf mesh shown is such a summer crown (shader season on)
+var _tl_base: Color = Color.WHITE  # leaf colour of that summer snapshot
+var _tl_keep: float = 1.0       # low-passed leaf density (share of cards shown)
+var _tl_col_w: Color = Color.WHITE  # low-passed leaf colour x density (/ _tl_keep: the leaf-area mean colour)
+var _tl_sen_w: float = 0.0      # low-passed autumn styling x density
 var proc_ms_sum: float = 0.0   # own _process() cost (sim + rebuild + HUD), for the bench
 var proc_ms_max: float = 0.0
 var rebuild_counts: Array[int] = [0, 0, 0, 0]  # wood, leaf, root, flower (stats / self-test)
@@ -374,12 +388,15 @@ func _build_leaf_fall() -> void:
 ## ONE mesh is rebuilt per call (round-robin, so none starves) and the four rebuilds land on different
 ## frames instead of one big hitch.
 func _rebuild_meshes(force: bool = false) -> void:
+	if force:
+		sim.mesh_invalidate()  # a background build of an older state must not land over this one
 	var vers: Array[int] = [sim.get_wood_version(), sim.get_leaf_version(), sim.get_root_version(), sim.get_flower_version()]
 	var have: Array[int] = [_wood_ver, _leaf_ver, _root_ver, _flower_ver]
 	for step: int in 4:
 		var k: int = (_rr + step) % 4
 		if not force and vers[k] == have[k]:
 			continue
+		var t0: int = Time.get_ticks_usec()
 		match k:
 			0:
 				wood_mi.mesh = sim.build_wood_mesh()
@@ -388,6 +405,7 @@ func _rebuild_meshes(force: bool = false) -> void:
 			1:
 				leaf_mi.mesh = sim.build_leaf_mesh()
 				_leaf_ver = vers[1]
+				_leaf_tl = false
 			2:
 				root_mi.mesh = sim.build_root_mesh()
 				fine_root_mi.mesh = sim.build_fine_root_mesh()
@@ -398,6 +416,7 @@ func _rebuild_meshes(force: bool = false) -> void:
 			_:
 				flower_mi.mesh = sim.build_flower_mesh()
 				_flower_ver = vers[3]
+		Prof.add(["gd.mesh.wood", "gd.mesh.leaf", "gd.mesh.roots", "gd.mesh.flower"][k], t0)
 		rebuild_counts[k] += 1
 		if not force:
 			_rr = (k + 1) % 4
@@ -406,9 +425,110 @@ func _rebuild_meshes(force: bool = false) -> void:
 	since_rebuild = 0.0
 
 
-func _versions_changed() -> bool:
-	return sim.get_wood_version() != _wood_ver or sim.get_leaf_version() != _leaf_ver \
-		or sim.get_root_version() != _root_ver
+## Keeps the meshes in step with the simulation without stalling the frame: the stale ones are built on
+## the binding's worker thread from a snapshot of the tree (TreeSim.mesh_request) and swapped in together
+## when ready (at most one build in flight, at most one swap per REBUILD_INTERVAL). The leaves, the biggest
+## upload, go in the frame after the rest so no single frame pays for everything.
+func _update_meshes_async() -> void:
+	var ready: int = sim.mesh_poll()
+	if ready != 0:
+		var first: int = ready & ~2
+		_install_meshes(sim.mesh_take(first if first != 0 else ready))
+		return
+	var tl: bool = _timelapse()
+	if _leaf_tl and not tl:
+		_leaf_ver = -1  # slowed down or paused: the true leaf mesh of today again (the shader season holds till then)
+	if since_rebuild < REBUILD_INTERVAL or sim.mesh_busy():
+		return
+	if tl and sim.get_phase() != 3:
+		return  # time-lapse: snapshots in full summer leaf only (phase 3, mature)
+	var mask: int = _stale_mask()
+	if mask != 0 and sim.mesh_request(mask):
+		since_rebuild = 0.0
+		_req_tl = tl
+		_req_tl_base = sim.get_leaf_color()
+
+
+func _timelapse() -> bool:
+	return playing and speed_dps >= TL_SPEED_DPS
+
+
+## Per-frame foliage season of a time-lapse summer crown (leaf shader uniforms, see make_leaf_material):
+## share of cards shown = leaf density, tint = today's leaf colour / the snapshot's summer colour, autumn
+## styling from the phase; low-passed over TL_SMOOTH_S, colour and styling weighted by the leaf density (what
+## the eye averages: a bare winter adds no colour, an oak's dead winter leaves add their brown).
+func _update_foliage_season(delta: float) -> void:
+	leaf_mat.set_shader_parameter("tl_on", 1.0 if _leaf_tl else 0.0)
+	if not _leaf_tl:
+		return
+	var k: float = 1.0 - exp(-delta / TL_SMOOTH_S)
+	var dens: float = clampf(sim.get_leaf_density(), 0.0, 1.0)
+	_tl_keep = lerpf(_tl_keep, dens, k)
+	_tl_col_w = _tl_col_w.lerp(sim.get_leaf_color() * dens, k)
+	_tl_sen_w = lerpf(_tl_sen_w, _autumn_look() * dens, k)
+	var w: float = maxf(_tl_keep, 0.001)
+	var c: Color = _tl_col_w / w
+	var b: Color = _tl_base
+	leaf_mat.set_shader_parameter("tl_keep", _tl_keep)
+	leaf_mat.set_shader_parameter("tl_tint", Vector3(c.r / maxf(b.r, 0.02), c.g / maxf(b.g, 0.02),
+		c.b / maxf(b.b, 0.02)).clamp(Vector3.ZERO, Vector3(8.0, 8.0, 8.0)))
+	leaf_mat.set_shader_parameter("tl_sen", clampf(_tl_sen_w / w, 0.0, 1.0))
+
+
+## 1 when the leaves on the tree are autumn or dead winter leaves (colouring, leaf fall, dormancy), else 0.
+func _autumn_look() -> float:
+	var phase: int = sim.get_phase()
+	return 1.0 if phase == 4 or phase == 5 or phase == 0 else 0.0
+
+
+## Bit mask of the meshes whose version moved on (1 wood, 2 leaves, 4 roots, 8 flowers).
+func _stale_mask() -> int:
+	var m: int = 0
+	if sim.get_wood_version() != _wood_ver:
+		m |= 1
+	if sim.get_leaf_version() != _leaf_ver:
+		m |= 2
+	if sim.get_root_version() != _root_ver:
+		m |= 4
+	if sim.get_flower_version() != _flower_ver:
+		m |= 8
+	return m
+
+
+## Swaps in a finished background build (TreeSim.mesh_take: [kinds, versions, wood, leaf, roots, fine roots, flowers]).
+func _install_meshes(r: Array) -> void:
+	if r.is_empty():
+		return
+	var kinds: int = r[0]
+	var vers: PackedInt64Array = r[1]
+	if kinds & 1:
+		wood_mi.mesh = r[2]
+		_wood_ver = vers[0]
+		flux.mark_geometry_dirty()
+		rebuild_counts[0] += 1
+	if kinds & 2:
+		leaf_mi.mesh = r[3]
+		_leaf_ver = vers[1]
+		if _req_tl and not _leaf_tl:
+			_tl_keep = clampf(sim.get_leaf_density(), 0.0, 1.0)  # start the smoothed season from today
+			_tl_col_w = sim.get_leaf_color() * _tl_keep
+			_tl_sen_w = _autumn_look() * _tl_keep
+		_leaf_tl = _req_tl
+		_tl_base = _req_tl_base
+		rebuild_counts[1] += 1
+	if kinds & 4:
+		root_mi.mesh = r[4]
+		fine_root_mi.mesh = r[5]
+		_root_ver = vers[2]
+		_envelope_pending = true
+		flux.set_fine_roots(fine_root_mi.mesh)
+		flux.mark_geometry_dirty()
+		rebuild_counts[2] += 1
+	if kinds & 8:
+		flower_mi.mesh = r[6]
+		_flower_ver = vers[3]
+		rebuild_counts[3] += 1
+	mesh_dirty = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -444,22 +564,41 @@ func _process(delta: float) -> void:
 	var t_proc: int = Time.get_ticks_usec()
 	frame_count += 1
 	since_rebuild += delta
+	var t: int = t_proc
 	if playing:
 		accumulator = minf(accumulator + delta * speed_dps, speed_dps * MAX_BACKLOG_SECONDS)
 		_simulate()
-	if since_rebuild >= REBUILD_INTERVAL / 3.0 and _versions_changed():
-		_rebuild_meshes()
-	_refresh_tree_stats()
+	Prof.add("gd.simulate", t)
+	t = Time.get_ticks_usec()
+	_update_meshes_async()
+	Prof.add("gd.rebuild_meshes", t)
+	t = Time.get_ticks_usec()
+	_stats_age += delta
+	if _stats_age >= STATS_INTERVAL or not playing:
+		_refresh_tree_stats()
 	_envelope_age += delta
 	if _envelope_pending and _envelope_age >= 0.25:
 		_update_soil_envelope()
+	Prof.add("gd.stats_envelope", t)
+	t = Time.get_ticks_usec()
 	soil.fit(delta)
+	Prof.add("gd.soil_fit", t)
+	t = Time.get_ticks_usec()
 	_update_view_state(delta)
+	Prof.add("gd.view_state", t)
+	t = Time.get_ticks_usec()
 	_frame_camera(delta)
+	Prof.add("gd.frame_camera", t)
+	t = Time.get_ticks_usec()
 	flux.update(sim, delta, playing, cam.distance)
+	Prof.add("gd.flux_update", t)
+	t = Time.get_ticks_usec()
 	hud.update_from(sim)
+	Prof.add("gd.hud_update", t)
+	t = Time.get_ticks_usec()
 	guides.update_from(tree_h)
 	hud.set_legend_visible(soil.xray or cam.root_view)
+	Prof.add("gd.guides", t)
 	var pm: float = float(Time.get_ticks_usec() - t_proc) / 1000.0
 	proc_ms_sum += pm
 	proc_ms_max = maxf(proc_ms_max, pm)
@@ -469,15 +608,18 @@ func _refresh_tree_stats() -> void:
 	if not _stats_dirty:
 		return
 	_stats_dirty = false
+	_stats_age = 0.0
 	tree_h = sim.get_height_m()
 	tree_crown_r = sim.get_crown_radius_m()
 	tree_root_depth = sim.get_root_depth_m()
 	_root_spread = sim.get_root_spread_m()
 
 
-func _frame_camera(_delta: float) -> void:
+func _frame_camera(delta: float) -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
-	cam.set_free_rect(hud.free_rect(view), view)
+	var t0: int = Time.get_ticks_usec()
+	cam.set_free_rect(hud.free_rect(view) if delta == 0.0 else hud.free_rect_cached(view), view)
+	Prof.add("gd.cam.free_rect", t0)
 	# The framed tree is the larger of: the live tree, the ghost control tree (when shown), and a floor of a
 	# quarter of the tallest the live tree has been or half its root spread (a coppiced or dead tree must not zoom in on empty space).
 	_peak_h = maxf(_peak_h, tree_h)
@@ -486,7 +628,9 @@ func _frame_camera(_delta: float) -> void:
 	if prune_tool != null and prune_tool.ghost_on:
 		fh = maxf(fh, prune_tool.ghost_extent.y)
 		fc = maxf(fc, prune_tool.ghost_extent.x)
+	t0 = Time.get_ticks_usec()
 	cam.fit_to(fh, fc, soil.radius, soil.depth, soil.wedge_width, soil.keel_depth)
+	Prof.add("gd.cam.fit_to", t0)
 
 
 ## Snaps plug, season look and camera to the current tree (start-up, screenshots, tests).
@@ -565,6 +709,7 @@ func _update_view_state(delta: float) -> void:
 	leaf_fall.lifetime = clampf(0.72 * h / 1.0, 3.0, 25.0)
 	(leaf_fall.process_material as ParticleProcessMaterial).emission_box_extents = Vector3(crown_r * 0.85, 0.15 * h + 0.2, crown_r * 0.85)
 	leaf_fall_mat.albedo_color = sim.get_leaf_color()
+	_update_foliage_season(delta)
 
 
 ## Ground litter 0..1 over the year: builds up during leaf fall (Oct-Nov), fades through winter, almost
@@ -637,7 +782,10 @@ func _simulate() -> void:
 #   DENDRO_RINGZOOM=6     ring-view zoom factor in the shot
 #   DENDRO_SIZE=1920x1080 window size
 #   DENDRO_MSAA=0|2|4, DENDRO_FXAA=1   anti-aliasing overrides
-#   DENDRO_BENCH=8        run 8 s at 10 years/s and print frame-time stats (with DENDRO_SHOT: also shoot)
+#   DENDRO_BENCH=8        run 8 s at 10 years/s and print frame-time stats (with DENDRO_SHOT: also shoot);
+#                         time-lapse from DENDRO_YEARS (default: from seed) at DENDRO_SPEED years/s (default 10),
+#                         DENDRO_RINGS=0 closes the ring panel, DENDRO_FLUX=0|1, DENDRO_VSYNC=0 uncapped frame rate,
+#                         DENDRO_PROFILE=1 prints the per-frame cost of each section (Prof, TreeSim.prof_take)
 #   DENDRO_SELFTEST=1     scripted UI self-test, prints PASS/FAIL, exits non-zero on failure
 #   DENDRO_SAVE=/abs.ron, DENDRO_LOAD=/abs.ron   save / load-by-replay checks (see save_flow.gd)
 #   DENDRO_SCREEN=pause_save|pause_load|loading  save / load screens for DENDRO_SHOT
@@ -657,6 +805,8 @@ func _apply_window_overrides() -> void:
 		var p: PackedStringArray = sz.split("x")
 		if p.size() == 2:
 			get_window().size = Vector2i(int(p[0]), int(p[1]))
+	if OS.get_environment("DENDRO_VSYNC") == "0" and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)  # bench: frame rate not capped
 	var uis: String = OS.get_environment("DENDRO_UISCALE")  # screenshot hook: interface scale (see Game.UI_SCALES)
 	if uis != "" and DisplayServer.get_name() != "headless":
 		get_window().content_scale_factor = float(uis)
@@ -841,8 +991,18 @@ func _run_bench(seconds: float, shot: String) -> void:
 		hud.set_playing(false)
 		_settle_view()
 	else:
-		hud.speed_slider.value = 1.0
+		# Time-lapse from DENDRO_YEARS (default: from seed) at DENDRO_SPEED years/s (default 10, the maximum).
+		var fy: String = OS.get_environment("DENDRO_YEARS")
+		if fy != "":
+			_advance_days_direct(float(fy) * 365.0 + 100.0)
+			_rebuild_meshes(true)
+			_settle_view()
+		_apply_view_env()
+		var sp: String = OS.get_environment("DENDRO_SPEED")
+		var dps: float = (float(sp) if sp != "" else 10.0) * 365.0
+		hud.speed_slider.value = log(dps) / log(Hud.MAX_SPEED_DAYS)
 		hud.set_playing(true)
+	hud.set_rings_visible(OS.get_environment("DENDRO_RINGS") != "0")
 	var vp_rid: RID = get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(vp_rid, true)
 	for i: int in 30:
@@ -851,6 +1011,7 @@ func _run_bench(seconds: float, shot: String) -> void:
 	var last: int = t_start
 	var n: int = 0
 	var worst: float = 0.0
+	var frame_ms: PackedFloat32Array = PackedFloat32Array()
 	var proc_sum: float = 0.0
 	var gpu_sum: float = 0.0
 	var cpu_sum: float = 0.0
@@ -860,6 +1021,9 @@ func _run_bench(seconds: float, shot: String) -> void:
 	var soil_builds0: int = soil.rebuild_count
 	proc_ms_sum = 0.0
 	proc_ms_max = 0.0
+	var age_start: float = sim.get_age_years()
+	Prof.take()
+	sim.prof_take()
 	while float(Time.get_ticks_usec() - t_start) / 1.0e6 < seconds:
 		await get_tree().process_frame
 		if static_bench:
@@ -868,6 +1032,7 @@ func _run_bench(seconds: float, shot: String) -> void:
 		var ft: float = float(now - last) / 1000.0
 		last = now
 		worst = maxf(worst, ft)
+		frame_ms.append(ft)
 		proc_sum += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		gpu_sum += RenderingServer.viewport_get_measured_render_time_gpu(vp_rid)
 		cpu_sum += RenderingServer.viewport_get_measured_render_time_cpu(vp_rid)
@@ -880,11 +1045,39 @@ func _run_bench(seconds: float, shot: String) -> void:
 		rebuild_counts[0] - counts0[0], rebuild_counts[1] - counts0[1], rebuild_counts[2] - counts0[2], wall / 1000.0])
 	print("[dendro][bench] soil body: %d rebuilds, %.1f ms building, %.1f ms envelope processing (total over the run)" % [
 		soil.rebuild_count - soil_builds0, soil.build_ms, envelope_ms])
+	frame_ms.sort()
+	var over33: int = 0
+	var over50: int = 0
+	for f: float in frame_ms:
+		over33 += 1 if f > 33.4 else 0
+		over50 += 1 if f > 50.0 else 0
+	print("[dendro][bench] frame times: median %.1f ms, p95 %.1f ms, p99 %.1f ms, %d frames > 33 ms, %d > 50 ms" % [
+		frame_ms[frame_ms.size() / 2], frame_ms[int(frame_ms.size() * 0.95)], frame_ms[int(frame_ms.size() * 0.99)], over33, over50])
+	print("[dendro][bench] simulated %.2f years in %.1f s = %.2f years/s (asked %.2f), flux=%s rings=%s" % [
+		sim.get_age_years() - age_start, wall / 1000.0, (sim.get_age_years() - age_start) / (wall / 1000.0), speed_dps / 365.0,
+		str(flux.enabled), str(hud.is_rings_visible())])
+	if Prof.on:
+		_print_profile(n, proc_ms_sum / n, cpu_sum / n, gpu_sum / n, wall / n)
 	if shot != "" and DisplayServer.get_name() != "headless":
 		var img: Image = get_viewport().get_texture().get_image()
 		DirAccess.make_dir_recursive_absolute(shot.get_base_dir())
 		img.save_png(shot)
 	get_tree().quit()
+
+
+## Per-frame cost breakdown of the bench run (DENDRO_PROFILE=1): GDScript sections (Prof) and the binding's
+## own timers (TreeSim.prof_take: simulation, mesh build / conversion / surface upload per mesh).
+func _print_profile(n: int, process_ms: float, render_cpu: float, render_gpu: float, frame_ms: float) -> void:
+	print("[dendro][prof] per frame (%d frames): frame %.2f ms; main.gd _process %.2f ms, render cpu %.2f ms, gpu %.2f ms" % [
+		n, frame_ms, process_ms, render_cpu, render_gpu])
+	# GDScript sections (gd.mesh.* are inside gd.rebuild_meshes), then the binding (rs.<mesh>.build / .convert /
+	# .upload are inside the gd.mesh.* that asked for them; rs.sim is inside gd.simulate).
+	for d: Dictionary in [Prof.take(), sim.prof_take()]:
+		var keys: Array = d.keys()
+		keys.sort_custom(func(a: String, b: String) -> bool: return (d[a] as Vector3).x > (d[b] as Vector3).x)
+		for k: String in keys:
+			var v: Vector3 = d[k]
+			print("[dendro][prof]   %-22s %7.3f ms/frame  (%5d calls, %.2f ms/call, longest %.1f ms)" % [k, v.x / n, int(v.y), v.x / maxf(v.y, 1.0), v.z])
 
 
 # ------------------------------------ self-test --------------------------------------------
@@ -1060,6 +1253,49 @@ func _run_selftest() -> void:
 	_check("mesh rebuild skipped when versions unchanged", c0 == rebuild_counts, str(rebuild_counts))
 	_run_days_ui(1.0)
 	_check("versions reported", sim.get_wood_version() >= 0 and sim.get_leaf_version() >= 0 and sim.get_root_version() >= 0)
+	# Background builds (paused: _process requests the stale meshes, swaps them in when the worker is done).
+	hud.set_playing(false)
+	_run_days_ui(40.0)
+	var stale0: int = _stale_mask()
+	var waited: int = 0
+	while _stale_mask() != 0 and waited < 600:
+		await get_tree().process_frame
+		waited += 1
+	_check("async meshes: stale meshes rebuilt in the background, versions caught up", stale0 != 0 and _stale_mask() == 0
+		and wood_mi.mesh != null and wood_mi.mesh.get_surface_count() == 1, "mask %d, %d frames" % [stale0, waited])
+	_run_days_ui(40.0)
+	var started: bool = sim.mesh_request(_stale_mask())
+	var w0: Mesh = wood_mi.mesh
+	_apply_seed(seed_value)  # the tree is replaced while the build runs: its result must be dropped
+	for i: int in 30:
+		await get_tree().process_frame
+	_check("async meshes: a build of a replaced tree is discarded", started and not sim.mesh_busy() and sim.mesh_poll() == 0
+		and (wood_mi.mesh != w0 or _wood_ver == sim.get_wood_version()))
+	# Time-lapse with the mesh worker busy: the live tree equals one grown directly (threads read copies only).
+	hud.speed_slider.value = hud.speed_slider.max_value
+	hud.set_playing(true)
+	var saw_tl: bool = false
+	for i: int in 90:
+		await get_tree().process_frame
+		saw_tl = saw_tl or _leaf_tl
+	hud.set_playing(false)
+	_check("time-lapse: summer crown with the season drawn by the leaf shader", saw_tl)
+	waited = 0
+	while (_leaf_tl or _stale_mask() != 0) and waited < 600:
+		await get_tree().process_frame
+		waited += 1
+	_check("paused after time-lapse: the true leaf mesh of today is back, shader season off", not _leaf_tl
+		and (leaf_mat.get_shader_parameter("tl_on") as float) == 0.0 and _leaf_ver == sim.get_leaf_version(), "%d frames" % waited)
+	var ref: TreeSim = TreeSim.new()
+	ref.set_species(sim.get_species())
+	ref.set_soil(sim.get_soil())
+	ref.reset(seed_value)
+	ref.advance_days(float(sim.get_days_elapsed()))
+	_check("time-lapse with background mesh builds: same state hash as a direct run", sim.get_days_elapsed() > 365
+		and ref.get_state_hash() == sim.get_state_hash(), "%d days, %s vs %s" % [sim.get_days_elapsed(), sim.get_state_hash(), ref.get_state_hash()])
+	hud.speed_slider.value = 0.5
+	var cmp: String = sim.debug_compare_surfaces()
+	_check("Rust surface encoding identical to Godot's add_surface_from_arrays", cmp == "" or cmp == "skipped", cmp)
 
 	# 7. Framing at default angles: crown + plug inside the free area, tree fills >= 55 % of its height.
 	hud.rings_button.button_pressed = false  # default layout (the ring panel narrows the free area)
@@ -1245,6 +1481,8 @@ func _run_selftest() -> void:
 	flux.snap(sim)
 	var july: float = flux.level
 	_check("flux: strong in July", july > 0.3, "level %.2f, uptake %.2f mm/day" % [july, sim.get_water_uptake_mm()])
+	var cmp40: String = sim.debug_compare_surfaces()
+	_check("Rust surface encoding identical to Godot's (40-year oak in leaf)", cmp40 == "" or cmp40 == "skipped", cmp40)
 	var up: PackedFloat32Array = sim.get_uptake_profile()
 	_check("uptake profile: one triplet per soil layer", up.size() % 3 == 0 and up.size() >= 24)
 	_check("flux uniforms reach the root shader", is_equal_approx(root_mat.get_shader_parameter("flux_level") as float, july)

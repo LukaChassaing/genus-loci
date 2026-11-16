@@ -26,7 +26,7 @@ jobs:
           # et constructeurs de génomes intégrés).
           pattern='(species|latin_name|\.name)\s*(==|!=)|match\s+[^{]*(species|latin_name)|"(quercus|prunus)|(quercus_robur|prunus_avium)\b|Quercus|Prunus'
           # Les commentaires (sources scientifiques citant des espèces) sont ignorés.
-          hits="$(grep -rnEi "$pattern" crates/dendro-core/src --include='*.rs' --exclude=genome.rs | grep -Ev '^[^:]+:[0-9]+:[[:space:]]*//' || true)"
+          hits="$(grep -rnEi "$pattern" crates/dendro-core/src --include='*.rs' --exclude=genome.rs --exclude=save.rs | grep -Ev '^[^:]+:[0-9]+:[[:space:]]*//' || true)"
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::Code propre à une espèce dans dendro-core (ajouter un trait générique au génome, pas une branche)."

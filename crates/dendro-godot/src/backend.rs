@@ -17,9 +17,67 @@ mod prune;
 #[path = "save_load.rs"]
 pub(crate) mod save_load;
 
-/// Converts mesh data to an `ArrayMesh` (one surface, or none when the mesh is empty).
-/// Packed arrays are built in bulk.
+/// Frame-cost profiler of the binding (read by the bench, `DENDRO_PROFILE=1`): accumulated time and
+/// call count per key, taken and cleared by `TreeSim.prof_take()`. Costs one `Instant::now()` per
+/// timed call, so it is always on.
+pub(crate) mod prof {
+    use std::sync::Mutex;
+    use std::time::Instant;
+
+    /// (key, total ms, calls, longest call ms).
+    static ACC: Mutex<Vec<(&'static str, f64, u32, f64)>> = Mutex::new(Vec::new());
+
+    /// Adds the time elapsed since `t0` under `key` (milliseconds).
+    pub fn add(key: &'static str, t0: Instant) {
+        add_ms(key, t0.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    /// Adds `ms` milliseconds under `key` (time measured elsewhere, e.g. on the mesh worker).
+    pub fn add_ms(key: &'static str, ms: f64) {
+        let mut acc = ACC.lock().unwrap_or_else(|e| e.into_inner());
+        match acc.iter_mut().find(|e| e.0 == key) {
+            Some(e) => {
+                e.1 += ms;
+                e.2 += 1;
+                e.3 = e.3.max(ms);
+            }
+            None => acc.push((key, ms, 1, ms)),
+        }
+    }
+
+    /// Times `f` under `key`.
+    pub fn time<T>(key: &'static str, f: impl FnOnce() -> T) -> T {
+        let t0 = Instant::now();
+        let r = f();
+        add(key, t0);
+        r
+    }
+
+    /// Everything accumulated since the last call: (key, total ms, calls, longest call ms).
+    pub fn take() -> Vec<(&'static str, f64, u32, f64)> {
+        std::mem::take(&mut *ACC.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+}
+
+/// Converts mesh data to an `ArrayMesh` (one surface, or none when the mesh is empty), encoded in
+/// Rust in Godot's storage format (`surface.rs`).
 pub fn mesh_data_to_array_mesh(data: &MeshData) -> Gd<ArrayMesh> {
+    mesh_data_to_array_mesh_named(data, "other")
+}
+
+/// `mesh_data_to_array_mesh`, with the encoding and the surface creation (GPU upload) profiled under
+/// `<key>.convert` and `<key>.upload`.
+pub fn mesh_data_to_array_mesh_named(data: &MeshData, key: &'static str) -> Gd<ArrayMesh> {
+    if data.is_empty() {
+        return ArrayMesh::new_gd();
+    }
+    let raw = prof::time(prof_key(key, ".convert"), || crate::surface::encode(data));
+    prof::time(prof_key(key, ".upload"), || crate::surface::to_array_mesh(Some(&raw)))
+}
+
+/// The same mesh through Godot's own conversion (`add_surface_from_arrays`): the reference the Rust
+/// encoding is checked against (`TreeSim.debug_compare_surfaces`).
+pub fn mesh_data_to_array_mesh_godot(data: &MeshData) -> Gd<ArrayMesh> {
     let mut mesh = ArrayMesh::new_gd();
     if data.is_empty() {
         return mesh;
@@ -51,6 +109,22 @@ pub fn mesh_data_to_array_mesh(data: &MeshData) -> Gd<ArrayMesh> {
 
     mesh.add_surface_from_arrays(PrimitiveType::TRIANGLES, &arrays);
     mesh
+}
+
+/// Static `<key><suffix>` names for the profiler (no allocation per call).
+fn prof_key(key: &'static str, suffix: &'static str) -> &'static str {
+    let upload = suffix == ".upload";
+    match key {
+        "wood" => if upload { "wood.upload" } else { "wood.convert" },
+        "leaf" => if upload { "leaf.upload" } else { "leaf.convert" },
+        "root" => if upload { "root.upload" } else { "root.convert" },
+        "fine_root" => if upload { "fine_root.upload" } else { "fine_root.convert" },
+        "flower" => if upload { "flower.upload" } else { "flower.convert" },
+        "wound" => if upload { "wound.upload" } else { "wound.convert" },
+        "control" => if upload { "control.upload" } else { "control.convert" },
+        "flux" => if upload { "flux.upload" } else { "flux.convert" },
+        _ => if upload { "other.upload" } else { "other.convert" },
+    }
 }
 
 /// Wraps the simulation of one tree.

@@ -315,6 +315,12 @@ func zoom(factor: float) -> void:
 
 
 func _process(delta: float) -> void:
+	var t0: int = Time.get_ticks_usec()
+	_process_cam(delta)
+	Prof.add("gd.camera_process", t0)
+
+
+func _process_cam(delta: float) -> void:
 	var k: float = 1.0 - exp(-4.0 * delta)
 	var kr: float = 1.0 - exp(-7.0 * delta)
 	target = target.lerp(goal_target, k)
