@@ -283,8 +283,10 @@ fn open_grown_cherry_dbh_follows_free_growth() {
 
 #[test]
 fn limb_to_stem_ratios_and_elastic_similarity() {
-    // Simulated areas obey Leonardo's rule with exponent 2 (Pressler), so
-    // the limb/stem ratio follows the share of foliage a limb carries:
+    // Simulated areas obey Leonardo's rule with exponent 2 (Pressler),
+    // plus the adaptive radial growth of loaded limbs (growth.rs), so the
+    // limb/stem ratio follows the share of foliage a limb carries, raised
+    // where its weight overstresses it:
     // scaffold limbs of open-grown trees are about a third to a half of the
     // stem diameter where they leave it, none matching it (Gilman 2003,
     // "Branch-to-stem diameter ratio affects strength of attachment",
@@ -299,10 +301,11 @@ fn limb_to_stem_ratios_and_elastic_similarity() {
     // DBH x (reach / height)^1.5, within a factor of two.
     //
     // Seed sensitivity: one tree's limbs depend on the random draws (and, in
-    // the last bit, on the math library), and the scaffold limbs of this
-    // model are still too slender (docs/sources.md, "Ecarts connus"), so a
-    // single seed sits near the factor-two limit. The tolerance is kept; the
-    // checks use the median over three seeds at each age.
+    // the last bit, on the math library); before the adaptive radial growth
+    // the scaffold limbs were too slender (docs/sources.md, "Ecarts
+    // connus") and a single seed sat near the factor-two limit. The
+    // tolerance is kept; the checks use the median over three seeds at
+    // each age.
     let (oaks, cherries) = limb_runs();
     for (runs, species, max_r) in [(oaks, "oak", 0.9), (cherries, "cherry", 0.6)] {
         for i in 0..runs[0].at.len() {

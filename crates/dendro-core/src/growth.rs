@@ -39,6 +39,13 @@
 //!   the pipe model (Shinozaki et al. 1964) as a consequence, lets climate
 //!   modulate ring width, and gives the even juvenile rings then constant
 //!   basal-area increment of open-grown trees (White 1998).
+//! * Adaptive radial growth (uniform-stress axiom, thigmomorphogenesis):
+//!   before Pressler's share is laid down, woody segments whose self-weight
+//!   bending stress exceeds a set-point take the extra wood that brings it
+//!   back (see `ShootSystem::adaptive_demand`). Pure Pressler allocation
+//!   made area ratios exactly 1 at every fork and left the 20-40 cm
+//!   branches of the 150-year oak at ~17.5 MPa in median (up to 38 MPa,
+//!   limb safety ~1.6) while its 2-10 cm branches sat at ~8-10 MPa.
 //!
 //! Level of detail (a stylisation, not biology): the voxel size scales with
 //! tree height, and a leafy shoot unit shorter than ~a voxel is extended in
@@ -1141,11 +1148,34 @@ impl ShootSystem {
         coef * total / self.foliage_path.max(total * 1.0)
     }
 
-    /// Secondary growth: add `area_per_foliage(coef) * foliage * factor` m2
-    /// of wood to every segment (Pressler), capping the radial increment. Returns the area
-    /// increment at the collar.
-    pub fn thicken(&mut self, coef: f32, factor: f32, max_dr: f32) -> f32 {
-        let k = self.area_per_foliage(coef) * factor;
+    /// Secondary growth of one growth phase: the phase's wood budget
+    /// (`area_per_foliage(coef) x factor` m2 per unit of foliage, i.e.
+    /// `coef x F_total x factor` m3) is laid down by Pressler's law, area
+    /// increment proportional to the foliage carried, except for the share
+    /// the adaptive (mechanical) response takes first (see
+    /// [`Self::adaptive_demand`]); the radial increment is capped at
+    /// `max_dr`. Returns the area increment at the collar.
+    ///
+    /// When no segment is over its stress set-point (or the response is
+    /// off), this is exactly the pure Pressler allocation.
+    pub fn thicken(&mut self, g: &Genome, factor: f32, max_dr: f32) -> f32 {
+        let mut k = self.area_per_foliage(g.wood.growth_coefficient) * factor;
+        let extra = self.adaptive_demand(g, k, max_dr);
+        if !extra.is_empty() {
+            // Zero-sum: the mechanical wood comes out of the phase's budget
+            // `k x sum F L` (Pressler's share shrinks in proportion).
+            let budget = k * self.foliage_path;
+            let want: f32 = extra.iter().map(|&(i, da)| da * self.nodes[i].length).sum();
+            let cap = budget * g.wood.adaptive_max_budget_share.clamp(0.0, 1.0);
+            let scale = if want > cap && want > 0.0 { cap / want } else { 1.0 };
+            let used = want * scale;
+            if budget > 0.0 {
+                k *= ((budget - used) / budget).max(0.0);
+            }
+            for &(i, da) in &extra {
+                self.nodes[i].area += da * scale;
+            }
+        }
         let mut collar = 0.0;
         for (i, n) in self.nodes.iter_mut().enumerate() {
             let r0 = n.radius();
@@ -1158,6 +1188,104 @@ impl ShootSystem {
             n.area = new_area;
         }
         collar
+    }
+
+    /// Adaptive radial growth (uniform-stress axiom): extra area (m2) each
+    /// woody segment needs, on top of its Pressler increment `k x F`, to
+    /// bring its self-weight bending stress back to the set-point
+    /// `WoodTraits::adaptive_stress_mpa`. Returns `(node, extra area)` for
+    /// the segments over the set-point; empty when the response is off.
+    ///
+    /// Loads as in the static mechanics at rest (`crate::mechanics`, calm
+    /// air, full summer crown): green wood (`MechanicsTraits::
+    /// green_density_kg_m3`) at each segment's midpoint, fresh leaf mass at
+    /// the leafy tips (`LAI_FULL` x crown projection x LMA / LDMC, split by
+    /// leaf units); moments summed as vectors from the tips (`M_i = sum_j
+    /// (a_j - s_i) x F_j` over the subtree of i), bending = the part
+    /// perpendicular to the segment axis, `sigma = 32 M / (pi d^3)`. The
+    /// diameter for the set-point is `d* = d (sigma / sigma*)^(1/3)`
+    /// (constant moment: the added wood's own weight is neglected within
+    /// a phase). Leafy shoots, dead wood and segments thinner than
+    /// `adaptive_min_diameter_cm` do not respond; the radial increment
+    /// (Pressler + adaptive) stays capped at `max_dr`.
+    ///
+    /// Mechanism: trees lay down more wood where they are more strained
+    /// (thigmomorphogenesis: Telewski 2006, Am J Bot 93:1466-1476; Moulia,
+    /// Coutand & Julien 2015, Front Plant Sci 6:52; reviews, not read in
+    /// full); as a design rule, the "axiom of uniform stress" (Mattheck &
+    /// Burkhardt 1990, Int J Fatigue 12:185-190, not read), supported for
+    /// stems by Morgan & Cannell 1994 (Tree Physiol 14:49-62, abstract),
+    /// for branch forks of Fagus crenata by Minamino & Tateno 2014 (PLoS
+    /// ONE 9:e93535, read) and by the near-constant stress along primary
+    /// branches of 40 species (Evans et al. 2008, Trees 22:283-289,
+    /// abstract). The static self-weight load stands in for the strain
+    /// history (wind sway is not simulated): a stylisation.
+    ///
+    /// Cost: one O(n) pass (a few vector operations per segment, one
+    /// `dpowf` per overstressed segment).
+    fn adaptive_demand(&self, g: &Genome, k: f32, max_dr: f32) -> Vec<(usize, f32)> {
+        let w = &g.wood;
+        if w.adaptive_stress_mpa <= 0.0 || w.adaptive_max_budget_share <= 0.0 || k <= 0.0 {
+            return Vec::new();
+        }
+        let n = self.nodes.len();
+        let rho = g.mechanics.green_density_kg_m3;
+        let unit_len = 0.75 * self.voxel - 0.06;
+        let cr = self.crown_radius().max(0.05);
+        let leaf_kg_total = PI * cr * cr * crate::flux::LAI_FULL * crate::flux::LMA * 1e-3 / crate::mechanics::LEAF_DRY_MATTER_CONTENT;
+        let units: f32 = self.nodes.iter().filter(|n| n.leafy && !n.is_snag()).map(|n| leaf_units(n, unit_len)).sum();
+        let per_unit = if units > 0.0 { leaf_kg_total / units } else { 0.0 };
+        let gv = Vec3::new(0.0, -crate::mechanics::GRAVITY, 0.0);
+        // Basipetal sums of force and of moment about the origin.
+        let mut fsum = vec![Vec3::ZERO; n];
+        let mut qsum = vec![Vec3::ZERO; n];
+        for (i, nd) in self.nodes.iter().enumerate() {
+            let end = nd.end(1.0);
+            let fw = gv * (rho * nd.area * nd.length);
+            let mut f = fw;
+            let mut q = (nd.start + (end - nd.start) * 0.5).cross(fw);
+            if nd.leafy && !nd.is_snag() {
+                let fl = gv * (per_unit * leaf_units(nd, unit_len));
+                f += fl;
+                q += end.cross(fl);
+            }
+            fsum[i] = f;
+            qsum[i] = q;
+        }
+        for i in (1..n).rev() {
+            let p = self.nodes[i].parent as usize;
+            let (f, q) = (fsum[i], qsum[i]);
+            fsum[p] += f;
+            qsum[p] += q;
+        }
+        let sigma_t = w.adaptive_stress_mpa * 1e6;
+        let min_r = 0.5 * w.adaptive_min_diameter_cm * 0.01;
+        let mut out = Vec::new();
+        for (i, nd) in self.nodes.iter().enumerate() {
+            if nd.leafy || nd.is_snag() {
+                continue;
+            }
+            let r = nd.radius();
+            if r < min_r {
+                continue;
+            }
+            let m = qsum[i] - nd.start.cross(fsum[i]);
+            let mb = (m - nd.dir * m.dot(nd.dir)).length();
+            let d = 2.0 * r;
+            let sigma = 32.0 * mb / (PI * d * d * d);
+            if sigma <= sigma_t {
+                continue;
+            }
+            let r_req = r * (sigma / sigma_t).dpowf(1.0 / 3.0);
+            let a_pressler = nd.area + k * nd.foliage;
+            let a_req = PI * r_req * r_req;
+            let a_cap = PI * (r + max_dr) * (r + max_dr);
+            let da = a_req.min(a_cap) - a_pressler;
+            if da > 0.0 {
+                out.push((i, da));
+            }
+        }
+        out
     }
 
     /// Stylised branch sag, applied once a year after secondary growth.

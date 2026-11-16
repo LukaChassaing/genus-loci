@@ -4,7 +4,10 @@
 //!
 //! Like [`crate::flux`], this is a **reading** of the simulation: no state,
 //! no feedback on growth, deterministic (transcendental functions through
-//! [`crate::fmath::DMath`]). Nothing breaks here; the outputs (safety factor
+//! [`crate::fmath::DMath`]). Growth has its own copy of the self-weight case
+//! (`ShootSystem::adaptive_demand` in growth.rs: same loads, same
+//! `σ = 32 M / (π D³)`), which drives the adaptive radial growth of the
+//! limbs; this module is not called by the simulation. Nothing breaks here; the outputs (safety factor
 //! per segment, weakest point, failure mode, critical speeds) are what a
 //! later step will turn into actual breakage logged as a `LogEvent`.
 //!

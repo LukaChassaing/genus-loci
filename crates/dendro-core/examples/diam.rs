@@ -1,6 +1,6 @@
 //! Diagnostics: stem and limb diameters against age.
 //!
-//! cargo run -p dendro-core --release --example diam -- [--species oak|cherry] [--seed N] [--years N]
+//! cargo run -p dendro-core --release --example diam -- [--species oak|cherry] [--genome PATH] [--seed N] [--years N]
 //!
 //! Per reporting age: height, DBH, girth, collar diameter, mean ring width
 //! of the last 5 years, basal-area increment (CAI), crown diameter / DBH,
@@ -21,6 +21,7 @@ fn main() {
                     _ => Genome::quercus_robur(),
                 }
             }
+            "--genome" => genome = Genome::from_ron(&std::fs::read_to_string(args.next().unwrap()).unwrap()).unwrap(),
             "--seed" => seed = args.next().unwrap().parse().unwrap(),
             "--years" => years = args.next().unwrap().parse().unwrap(),
             o => panic!("unknown {o}"),

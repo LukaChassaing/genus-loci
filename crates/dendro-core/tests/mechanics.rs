@@ -267,15 +267,26 @@ fn decay_reduces_safety() {
     assert!(cb.stem_break.unwrap_or(80.0) < ca.stem_break.unwrap_or(80.0), "critical stem speed {ca:?} -> {cb:?}");
     // (2) Decay from the pruning model reaches the mechanics: topping a
     // 60-year oak at half height leaves a decay column in the stem (see
-    // tests/pruning.rs, big_wound_decays_small_one_closes); 20 years later
-    // it is still standing (later, the decayed head breaks off).
+    // tests/pruning.rs, big_wound_decays_small_one_closes). Infection is a
+    // random event of the pruning model, and the wound can later leave the
+    // tree with its host (seen: decay from year 8, the wound record "gone"
+    // at year 12 with the current genome): the check uses the first year
+    // (within 20) in which a decay column stands in the stem. It used to
+    // check year 20 only.
     let mut topped = Simulation::new(Genome::quercus_robur(), 42);
     topped.advance_days(60 * 365 + 20);
     let h = topped.height_m();
     topped.top_at(0.5 * h);
-    topped.advance_years(20);
+    let mut found = false;
+    for _ in 0..20 {
+        topped.advance_years(1);
+        if topped.mechanics_inputs().0.iter().any(|s| s.decay_radius_m > 0.0) {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "no decayed segment within 20 years of topping");
     let (segs, site) = topped.mechanics_inputs();
-    assert!(segs.iter().any(|s| s.decay_radius_m > 0.0), "no decayed segment after topping");
     let t = topped.genome().mechanics.clone();
     let mut cured = segs.clone();
     for s in cured.iter_mut() {
@@ -318,8 +329,12 @@ fn self_weight_safety_is_plausible() {
     // found trees ~4x below their elastic buckling height (Greenhill), a
     // comparable margin; Wessolly's static assessment asks >= 1.5 against
     // a Beaufort 12 wind on top of the weight.
-    // Known gap (docs/sources.md, « Charpentières »): the limbs of the old
-    // oak are too slender; that case is checked separately below.
+    // Primary branches of 40 woody species carry their own weight at a
+    // bending stress of 11.1 MPa on average (species means 5.2-18.9 MPa;
+    // Evans et al. 2008, Trees 22:283-289, abstract), i.e. a safety of
+    // ~3-11 for a green MOR of 55-57 MPa: the >= 2 floor is loose. Every
+    // species and age, the 150-year oak included (its limbs were too
+    // slender, ~1.6, before the adaptive radial growth of growth.rs).
     for (sp, by_age) in trees().iter().enumerate() {
         for (a, sims) in by_age.iter().enumerate() {
             let snaps: Vec<_> = sims.iter().map(|s| s.mechanics_model().evaluate(&in_leaf(0.0))).collect();
@@ -328,28 +343,106 @@ fn self_weight_safety_is_plausible() {
             let buckling = median(snaps.iter().map(|s| s.buckling_safety).collect());
             assert!(stem >= 2.0, "species {sp} age {}: stem safety {stem:.2}", AGES[a]);
             assert!(buckling > 1.0, "species {sp} age {}: buckles under its own weight ({buckling:.2})", AGES[a]);
-            let old_oak = sp == 0 && AGES[a] == 150;
-            if !old_oak {
-                assert!(limb >= 2.0, "species {sp} age {}: limb safety {limb:.2}", AGES[a]);
-            }
+            assert!(limb >= 2.0, "species {sp} age {}: limb safety {limb:.2}", AGES[a]);
             let mass = median(snaps.iter().map(|s| s.above_ground_mass_kg).collect());
             assert!(mass > 0.0);
         }
     }
 }
 
+/// Per tree: the stem path (collar, thickest child), and for every
+/// structural first-order limb (non-stem child of a stem segment, living,
+/// diameter >= 0.2 DBH) its segment index and the area ratio at its
+/// insertion, `(stem above + all living children) / stem below`.
+fn scaffold_insertions(sim: &Simulation) -> Vec<(usize, f32)> {
+    let (segs, site) = sim.mechanics_inputs();
+    let n = segs.len();
+    let mut thickest = vec![usize::MAX; n];
+    let mut kids = vec![0.0f32; n];
+    for (i, s) in segs.iter().enumerate().skip(1) {
+        let p = s.parent.unwrap();
+        if !s.dead {
+            kids[p] += s.radius_m * s.radius_m;
+        }
+        if thickest[p] == usize::MAX || s.radius_m > segs[thickest[p]].radius_m {
+            thickest[p] = i;
+        }
+    }
+    let mut on = vec![false; n];
+    let mut c = 0;
+    on[0] = true;
+    while thickest[c] != usize::MAX {
+        c = thickest[c];
+        on[c] = true;
+    }
+    (1..n)
+        .filter(|&i| {
+            let p = segs[i].parent.unwrap();
+            on[p] && !on[i] && !segs[i].dead && 2.0 * segs[i].radius_m >= 0.2 * site.dbh_m
+        })
+        .map(|i| {
+            let p = segs[i].parent.unwrap();
+            (i, kids[p] / (segs[p].radius_m * segs[p].radius_m))
+        })
+        .collect()
+}
+
 #[test]
-fn old_oak_limbs_known_gap() {
-    // Sentinel of a known gap, not a target: the 150-year oak's structural
-    // limbs carry their weight with a safety of only ~1.5-1.7 (median of
-    // three seeds), below the >= 2 expected of sound trees, because the
-    // simulated limbs are too slender (docs/sources.md, « Charpentières » and
-    // « Mécanique »). When the limb allometry is fixed this test will fail:
-    // move the case into `self_weight_safety_is_plausible`.
-    let snaps: Vec<_> = trees()[0][1].iter().map(|s| s.mechanics_model().evaluate(&in_leaf(0.0))).collect();
-    let limb = median(snaps.iter().map(|s| s.limb_safety).collect());
-    assert!(limb > 1.0, "old oak limbs break under their own weight: {limb:.2}");
-    assert!(limb < 2.0, "old oak limbs now reach the target ({limb:.2}): fold this case into self_weight_safety_is_plausible");
+fn scaffold_insertions_add_cross_section() {
+    // Leonardo's rule says the daughters' cross-sections sum to the
+    // mother's (ratio 1). For a branch loaded by its own weight, the
+    // uniform-stress model needs more: 1.04 for a lateral of a tenth of the
+    // main axis' weight, 1.24 for equal weights, more at wide angles
+    // (Minamino & Tateno 2014, PLoS ONE 9:e93535, Figs 2-3); measured fork
+    // ratios of Fagus crenata are "a little larger" than 1, closest to the
+    // uniform-stress prediction (same paper, Fig. 6). Here: the median
+    // ratio at the scaffold-limb insertions of the 60- and 150-year oak and
+    // cherry (all seeds pooled) lies in [0.95, 1.25] (below 1: the area of
+    // shed branches is gone from the sum), and for the 150-year oak, whose
+    // limbs are loaded most, above 1.02 (pure Pressler allocation gives
+    // 0.99-1.00). The band is ours, built on the two model limits.
+    for (sp, by_age) in trees().iter().enumerate() {
+        for (a, sims) in by_age.iter().enumerate() {
+            let ratios: Vec<f32> = sims.iter().flat_map(|s| scaffold_insertions(s).into_iter().map(|x| x.1)).collect();
+            if ratios.is_empty() {
+                continue;
+            }
+            let m = median(ratios.clone());
+            assert!((0.95..=1.25).contains(&m), "species {sp} age {}: median area ratio at limb insertions {m:.3} ({} limbs)", AGES[a], ratios.len());
+            if sp == 0 && AGES[a] == 150 {
+                assert!(m > 1.02, "old oak: median area ratio at limb insertions {m:.3} (pure pipe model)");
+            }
+        }
+    }
+}
+
+#[test]
+fn old_oak_limbs_bear_crown_like_stress() {
+    // Bending stress under self-weight is roughly constant along primary
+    // branches and similar across species (~11 MPa; Evans et al. 2008,
+    // Trees 22:283-289, abstract). In the 150-year oak, the base of the
+    // scaffold limbs must not carry much more stress than the smaller
+    // branches of 2-10 cm (median over seeds of the per-tree median ratio
+    // <= 1.5; it was ~2.3 with the pure pipe model), and stays inside the
+    // range of species means, 5.2-18.9 MPa. The 1.5 factor is ours.
+    let mut ratio = Vec::new();
+    let mut limb_mpa = Vec::new();
+    for sim in &trees()[0][1] {
+        let snap = sim.mechanics_model().evaluate(&in_leaf(0.0));
+        let (segs, _) = sim.mechanics_inputs();
+        let limbs: Vec<f32> = scaffold_insertions(sim).into_iter().map(|(i, _)| snap.segment_stress_mpa[i]).collect();
+        let small: Vec<f32> = (0..segs.len())
+            .filter(|&i| snap.segment_role[i] != dendro_core::SegmentRole::Trunk && !segs[i].dead && segs[i].leaf_weight <= 0.0 && (0.01..0.05).contains(&segs[i].radius_m))
+            .map(|i| snap.segment_stress_mpa[i])
+            .collect();
+        let (l, s) = (median(limbs), median(small));
+        ratio.push(l / s);
+        limb_mpa.push(l);
+    }
+    let (r, l) = (median(ratio.clone()), median(limb_mpa.clone()));
+    println!("old oak: limb-base / 2-10 cm stress ratios {ratio:?}, limb-base stress {limb_mpa:?} MPa");
+    assert!(r <= 1.5, "old oak: limb-base stress / 2-10 cm branch stress = {r:.2} ({ratio:?})");
+    assert!((5.2..=18.9).contains(&l), "old oak: median limb-base stress {l:.1} MPa ({limb_mpa:?})");
 }
 
 #[test]

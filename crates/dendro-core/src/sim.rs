@@ -416,7 +416,7 @@ impl Simulation {
         }
         let (mi, mh) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
-        let collar = self.shoots.thicken(w.growth_coefficient, factor, w.max_ring_width_mm * 0.001 * share * 1.5);
+        let collar = self.shoots.thicken(&self.genome, factor, w.max_ring_width_mm * 0.001 * share * 1.5);
         self.pending_early_mm = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.pending_measure = mh;
         self.roots.thicken(collar);
@@ -452,7 +452,7 @@ impl Simulation {
         }
         let (mi, _) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
-        let collar = self.shoots.thicken(w.growth_coefficient, factor, w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5);
+        let collar = self.shoots.thicken(&self.genome, factor, w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5);
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
         self.shoots.sag(&self.genome);
@@ -910,7 +910,9 @@ impl Simulation {
             .map(|(i, n)| {
                 let age = year.saturating_sub(n.birth_year) as f32;
                 // Rendered radius. The simulated areas follow Pressler's law
-                // (a branching exponent of exactly 2); measured exponents are
+                // (a branching exponent of exactly 2) plus, on loaded limbs, the
+                // adaptive radial growth (growth.rs: area ratio ~1.1 at the old
+                // oak's limb insertions); measured exponents are
                 // ~1.8-2.3 (Eloy 2011), i.e. limbs and boughs may be somewhat
                 // thicker relative to the stem than area preservation gives. Drawn
                 // radius = simulated radius x (r_collar / r)^(1 - 2/e),

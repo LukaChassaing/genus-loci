@@ -472,6 +472,24 @@ pub struct WoodTraits {
     /// Mesh only: out-of-roundness (fluting) of thick wood, relative.
     #[serde(default)]
     pub bark_irregularity: f32,
+    /// Adaptive (mechanical) radial growth: set-point of the self-weight
+    /// bending stress (MPa, full summer crown, calm air) above which a
+    /// woody segment lays down extra wood until its stress is back at the
+    /// set-point, taken from the year's wood budget (see
+    /// `ShootSystem::thicken`). Uniform-stress axiom (Mattheck & Burkhardt
+    /// 1990; Morgan & Cannell 1994; branches: Evans et al. 2008, Minamino &
+    /// Tateno 2014). 0 = off (pure Pressler allocation, the behaviour of
+    /// genomes written before this trait).
+    #[serde(default)]
+    pub adaptive_stress_mpa: f32,
+    /// Adaptive growth: segments thinner than this (cm) do not respond
+    /// (flexible twigs deflect rather than thicken).
+    #[serde(default)]
+    pub adaptive_min_diameter_cm: f32,
+    /// Adaptive growth: the largest share (0..1) of a growth phase's wood
+    /// budget that the mechanical response may take from Pressler's law.
+    #[serde(default)]
+    pub adaptive_max_budget_share: f32,
     /// Mesh stylisation: widening of a branch base ring where it leaves its
     /// parent (branch collar), as a fraction of the branch radius.
     pub collar_flare: f32,
@@ -770,9 +788,10 @@ impl Default for SymbiosisTraits {
     }
 }
 
-/// Wood and crown mechanics (see [`crate::mechanics`]): read-only, they do
-/// not act on growth (the sag model keeps using `WoodTraits::density_kg_m3`
-/// and `elasticity_gpa`). Every value is sourced in the species RON files and
+/// Wood and crown mechanics (see [`crate::mechanics`]). Read by the static
+/// mechanics; the green density also sets the self-weight load of the
+/// adaptive radial growth (`WoodTraits::adaptive_stress_mpa`). The sag
+/// model keeps using `WoodTraits::density_kg_m3` and `elasticity_gpa`. Every value is sourced in the species RON files and
 /// `docs/sources.md`. Defaults: a generic temperate hardwood (the mean of the
 /// two built-in species' sources, for genomes written before this block).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
