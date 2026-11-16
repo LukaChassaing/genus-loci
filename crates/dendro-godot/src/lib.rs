@@ -470,4 +470,70 @@ impl TreeSim {
         }
         GString::from(report.join(", ").as_str())
     }
+
+    /// Static mechanics (« Mécanique ») under a steady gust of `wind_speed_ms` at 10 m, today's foliage:
+    /// safety factors per failure mode, weakest section, expected failure, critical speeds (m/s, -1 when
+    /// above 80 m/s), masses, moments, drag. See `dendro_core::mechanics`; cached per day / wood version.
+    #[func]
+    fn get_mechanics(&mut self, wind_speed_ms: f64) -> VarDictionary {
+        let s = prof::time("mech", || self.backend.mechanics(wind_speed_ms.clamp(0.0, 80.0) as f32).clone());
+        let mut d = VarDictionary::new();
+        let mut put = |k: &str, v: Variant| {
+            d.set(&k.to_variant(), &v);
+        };
+        let crit = |v: Option<f32>| v.map_or(-1.0, |x| x as f64);
+        put("wind_ms", (s.wind_speed_ms as f64).to_variant());
+        put("leaf_fraction", (s.leaf_fraction as f64).to_variant());
+        put("stem_safety", (s.stem_safety as f64).to_variant());
+        put("limb_safety", (s.limb_safety as f64).to_variant());
+        put("anchorage_safety", (s.anchorage_safety as f64).to_variant());
+        put("min_safety", (s.stem_safety.min(s.limb_safety).min(s.anchorage_safety) as f64).to_variant());
+        put("expected_mode", (s.expected_failure.code() as i64).to_variant());
+        put("expected_label", GString::from(s.expected_failure.label_fr()).to_variant());
+        put("critical_stem", crit(s.critical.stem_break).to_variant());
+        put("critical_limb", crit(s.critical.limb_break).to_variant());
+        put("critical_uproot", crit(s.critical.uprooting).to_variant());
+        match s.critical.first() {
+            Some((m, v)) => {
+                put("first_mode", (m.code() as i64).to_variant());
+                put("first_label", GString::from(m.label_fr()).to_variant());
+                put("first_speed", (v as f64).to_variant());
+            }
+            None => {
+                put("first_mode", (-1i64).to_variant());
+                put("first_label", GString::from("").to_variant());
+                put("first_speed", (-1.0f64).to_variant());
+            }
+        }
+        if let Some(w) = s.weakest {
+            put("weak_role", (w.role.code() as i64).to_variant());
+            put("weak_height_m", (w.height_m as f64).to_variant());
+            put("weak_diameter_cm", (w.diameter_cm as f64).to_variant());
+            put("weak_safety", (w.safety as f64).to_variant());
+            put("weak_decayed", w.decayed.to_variant());
+        }
+        put("base_moment_knm", (s.base_moment_nm as f64 / 1000.0).to_variant());
+        put("critical_moment_knm", (s.critical_turning_moment_nm as f64 / 1000.0).to_variant());
+        put("mass_kg", (s.above_ground_mass_kg as f64).to_variant());
+        put("wood_mass_kg", (s.wood_mass_kg as f64).to_variant());
+        put("leaf_mass_kg", (s.leaf_mass_kg as f64).to_variant());
+        put("stem_mass_kg", (s.stem_mass_kg as f64).to_variant());
+        put("drag_kn", (s.drag_n as f64 / 1000.0).to_variant());
+        put("pressure_height_m", (s.centre_of_pressure_m as f64).to_variant());
+        put("crown_area_m2", (s.crown_frontal_area_m2 as f64).to_variant());
+        put("crown_cd", (s.crown_drag_coefficient as f64).to_variant());
+        put("buckling_safety", (s.buckling_safety as f64).to_variant());
+        d
+    }
+    /// Safety factor of every shoot segment (node order) of the last `get_mechanics` speed.
+    #[func]
+    fn get_mechanics_safety(&mut self, wind_speed_ms: f64) -> PackedFloat32Array {
+        PackedFloat32Array::from(self.backend.mechanics(wind_speed_ms.clamp(0.0, 80.0) as f32).segment_safety.as_slice())
+    }
+    /// The wood coloured by safety factor under `wind_speed_ms` (red <= 1, green >= 4; minor wood faded).
+    #[func]
+    fn build_mechanics_mesh(&mut self, wind_speed_ms: f64) -> Gd<ArrayMesh> {
+        let m = prof::time("mech.build", || self.backend.mechanics_mesh(wind_speed_ms.clamp(0.0, 80.0) as f32));
+        mesh_data_to_array_mesh_named(&m, "other")
+    }
 }

@@ -112,8 +112,8 @@ const SAPWOOD_DEPTH: f32 = 0.04;
 /// Poorter et al. 2009, "Causes and consequences of variation in leaf mass
 /// per area (LMA): a meta-analysis", New Phytol 182:565-588 (deciduous
 /// trees ~50-100 g m-2); LAI 4 is a calibration for an open-grown crown.
-const LMA: f32 = 75.0;
-const LAI_FULL: f32 = 4.0;
+pub(crate) const LMA: f32 = 75.0;
+pub(crate) const LAI_FULL: f32 = 4.0;
 /// Days over which the year's leaves and shoots are built (budburst to full
 /// expansion), calibration.
 const FLUSH_DAYS: f32 = 35.0;

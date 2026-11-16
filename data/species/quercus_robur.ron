@@ -411,4 +411,30 @@
         // Open-grown pedunculate oaks commonly live 500+ years.
         typical_lifespan_years: 600.0,
     ),
+    // Static mechanics (crates/dendro-core/src/mechanics.rs; read-only, no
+    // effect on growth). No green-wood table for Q. robur was available:
+    // the values are those of white oak (Quercus alba, same white-oak
+    // group) in the USDA Wood Handbook (FPL-GTR-190, 2010), a proxy.
+    mechanics: (
+        // Table 4-1: green moisture content of white oak 64 % (heartwood)
+        // to 78 % (sapwood); Table 5-3a: specific gravity 0.60 (green
+        // volume). 0.60 x 1.64 = 984 to 0.60 x 1.78 = 1068 kg/m3; mean.
+        green_density_kg_m3: 1026.0,
+        // Table 5-3a, white oak, green: MOR 57 000 kPa, MOE 8 600 MPa.
+        green_mor_mpa: 57.0,
+        green_moe_gpa: 8.6,
+        // Vollsinger et al. 2005 (Can J For Res 35:1238-1249): crown drag
+        // coefficients of 0.15-0.22 at 20 m/s on the still-air frontal
+        // area (three hardwoods; no oak measured): value in that range,
+        // estimated.
+        crown_drag_coefficient: 0.2,
+        // Same study: drag proportional to crown mass x wind speed, i.e.
+        // U^1 (B = -1) over 4-20 m/s. Not measured on oak: estimated.
+        vogel_exponent: -1.0,
+        // ForestGALES 2.5 (Forest Research), Sitka spruce, freely draining
+        // soil, deep rooting: Creg = 178.1 N m/kg, refitted from Nicoll et
+        // al. 2006. No broadleaf tree-pulling coefficient was found: conifer
+        // value used as an estimate (docs/sources.md, « Écarts connus »).
+        anchorage_nm_per_kg: 178.1,
+    ),
 )

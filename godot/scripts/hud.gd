@@ -14,6 +14,7 @@ signal soil_opacity_changed(opacity: float)
 signal flux_toggled(on: bool)
 signal guides_toggled(on: bool)
 signal prune_toggled(on: bool)
+signal mech_toggled(on: bool)
 
 const MONTHS: Array[String] = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
 	"août", "septembre", "octobre", "novembre", "décembre"]
@@ -50,6 +51,7 @@ var soil_slider: HSlider     # soil opacity 0..1 ("Sol")
 var flux_button: Button      # water / nutrient flux on the roots ("Flux")
 var guides_button: Button
 var prune_button: Button     # pruning tool (« Taille », key T)
+var mech_button: Button      # mechanics panel (« Mécanique », key M)
 ## Extra right-hand panels (pruning journal...) that the 3-D view must avoid, see free_rect.
 var side_panels: Array[Control] = []
 var play_button: Button
@@ -193,7 +195,7 @@ func _build_ring_panel(root: Control) -> void:
 
 ## Bottom bar, two rows (fits 1280 px with room to spare):
 ##   1. time and tools: play, speed, drought | Taille, Repères, Cernes, Flux, Sol opacity
-##   2. the site: species, soil type, seed (these restart the simulation)
+##   2. the site: species, soil type, seed (these restart the simulation) | Mécanique (the milieu's loads)
 func _build_bottom_bar(root: Control) -> void:
 	var p: PanelContainer = PanelContainer.new()
 	p.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -334,6 +336,16 @@ func _build_bottom_bar(root: Control) -> void:
 	_seed_label = Label.new()
 	_seed_label.modulate = Color(1, 1, 1, 0.8)
 	h2.add_child(_seed_label)
+	# The milieu put to the test (M1): on the site row, right-aligned (row 1 has no room left at 1280 px x 1.3).
+	var spacer2: Control = Control.new()
+	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h2.add_child(spacer2)
+	mech_button = _no_focus(Button.new()) as Button
+	mech_button.text = "Mécanique"
+	mech_button.toggle_mode = true
+	mech_button.tooltip_text = "Tenue au vent et au poids propre, vitesses critiques (M)"
+	mech_button.toggled.connect(func(on: bool) -> void: mech_toggled.emit(on))
+	h2.add_child(mech_button)
 	_on_speed_changed(_speed_slider.value)
 
 
@@ -393,10 +405,11 @@ const RING_MIN: float = 60.0
 const RING_EXTRA: float = 60.0  # text strip under the disc
 
 
-## Docks the visible side panels (ring view, pruning panel, flux panel: in that order) in one right-hand column,
+## Docks the visible side panels (ring view, pruning panel, flux panel, mechanics panel: in that order) in one right-hand column,
 ## top to bottom, same width, no overlap. When the column would be taller than [top, bottom] it is compressed in
-## steps: the flux panel folds into its legend strip, then the ring disc shrinks, then the pruning panel's
-## scrolling text area. Returns the x of the column's left edge minus a gap (the right limit of the free 3-D area).
+## steps: the flux panel folds into its legend strip and the mechanics panel to its slider and summary line, then
+## the ring disc shrinks, then the pruning panel's scrolling text area; as a last resort they leave the column.
+## Returns the x of the column's left edge minus a gap (the right limit of the free 3-D area).
 func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
 	var stack: Array[Control] = []
 	if _ring_panel.visible:
@@ -407,14 +420,16 @@ func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
 	if stack.is_empty():
 		return view.x - SIDE_EDGE
 	var avail: float = bottom - top - SIDE_GAP * float(stack.size() - 1)
-	var flux: FluxPanel = null
+	# Foldable panels (flux, then mechanics): fold first, leave the column last. Both expose is_collapsed,
+	# set_auto_collapsed, full_height and docked_out.
+	var foldable: Array[Control] = []
 	var other: Array[Control] = []
 	for sp: Control in stack:
-		if sp is FluxPanel:
-			flux = sp
+		if sp is FluxPanel or sp is MechPanel:
+			foldable.append(sp)
 		else:
 			other.append(sp)
-	# 1. Everything at natural size; the flux panel folds if the whole does not fit.
+	# 1. Everything at natural size; the foldable panels fold, in order, while the whole does not fit.
 	_ring_view.custom_minimum_size = Vector2(RING_MAX, RING_MAX + RING_EXTRA)
 	for sp: Control in other:
 		_dock(sp)
@@ -423,15 +438,19 @@ func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
 	var other_h: float = 0.0
 	for sp: Control in other:
 		other_h += sp.get_combined_minimum_size().y
-	if flux != null:
-		_dock(flux)
-		flux.set_auto_collapsed(false)
-		var fh: float = flux.get_combined_minimum_size().y
-		flux.full_height = fh
-		if other_h + fh > avail:
-			flux.set_auto_collapsed(true)
-			fh = flux.get_combined_minimum_size().y
-		other_h += fh
+	var fold_h: float = 0.0
+	for f: Control in foldable:
+		_dock(f)
+		f.call("set_auto_collapsed", false)
+		var fh: float = f.get_combined_minimum_size().y
+		f.set("full_height", fh)
+		fold_h += fh
+	for f: Control in foldable:
+		if other_h + fold_h > avail:
+			var before: float = f.get_combined_minimum_size().y
+			f.call("set_auto_collapsed", true)
+			fold_h += f.get_combined_minimum_size().y - before
+	other_h += fold_h
 	# 2. Still too tall: shrink the ring disc, then the pruning panel's text area.
 	var over: float = other_h - avail
 	if over > 0.0 and _ring_panel.visible:
@@ -443,17 +462,20 @@ func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
 			if sp.has_meta("dock_fit"):
 				var h: float = sp.get_combined_minimum_size().y
 				(sp.get_meta("dock_fit") as Callable).call(h - over)
-	# 3. Still too tall (large interface scale): the flux panel leaves the column, its legend is not worth the room.
-	var out_of_room: bool = false
-	if flux != null:
-		var rest: float = 0.0
-		for sp: Control in other:
-			rest += sp.get_combined_minimum_size().y
-		out_of_room = rest + flux.get_combined_minimum_size().y > avail + 0.5
-		flux.docked_out = out_of_room
+	# 3. Still too tall (large interface scale): foldable panels leave the column, the flux legend first.
+	var rest: float = 0.0
+	for sp: Control in other:
+		rest += sp.get_combined_minimum_size().y
+	var kept: float = 0.0
+	for f: Control in foldable:
+		kept += f.get_combined_minimum_size().y
+	for f: Control in foldable:
+		var out_of_room: bool = rest + kept > avail + 0.5
+		f.set("docked_out", out_of_room)
 		if out_of_room:
-			stack.erase(flux)
-			flux.position = Vector2(-10000.0, -10000.0)
+			kept -= f.get_combined_minimum_size().y
+			stack.erase(f)
+			f.position = Vector2(-10000.0, -10000.0)
 	# 4. Stack: one width for the whole column.
 	var w: float = 0.0
 	for sp: Control in stack:
@@ -481,7 +503,7 @@ func side_panel_rects() -> Array[Rect2]:
 	if _ring_panel.visible:
 		out.append(Rect2(_ring_panel.position, _ring_panel.size))
 	for sp: Control in side_panels:
-		if is_instance_valid(sp) and sp.visible and not (sp is FluxPanel and (sp as FluxPanel).docked_out):
+		if is_instance_valid(sp) and sp.visible and not ((sp is FluxPanel or sp is MechPanel) and bool(sp.get("docked_out"))):
 			out.append(Rect2(sp.global_position, sp.size))
 	return out
 

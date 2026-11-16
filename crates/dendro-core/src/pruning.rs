@@ -1916,6 +1916,42 @@ impl Simulation {
         best.min(1.0)
     }
 
+    /// Radius (m) of the decayed core at the base of every shoot node (index
+    /// order; 0 = sound), for the mechanics (`crate::mechanics`): the decay
+    /// column of each infected wound occupies its host and, along the axis
+    /// towards the collar, the ancestors within `decay_len` (weak CODIT wall
+    /// 1). Stylised as a centred hollow: real columns are eccentric (they
+    /// start at the wound face). Descendants are left sound (wood formed
+    /// after wounding is walled off, CODIT wall 4; sprouts on a cut are new
+    /// wood). O(wounds x column length + n).
+    pub(crate) fn decay_radius_by_node(&self) -> Vec<f32> {
+        let n = self.shoots.nodes.len();
+        let mut out = vec![0.0f32; n];
+        if !self.prune.active {
+            return out;
+        }
+        let map: HashMap<u32, usize> = self.shoots.nodes.iter().enumerate().map(|(i, nd)| (nd.id, i)).collect();
+        for w in self.prune.wounds.iter().filter(|w| w.infected && !w.gone && w.decay_r > 0.0) {
+            let Some(&hi) = map.get(&w.host) else { continue };
+            let mut i = hi;
+            let mut travelled = 0.0f32;
+            loop {
+                let nd = &self.shoots.nodes[i];
+                out[i] = out[i].max(w.decay_r.min(0.98 * nd.radius()));
+                if i == 0 || nd.parent == NONE {
+                    break;
+                }
+                travelled += if i == hi { 0.0 } else { nd.length };
+                let p = nd.parent as usize;
+                if travelled + self.shoots.nodes[p].length > w.decay_len + w.decay_r {
+                    break;
+                }
+                i = p;
+            }
+        }
+        out
+    }
+
     /// Pruning knots in the stem section at height `y`: `(year of the cut,
     /// stem radius when cut (m), year closed or u32::MAX)` for wounds on the
     /// stem within one stem radius of `y`.

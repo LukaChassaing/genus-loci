@@ -141,6 +141,20 @@ pub struct Backend {
     timeline: prune::Timeline,
     /// Load in progress / last load outcome (see `save_load.rs`).
     load: save_load::LoadState,
+    /// Mechanics of the shown tree (« Mécanique » panel), see `mechanics`.
+    mech: Option<MechCache>,
+}
+
+/// The mechanics model and critical speeds of one state of the tree (they do not depend on the wind
+/// speed of the panel slider): rebuilt when the day or the wood changes, so moving the slider costs
+/// one O(n) evaluation, and the ~80-pass critical speed search runs once per state.
+struct MechCache {
+    day: u64,
+    wood_version: u64,
+    model: dendro_core::MechanicsModel,
+    critical: dendro_core::CriticalSpeeds,
+    /// Last evaluation (slider speed) and its snapshot.
+    last: Option<(f32, dendro_core::MechanicsSnapshot)>,
 }
 
 impl Backend {
@@ -158,7 +172,7 @@ impl Backend {
         let species = if species < genomes.len() { species } else { 0 };
         let genome = genomes.swap_remove(species);
         let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
-        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default() };
+        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default(), mech: None };
         b.timeline_reset();
         b
     }
@@ -528,5 +542,35 @@ impl Backend {
     /// Flow path geometry (`dendro_core::flux::FluxGeometry`).
     pub fn flux_geometry(&self) -> dendro_core::FluxGeometry {
         self.sim.flux_geometry(dendro_core::FluxBudget::default())
+    }
+
+    /// Drops the cached mechanics: the tree was replaced or cut outside the normal stepping (a cut, an
+    /// undo or rewind, a load), where (day, wood version) alone could repeat for a different tree.
+    pub(crate) fn mechanics_stale(&mut self) {
+        self.mech = None;
+    }
+
+    /// Static mechanics of the tree today under a steady gust of `speed` m/s at 10 m (today's foliage,
+    /// see `dendro_core::mechanics`), with the critical speeds; cached per (day, wood version, speed).
+    pub fn mechanics(&mut self, speed: f32) -> &dendro_core::MechanicsSnapshot {
+        let (day, wv) = (self.sim.days_elapsed(), self.sim.wood_version());
+        if !self.mech.as_ref().is_some_and(|c| c.day == day && c.wood_version == wv) {
+            let model = self.sim.mechanics_model();
+            let critical = model.critical_speeds(&dendro_core::WindLoad::new(0.0));
+            self.mech = Some(MechCache { day, wood_version: wv, model, critical, last: None });
+        }
+        let c = self.mech.as_mut().expect("mechanics cache just filled");
+        if !c.last.as_ref().is_some_and(|l| l.0 == speed) {
+            let mut snap = c.model.evaluate(&dendro_core::WindLoad::new(speed));
+            snap.critical = c.critical;
+            c.last = Some((speed, snap));
+        }
+        &c.last.as_ref().expect("mechanics snapshot just computed").1
+    }
+
+    /// Wood mesh coloured by the safety factor of each segment under `speed` m/s.
+    pub fn mechanics_mesh(&mut self, speed: f32) -> MeshData {
+        let colors = dendro_core::mechanics::safety_colors(self.mechanics(speed));
+        self.sim.wood_mesh_tinted(&colors)
     }
 }

@@ -164,6 +164,26 @@ static func run(host: Node, check: Callable) -> void:
 		await tree.process_frame
 		check.call("flux panel: click header folds it to a strip", fp.is_collapsed() and not fp._body.visible and fp._strip.visible)
 		fp.set_user_collapsed(false)
+		# The mechanics panel joins the column: still no overlap, nothing over the bar (it folds or leaves).
+		var mp: MechPanel = host.get("mech_panel") as MechPanel
+		if mp != null:
+			hud_node.mech_button.button_pressed = true
+			await tree.process_frame
+			await tree.process_frame
+			hud_node.free_rect(view)
+			var rects4: Array[Rect2] = hud_node.side_panel_rects()
+			var bad: bool = false
+			for i: int in rects4.size():
+				bad = bad or rects4[i].end.y > bar_y + 0.5 or rects4[i].position.x < 0.0
+				for j: int in range(i + 1, rects4.size()):
+					bad = bad or rects4[i].grow(-0.5).intersects(rects4[j].grow(-0.5))
+			check.call("side panels: + mechanics, still docked without overlap above the bar", not bad and (rects4.size() == 4 or mp.docked_out),
+				"%s bar_y=%.0f" % [str(rects4), bar_y])
+			mp.set_user_collapsed(true)
+			await tree.process_frame
+			check.call("mechanics panel: header folds it to slider + summary", mp.is_collapsed() and not mp._body.visible and mp._summary.visible)
+			mp.set_user_collapsed(false)
+			hud_node.mech_button.button_pressed = false
 
 		# Ghost framing: with the control tree shown, both trees are inside the free area; hidden, framing returns.
 		var cam_node: OrbitCamera = host.get("cam") as OrbitCamera

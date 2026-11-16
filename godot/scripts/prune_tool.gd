@@ -521,6 +521,7 @@ func _after_change(replaced: bool) -> void:
 		hud.force_ring_refresh()
 	host.set("_stats_dirty", true)
 	host.set("mesh_dirty", true)
+	host.call("on_mechanics_stale")  # (day, wood version) can repeat after an undo: recompute the « Mécanique » panel
 	# Flux paths follow the new wood at once (no dashes left on removed branches).
 	var fx: Node = host.get("flux") as Node
 	if fx != null and fx.has_method("mark_geometry_dirty"):

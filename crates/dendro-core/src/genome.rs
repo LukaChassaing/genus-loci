@@ -50,6 +50,10 @@ pub struct Genome {
     /// (see [`crate::pruning`]). Defaults are neutral-ish averages.
     #[serde(default)]
     pub pruning: crate::pruning::PruningTraits,
+    /// Static mechanics: green wood strength, crown drag, anchorage (see
+    /// [`crate::mechanics`]). Read-only: no effect on growth.
+    #[serde(default)]
+    pub mechanics: MechanicsTraits,
 }
 
 /// Above-ground architecture (bud/shoot model, after Palubicki et al. 2009,
@@ -762,6 +766,52 @@ impl Default for SymbiosisTraits {
             nitrogen_share: 0.0,
             water_share: 0.0,
             hyphal_reach_m: 0.0,
+        }
+    }
+}
+
+/// Wood and crown mechanics (see [`crate::mechanics`]): read-only, they do
+/// not act on growth (the sag model keeps using `WoodTraits::density_kg_m3`
+/// and `elasticity_gpa`). Every value is sourced in the species RON files and
+/// `docs/sources.md`. Defaults: a generic temperate hardwood (the mean of the
+/// two built-in species' sources, for genomes written before this block).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MechanicsTraits {
+    /// Density of green (fresh, living) wood: oven-dry mass + water per
+    /// green volume (kg/m3) = specific gravity (green volume) x (1 + green
+    /// moisture content). Self-weight load of the mechanics.
+    pub green_density_kg_m3: f32,
+    /// Modulus of rupture of green clear wood in static bending (MPa).
+    pub green_mor_mpa: f32,
+    /// Modulus of elasticity of green clear wood in static bending (GPa).
+    /// Used for the elastic buckling (Greenhill) check; the deflection and
+    /// sway of the dynamic step will use it too.
+    pub green_moe_gpa: f32,
+    /// Crown drag coefficient at the reference speed of 20 m/s, defined on
+    /// the still-air frontal area of the leafy crown (as in Vollsinger et
+    /// al. 2005, Can J For Res 35:1238-1249).
+    pub crown_drag_coefficient: f32,
+    /// Vogel exponent B of crown reconfiguration (< 0): drag grows as
+    /// U^(2+B) instead of U^2 between `mechanics::RECONF_MIN_MS` and
+    /// `RECONF_MAX_MS` (Vogel 1989, J Exp Bot 40:941-948).
+    pub vogel_exponent: f32,
+    /// Anchorage coefficient (N m per kg of green stem mass): critical
+    /// turning moment of the root-soil plate per kg of stem, for deep
+    /// rooting on a freely draining soil (`Creg` of Gardiner et al. 2000
+    /// and ForestGALES; Nicoll et al. 2006, Can J For Res 36:1871-1883).
+    pub anchorage_nm_per_kg: f32,
+}
+
+impl Default for MechanicsTraits {
+    fn default() -> Self {
+        MechanicsTraits {
+            green_density_kg_m3: 885.0,
+            green_mor_mpa: 56.0,
+            green_moe_gpa: 8.8,
+            crown_drag_coefficient: 0.2,
+            vogel_exponent: -1.0,
+            anchorage_nm_per_kg: 178.1,
         }
     }
 }

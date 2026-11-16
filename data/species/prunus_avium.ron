@@ -368,4 +368,28 @@
         // Wild cherry is short-lived (rarely much over 100 years).
         typical_lifespan_years: 110.0,
     ),
+    // Static mechanics (crates/dendro-core/src/mechanics.rs; read-only, no
+    // effect on growth). No green-wood table for P. avium was available:
+    // the values are those of black cherry (Prunus serotina) in the USDA
+    // Wood Handbook (FPL-GTR-190, 2010), a proxy.
+    mechanics: (
+        // Table 4-1: green moisture content of black cherry heartwood 58 %
+        // (sapwood not given); Table 5-3a: specific gravity 0.47 (green
+        // volume). 0.47 x 1.58 = 743 kg/m3 (heartwood: sapwood, wetter, is
+        // heavier; underestimate).
+        green_density_kg_m3: 743.0,
+        // Table 5-3a, black cherry, green: MOR 55 000 kPa, MOE 9 000 MPa.
+        green_mor_mpa: 55.0,
+        green_moe_gpa: 9.0,
+        // Vollsinger et al. 2005 (Can J For Res 35:1238-1249): 0.15-0.22 at
+        // 20 m/s on the still-air frontal area (no cherry measured):
+        // estimated, same as oak.
+        crown_drag_coefficient: 0.2,
+        // Same study: drag ~ U^1 (B = -1) over 4-20 m/s; estimated.
+        vogel_exponent: -1.0,
+        // ForestGALES 2.5, Sitka spruce, freely draining, deep rooting
+        // (conifer proxy, estimated). The shallower, spreading root system
+        // of cherry acts through the simulated rooting depth, not here.
+        anchorage_nm_per_kg: 178.1,
+    ),
 )

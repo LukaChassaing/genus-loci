@@ -118,6 +118,7 @@ impl Backend {
 
     fn adopt(&mut self, sim: Simulation) {
         self.sim = sim;
+        self.mechanics_stale();
         self.carry_days = 0.0;
         self.drought = self.sim.drought();
     }
@@ -129,6 +130,7 @@ impl Backend {
         }
         self.checkpoint_today();
         self.drop_future_checkpoints();
+        self.mechanics_stale();
         self.sim.cut(node_id, t, flush).map_or(-1, |k| k.code() as i32)
     }
 
@@ -143,6 +145,7 @@ impl Backend {
     pub fn prune_op(&mut self, op: &str, arg: f32) -> i32 {
         self.checkpoint_today();
         self.drop_future_checkpoints();
+        self.mechanics_stale();
         let n = match op {
             "raise" => self.sim.raise_crown(arg),
             "top" => self.sim.top_at(arg).map_or(0, |_| 1),

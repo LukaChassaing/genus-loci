@@ -33,6 +33,10 @@ var flux_panel: FluxPanel        # per-kind flux toggles, legend and live values
 var prune_tool: PruneTool         # pruning tool « Taille » (T), wounds, control ghost
 var save_flow: SaveFlow           # save / load: F5 / F9, autosave, loading card (save_flow.gd)
 var flux: RootFlux               # root material + water / nutrient flux (dashes, motes)
+var mech_panel: MechPanel         # static mechanics « Mécanique » (M): wind slider, safety, critical speeds
+var mech_mi: MeshInstance3D       # the wood coloured by safety factor, shown instead of the bark while the panel is open
+var _mech_mesh_age: float = 10.0
+const MECH_MESH_INTERVAL: float = 0.15  # tinted wood rebuilt at most ~7 times a second while the slider moves
 var _last_water_q: int = -1
 # Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
 var _stats_dirty: bool = true
@@ -146,6 +150,15 @@ func _ready() -> void:
 	add_child(save_flow)
 	save_flow.setup(self, load_path, load_error)
 	hud.side_panels.append(flux_panel)  # docked under the pruning panel (Hud.layout_side_panels)
+	mech_panel = MechPanel.new(sim)
+	mech_panel.host = self
+	mech_panel.visible = false
+	hud.add_child(mech_panel)
+	hud.mech_toggled.connect(func(on: bool) -> void:
+		mech_panel.visible = on
+		if on:
+			mech_panel.refresh())
+	hud.side_panels.append(mech_panel)  # docked last (Hud.layout_side_panels)
 	guides.soil = soil
 	guides.cam = cam
 	cam.wedge_dir = soil.wedge_dir
@@ -191,6 +204,7 @@ func on_tree_loaded() -> void:
 	mesh_dirty = true
 	_rebuild_meshes(true)
 	_settle_view()
+	on_mechanics_stale()
 
 
 func _new_seed() -> void:
@@ -337,6 +351,14 @@ func _build_tree_nodes() -> void:
 	fine_root_mi.material_override = fine_root_mat
 	fine_root_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(fine_root_mi)
+	mech_mi = MeshInstance3D.new()
+	mech_mi.name = "MechanicsWood"
+	var mm: StandardMaterial3D = StandardMaterial3D.new()
+	mm.vertex_color_use_as_albedo = true
+	mm.roughness = 0.85
+	mech_mi.material_override = mm
+	mech_mi.visible = false
+	add_child(mech_mi)
 	_build_leaf_fall()
 
 
@@ -531,6 +553,29 @@ func _install_meshes(r: Array) -> void:
 	mesh_dirty = false
 
 
+## The tree was cut, rewound, undone or replaced: the mechanics panel recomputes (now if open, else when opened)
+## and the tinted wood follows. The binding drops its own cache on the same paths.
+func on_mechanics_stale() -> void:
+	if mech_panel != null:
+		mech_panel.refresh()
+
+
+## While the « Mécanique » panel is open (and « Colorer le bois » on), the wood is drawn coloured by safety factor
+## (TreeSim.build_mechanics_mesh) in place of the bark mesh; rebuilt when the panel recomputed, throttled.
+func _update_mech_overlay(delta: float) -> void:
+	_mech_mesh_age += delta
+	# Not while time runs: the tinted mesh is built on the main thread (~100 ms on an old oak) and would lag
+	# behind the growing wood; the bark mesh (built on the worker thread) is shown instead.
+	var on: bool = mech_panel != null and mech_panel.visible and mech_panel.tint_on and not playing
+	if on and mech_panel.mesh_dirty and _mech_mesh_age >= MECH_MESH_INTERVAL:
+		mech_panel.mesh_dirty = false
+		_mech_mesh_age = 0.0
+		mech_mi.mesh = sim.build_mechanics_mesh(mech_panel.wind)
+	var tinted: bool = on and mech_mi.mesh != null
+	mech_mi.visible = tinted
+	wood_mi.visible = not tinted
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k: InputEventKey = event
@@ -551,6 +596,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				cam.toggle_root_view()
 			KEY_E:
 				cam.toggle_ensemble()
+			KEY_M:
+				hud.mech_button.button_pressed = not hud.mech_button.button_pressed
 			KEY_F5:
 				save_flow.quick_save()
 			KEY_F9:
@@ -592,6 +639,9 @@ func _process(delta: float) -> void:
 	t = Time.get_ticks_usec()
 	flux.update(sim, delta, playing, cam.distance)
 	Prof.add("gd.flux_update", t)
+	t = Time.get_ticks_usec()
+	_update_mech_overlay(delta)
+	Prof.add("gd.mech_overlay", t)
 	t = Time.get_ticks_usec()
 	hud.update_from(sim)
 	Prof.add("gd.hud_update", t)
@@ -775,6 +825,8 @@ func _simulate() -> void:
 #   DENDRO_SOIL_OPACITY=0..1  soil opacity;  DENDRO_FLUX=0|1  flux dashes / motes on the roots
 #   DENDRO_FLUX_T=0.25    extra flux phase (dashes travelled) for motion stills
 #   DENDRO_FLUX_KINDS=all|none|water,minerals,sugar,o2,co2,vapour,myco   flux kinds shown (panel toggles)
+#   DENDRO_MECA=32        « Mécanique » panel open at that gust speed (m/s), wood coloured by safety factor;
+#                         DENDRO_MECA_TINT=0 keeps the bark
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
 #   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
@@ -917,6 +969,19 @@ func _apply_view_env() -> void:
 		flux_panel.sync_checks()
 	if OS.get_environment("DENDRO_GUIDES") == "1":
 		hud.guides_button.button_pressed = true
+	var meca: String = OS.get_environment("DENDRO_MECA")
+	if meca != "":
+		mech_panel.set_wind(float(meca))
+		if OS.get_environment("DENDRO_MECA_TINT") == "0":
+			mech_panel.tint_check.button_pressed = false
+		hud.mech_button.button_pressed = true
+		mech_panel.refresh()
+		_mech_mesh_age = MECH_MESH_INTERVAL
+		_update_mech_overlay(0.0)
+		var d: Dictionary = mech_panel.values
+		print("[dendro] mechanics at %.1f m/s: min safety %.2f (%s), first failure %s at %.1f m/s, mass %.0f kg" % [
+			mech_panel.wind, float(d.get("min_safety", -1.0)), String(d.get("expected_label", "")),
+			String(d.get("first_label", "")), float(d.get("first_speed", -1.0)), float(d.get("mass_kg", 0.0))])
 
 
 ## Close-up on an outer cluster of blossoms (or of fruit once the bloom is over), seen from outside the crown.
@@ -1598,6 +1663,57 @@ func _run_selftest() -> void:
 	var oak_fl: ArrayMesh = sim.build_flower_mesh()
 	_check("oak: flower mesh empty", oak_fl.get_surface_count() == 0 or (oak_fl.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 0)
 	_check("oak bark look restored", bark_mat.roughness > 0.9 and bark_mat.albedo_texture == _oak_bark[0])
+
+	# 12. Mechanics panel (« Mécanique », key M): static wind load, safety factors, critical speeds, tinted wood.
+	_check("Beaufort scale (gust label)", MechPanel.beaufort(0.2) == 0 and MechPanel.beaufort(10.0) == 5
+		and MechPanel.beaufort(32.7) == 12 and MechPanel.beaufort(20.8) == 9)
+	_check("mechanics panel closed by default", not mech_panel.visible and wood_mi.visible)
+	_press_key(KEY_M)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var md: Dictionary = mech_panel.values
+	_check("key M: mechanics panel open with values", mech_panel.visible and hud.mech_button.button_pressed
+		and md.has("min_safety") and md.has("critical_uproot") and float(md["mass_kg"]) > 1.0,
+		"mass %.0f kg" % float(md.get("mass_kg", 0.0)))
+	_mech_mesh_age = MECH_MESH_INTERVAL
+	_update_mech_overlay(0.0)
+	_check("mechanics: wood drawn coloured by safety", mech_mi.visible and not wood_mi.visible and mech_mi.mesh != null
+		and mech_mi.mesh.get_surface_count() == 1)
+	var seg_sf: PackedFloat32Array = sim.get_mechanics_safety(mech_panel.wind)
+	var sf_ok: bool = seg_sf.size() > 10
+	for v: float in seg_sf:
+		sf_ok = sf_ok and v > 0.0
+	_check("mechanics: a positive safety factor per shoot segment", sf_ok, "%d segments" % seg_sf.size())
+	mech_panel.set_wind(0.0)
+	mech_panel.refresh()
+	var calm: float = float(mech_panel.values["min_safety"])
+	var calm_drag: float = float(mech_panel.values["drag_kn"])
+	mech_panel.slider.value = 45.0  # same path as a drag of the slider
+	mech_panel.refresh()
+	var gale: float = float(mech_panel.values["min_safety"])
+	_check("mechanics: more wind, less safety; no drag in calm air", gale < calm and calm_drag == 0.0
+		and float(mech_panel.values["drag_kn"]) > 0.0, "calm %.2f, 45 m/s %.2f" % [calm, gale])
+	var crit: Array = [float(md["critical_stem"]), float(md["critical_limb"]), float(md["critical_uproot"])]
+	var first: float = float(mech_panel.values["first_speed"])
+	var lowest: float = 1e9
+	for c: float in crit:
+		if c >= 0.0:
+			lowest = minf(lowest, c)
+	_check("mechanics: first failure = lowest critical speed", first < 0.0 or is_equal_approx(first, lowest), "%s / %.1f" % [str(crit), first])
+	var rects: Array[Rect2] = hud.side_panel_rects()
+	var overlap: bool = false
+	for i: int in rects.size():
+		for j: int in range(i + 1, rects.size()):
+			overlap = overlap or rects[i].grow(-1.0).intersects(rects[j].grow(-1.0))
+	_check("mechanics panel docked in the side column without overlap", not overlap, str(rects))
+	mech_panel.tint_check.button_pressed = false
+	_update_mech_overlay(0.0)
+	_check("mechanics: tint off shows the bark", wood_mi.visible and not mech_mi.visible)
+	mech_panel.tint_check.button_pressed = true
+	_press_key(KEY_M)
+	await get_tree().process_frame
+	_update_mech_overlay(0.0)
+	_check("key M again: panel closed, bark back", not mech_panel.visible and wood_mi.visible and not mech_mi.visible)
 
 	await UiSelftest.run(self, _check)  # shell screens: title, setup, plates, options, pause, settings, HUD fit
 

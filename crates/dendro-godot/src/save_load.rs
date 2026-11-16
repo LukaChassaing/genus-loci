@@ -137,6 +137,7 @@ impl Backend {
                 let millis = l.started.elapsed().as_millis() as u64;
                 let day = res.sim.days_elapsed();
                 self.sim = res.sim;
+                self.mechanics_stale();
                 self.carry_days = 0.0;
                 self.drought = self.sim.drought();
                 self.timeline_install(res.base, res.checkpoints);

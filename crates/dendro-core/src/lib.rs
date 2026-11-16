@@ -30,6 +30,7 @@ pub mod fmath;
 pub mod genome;
 mod growth;
 mod math;
+pub mod mechanics;
 pub mod mesh;
 pub mod phenology;
 pub mod pruning;
@@ -42,11 +43,12 @@ pub mod soil;
 
 pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
-pub use genome::{MycorrhizaType, SymbiosisTraits};
+pub use genome::{MechanicsTraits, MycorrhizaType, SymbiosisTraits};
 pub use genome::{
     Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
     Tolerances, WoodTraits,
 };
+pub use mechanics::{CriticalSpeeds, FailureMode, MechSegment, MechSite, MechanicsModel, MechanicsSnapshot, SegmentRole, WeakPoint, WindLoad};
 pub use mesh::MeshData;
 pub use phenology::{Phase, ReproStage, Season};
 pub use pruning::{

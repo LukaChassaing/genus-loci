@@ -858,6 +858,16 @@ impl Simulation {
 
     /// Trunk and branches. See [`crate::mesh`] for conventions.
     pub fn wood_mesh(&self) -> MeshData {
+        self.wood_mesh_with(None)
+    }
+
+    /// The wood mesh with one vertex colour per shoot segment (node order,
+    /// e.g. [`crate::mechanics::safety_colors`]) instead of the bark colours.
+    pub fn wood_mesh_tinted(&self, colors: &[[f32; 4]]) -> MeshData {
+        self.wood_mesh_with(Some(colors))
+    }
+
+    fn wood_mesh_with(&self, tint: Option<&[[f32; 4]]>) -> MeshData {
         let year = self.year();
         let ext = self.shoots.ext;
         let nodes = &self.shoots.nodes;
@@ -913,7 +923,9 @@ impl Simulation {
                 // Young shoots green-brown, then grey-brown bark, darker on old trunks.
                 let t = (age / 4.0).min(1.0);
                 let dark = (r / 0.4).min(1.0);
-                let col = if n.is_snag() {
+                let col = if let Some(c) = tint.and_then(|t| t.get(i)) {
+                    *c
+                } else if n.is_snag() {
                     // Dead wood: bark sloughs off, silver-grey.
                     [0.56, 0.54, 0.50, 1.0]
                 } else {

@@ -214,7 +214,7 @@ fn pow_k(x: f32, k: f32) -> f32 {
 /// Leaf area of a leafy shoot unit relative to the reference (a full-length
 /// unit of about a voxel): short, weak units carry fewer leaves.
 #[inline]
-fn leaf_units(n: &Node, unit_len: f32) -> f32 {
+pub(crate) fn leaf_units(n: &Node, unit_len: f32) -> f32 {
     0.5 + 0.5 * (n.length / unit_len.max(1e-3)).min(1.0)
 }
 
