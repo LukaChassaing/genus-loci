@@ -37,6 +37,7 @@
 //!   increment as the stem base; each root segment gets a share equal to the
 //!   fraction of root tips it supports.
 
+use crate::fmath::DMath;
 use crate::genome::RootTraits;
 use crate::soil::{Layer, SoilColumn};
 use crate::math::Vec3;
@@ -193,7 +194,7 @@ impl RootSystem {
                 }
             }
             let az = (137.5f32 * k as f32).to_radians() + 0.4 * rng::unit(rng::hash(seed, S_ROOT, k as u64, 1));
-            let dir = Vec3::new(az.cos(), -0.18, az.sin()).normalize_or(Vec3::new(1.0, 0.0, 0.0));
+            let dir = Vec3::new(az.dcos(), -0.18, az.dsin()).normalize_or(Vec3::new(1.0, 0.0, 0.0));
             let start = self.nodes[best].end();
             let pref = (0.3 + 0.7 * rng::unit(rng::hash(seed, S_ROOT, k as u64, 2))) * rt.lateral_depth_m;
             self.push(RootNode {
@@ -273,10 +274,10 @@ impl RootSystem {
             // maximum). Calibration: the squared linear ramp is a
             // smooth stand-in for that threshold behaviour.
             let r_soil = resist(depth + 0.05);
-            let f_soil = (1.0 - r_soil / rt.max_penetration_mpa.max(0.1)).clamp(0.0, 1.0).powi(2);
+            let f_soil = (1.0 - r_soil / rt.max_penetration_mpa.max(0.1)).clamp(0.0, 1.0).dpowi(2);
             let limit = match n.kind {
                 RootKind::Tap => {
-                    rt.taproot_dominance * (-age / rt.taproot_decline_years).exp().max(0.08) * (1.0 - depth / barrier) * f_soil * deepen
+                    rt.taproot_dominance * (-age / rt.taproot_decline_years).dexp().max(0.08) * (1.0 - depth / barrier) * f_soil * deepen
                 }
                 RootKind::Lateral => {
                     // Pioneer laterals keep most of their speed until close
@@ -284,7 +285,7 @@ impl RootSystem {
                     let reach = (1.0 - rh / spread_limit).max(0.0);
                     let reach = if n.order == 1 { reach.sqrt() } else { reach };
                     reach.min(1.0 - n.axis_len / order_len)
-                        * 0.75f32.powi(n.order as i32 - 1)
+                        * 0.75f32.dpowi(n.order as i32 - 1)
                         * (0.5 + 0.5 * f_soil)
                 }
                 RootKind::Sinker => 0.5 * (1.0 - depth / barrier) * f_soil * deepen,
@@ -300,7 +301,7 @@ impl RootSystem {
             // Crowding slows side roots; the first-order "pioneer" laterals
             // that explore beyond the crown are much less affected.
             let crowd = cell_of(e).map(|c| 1.0 / (1.0 + occ[c] as f32 / 6.0)).unwrap_or(1.0);
-            let crowd = if n.kind == RootKind::Lateral && n.order == 1 { crowd.powf(0.25) } else { crowd };
+            let crowd = if n.kind == RootKind::Lateral && n.order == 1 { crowd.dpowf(0.25) } else { crowd };
             let ext = base * limit.min(1.0) * crowd;
             if ext < 0.005 {
                 continue;
@@ -361,7 +362,7 @@ impl RootSystem {
             if n.order < rt.max_order && n.kind != RootKind::Tap && rng::unit(h(4)) < rt.branching_probability {
                 let side = if rng::unit(h(5)) < 0.5 { -1.0 } else { 1.0 };
                 let ang = side * (0.9 + 0.5 * rng::unit(h(6)));
-                let (s, c) = ang.sin_cos();
+                let (s, c) = ang.dsin_cos();
                 let sd = Vec3::new(d.x * c - d.z * s, d.y.min(-0.05), d.x * s + d.z * c).normalize_or(d);
                 self.push(RootNode {
                     id: 0,
@@ -430,7 +431,7 @@ impl RootSystem {
         for l in soil.layers.iter_mut() {
             l.root_len = l.struct_len * (1.0 + rt.fine_root_per_m * proliferation(l, rt));
         }
-        soil.root_zone_m2 = PI * self.spread().max(0.5).powi(2);
+        soil.root_zone_m2 = PI * self.spread().max(0.5).dpowi(2);
         soil.refresh_states();
     }
 
@@ -477,7 +478,7 @@ impl RootSystem {
             for s in 0..=k {
                 let p = n.start + n.dir * (n.length * s as f32 / k as f32);
                 let r = p.horizontal_len();
-                let az = p.z.atan2(p.x).rem_euclid(2.0 * PI);
+                let az = p.z.datan2(p.x).rem_euclid(2.0 * PI);
                 let si = ((az / (2.0 * PI) * sectors as f32) as usize).min(sectors - 1);
                 let bi = ((r / r_max * bins as f32) as usize).min(bins - 1);
                 let c = &mut out[si * bins + bi];
@@ -493,7 +494,7 @@ impl RootSystem {
             .nodes
             .iter()
             .filter(|r| r.kind == RootKind::Lateral && r.order == 1 && !r.continues)
-            .map(|r| (r.area, r.dir.z.atan2(r.dir.x)))
+            .map(|r| (r.area, r.dir.z.datan2(r.dir.x)))
             .collect();
         v.sort_by(|a, b| b.0.total_cmp(&a.0));
         v.into_iter().take(n).map(|x| x.1).collect()

@@ -36,6 +36,7 @@
 //! site, and the other parameters (drainage mm/day, stones, nutrient index)
 //! are stylised.
 
+use crate::fmath::DMath;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -517,7 +518,7 @@ impl SoilColumn {
         // canopy is taken at LAI 6 when fully leafed (their r = 0.75 case);
         // leafless winter wood shades the ground by ~30 %.
         let lai = 6.0 * leaf;
-        let e_soil = pet * 0.7 * (-0.5 * lai).exp();
+        let e_soil = pet * 0.7 * (-0.5 * lai).dexp();
         let mut want = e_soil;
         for l in self.layers.iter_mut() {
             if l.top >= 0.15 || want <= 0.0 {

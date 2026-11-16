@@ -70,41 +70,26 @@ Limites honnêtes : sous Windows le job utilise `Godot_*_win64_console.exe` (pr�
 
 ## Déterminisme
 
-Objectif (roadmap M0) : même graine, même génome, mêmes appels, même état sur Linux et Windows. `examples/state_hash.rs` fait pousser le chêne et le merisier 100 ans (graine 42) et imprime, par arbre, `hash` (FNV-1a sur les bits des statistiques, cernes et quatre maillages) et `state` (`Simulation::state_hash()` de `save.rs`, sur l'état interne). En local : deux exécutions successives donnent des sorties identiques.
+Objectif (roadmap M0) : même graine, même génome, mêmes appels, même état sur Linux et Windows. `examples/state_hash.rs` fait pousser le chêne et le merisier 100 ans (graine 42) et imprime, par arbre, `hash` (FNV-1a sur les bits des statistiques, cernes et quatre maillages) et `state` (`Simulation::state_hash()` de `save.rs`, sur l'état interne). En local : deux exécutions successives donnent des sorties identiques. Le job CI `determinism-compare` compare les sorties Linux et Windows.
 
-### Sources possibles de divergence dans `dendro-core/src`
+### Constat de la première CI
 
-| Source | Statut |
-|---|---|
-| **Fonctions transcendantes de la libm de la plateforme** : `std` f32/f64 `sin`, `cos`, `tan`, `acos`, `atan2`, `exp`, `ln`, `powf` appellent glibc sous Linux et l'UCRT/compiler-rt sous Windows ; les deux sont précises à ~1 ulp mais **pas identiques bit à bit**. | **Risque réel, probablement fatal sur 100 ans.** Comptage (hors tests non triés) : `climate.rs` 8 `sin`, 8 `cos`, 2 `tan`, 2 `acos` ; `growth.rs` 6 `sin`, 6 `cos`, 4 `powf`, 1 `tan`, 1 `exp`, 1 `atan2`, 1 `acos` ; `roots.rs` 3 `powi`, 2 `atan2`, 1 chacun `sin`/`cos`/`powf`/`exp` ; `rng.rs` 2 `ln`, 1 `cos` (en f64) ; `mesh.rs` 3 `sin`/`cos`, 1 `atan2` ; `flux.rs` 2 `powf`, 1 `sin`/`cos`/`exp` ; `pruning.rs` 1 `sin`, 1 `powf` ; `phenology.rs` 1 `powf`, 1 `powi` ; `sim.rs` 1 `powf`, 1 `exp` ; `soil.rs` 1 `exp` ; `genome.rs` 1 `exp`. |
-| `sqrt`, `+ - * /`, `abs`, `min`, `max`, `floor` | Exacts selon IEEE 754, sans risque. |
-| `powi` | Appelle `__powisf2` (multiplications en chaîne) ; déterministe tant que le compilateur ne le replie pas différemment ; à surveiller, pas à remplacer en priorité. |
-| FMA / `fast-math` | Rust ne contracte pas `a*b+c` et n'a pas de fast-math en stable ; pas de `-C target-cpu=native` (aucun `.cargo/config`). Rien à faire, à ne pas introduire. |
-| `HashMap` / `HashSet` (`pruning.rs`, 8 occurrences) | Utilisés uniquement en recherche (`id -> index`), aucune itération sur la table (vérifié par recherche). L'ordre aléatoire ne joue donc pas. À maintenir : ne jamais itérer dessus (préférer `BTreeMap`/`Vec`). |
-| Threads | Aucun dans le cœur (`rayon`/`std::thread` absents). |
-| Tri | 7 `sort*`; `sort_unstable` de Rust est déterministe pour une entrée donnée. Un tri sur des `f32` avec égalités doit rester total (`total_cmp`). |
-| Sérialisation `Debug` des `f32` (hachage de `save.rs`) | Forme la plus courte aller-retour, identique sur toutes les plateformes. |
+Les deux plateformes divergeaient (chêne : Linux `height=23.9131 dbh=77.6333`, Windows `height=24.1681 dbh=75.8739`), et le test `limb_to_stem_ratios_and_elastic_similarity` échouait seulement sous Windows. Cause : les fonctions transcendantes de `std` (`sin`, `cos`, `exp`, `ln`, `powf`...) appellent la libm de la plateforme (glibc, UCRT), précise à ~1 ulp mais pas identique bit à bit ; la croissance sur 36 500 jours amplifie la moindre différence.
 
-**Prédiction** : les hachages Linux et Windows divergent probablement dès que la CI tournera (au premier ulp différent d'un `sin`/`powf`, la divergence est amplifiée par la croissance sur 36 500 jours). Si le job `determinism-compare` est rouge, c'est ce point, pas un bogue de la CI.
+### Ce qui a été fait
 
-### Correctif proposé (non appliqué : `sim.rs`, `growth.rs`, `mesh.rs`, `rings.rs` sont en cours de modification par un autre chantier)
+- Crate `libm` (Rust pur, `libm = "0.2"`) et module `crates/dendro-core/src/fmath.rs` : trait `DMath` implémenté pour `f32` et `f64`, méthodes `dsin`, `dcos`, `dtan`, `dacos`, `datan2`, `dexp`, `dln`, `dpowf`, `dsin_cos`, `dpowi`. `dpowi` est une exponentiation par carrés dans un ordre fixe (`std::powi` n'est pas garanti identique d'un niveau d'optimisation ou d'une plateforme à l'autre).
+- Les 66 appels de `dendro-core/src` ont été remplacés (`climate` 10, `growth` 14, `roots` 9, `mesh` 6, `flux` 4, `pruning` 3, `rng` 2 (en f64), `phenology` 2, `sim` 2, `genome`, `math`, `soil` 1 chacun).
+- Restent des méthodes `std`, exactes selon IEEE 754 : `+ - * /`, `sqrt`, `abs`, `min`, `max`, `clamp`, `floor`, `ceil`, `round`, `rem_euclid`, `signum`, `to_radians`/`to_degrees` (multiplications). Aucun `mul_add`, `cbrt`, `hypot`, `tanh`... dans le cœur. Pas de FMA implicite : Rust ne contracte pas `a*b+c`, et il n'y a ni `-C target-cpu=native` ni fast-math.
+- Garde-fou : `crates/dendro-core/tests/determinism.rs` échoue si `.sin(`, `.cos(`, `.exp(`, `.ln(`, `.powf(`, `.powi(`, `.atan2(`, `.tanh(`, `.mul_add(`... (ou `f32::sin(`...) apparaît dans `crates/dendro-core/src` hors `fmath.rs` (`.log(` est exclu : `SaveFile::log()` est un accesseur).
+- Autres sources examinées, sans effet : `HashMap`/`HashSet` de `pruning.rs` (recherche id -> index, jamais itérés) ; tris (`sort_by` avec `total_cmp` et départage par indice, `sort_unstable` sur clés totalement ordonnées) ; pas de thread, d'horloge ni de `env` dans le cœur ; les conversions `as u32`/`as usize` portent sur des indices et des quantités bornées (les `as` flottant -> entier saturent de façon définie, NaN -> 0) ; aucune dépendance à la largeur de `usize` trouvée dans le calcul (les compteurs sont des `u32`). Le binding Godot ne renvoie à la simulation que des durées en jours (la fraction de jour par image est reportée dans le binding, et `advance_days(n)` est identique à n appels d'un jour) et des actions de taille (position de coupe, journalisées donc rejouées telles quelles) : aucune valeur calculée côté GDScript n'influence la croissance.
+- Les trajectoires ont légèrement changé (autre libm) : chêne de 100 ans 24,38 m / 76,1 cm, merisier 23,27 m / 76,1 cm. Quatre tests calibrés à la limite ont été rendus robustes par une médiane sur plusieurs graines (bornes inchangées) : voir les commentaires de `limb_to_stem_ratios_and_elastic_similarity`, `soil_shapes_the_tree`, `oak_architecture` et `cherry_declines_while_oak_grows`. Aucun test ne compare un hachage d'état figé.
+- Coût : environ +5 % sur les tests de performance (chêne 200 ans 3,9 -> 4,1 s, merisier 130 ans 0,49 -> 0,52 s, `state_hash` inchangé à 1,07 s), pas d'optimisation nécessaire.
 
-1. `crates/dendro-core/Cargo.toml` : ajouter `libm = "0.2"` (Rust pur, mêmes résultats partout).
-2. Créer un module `crates/dendro-core/src/fmath.rs` (déclaré `mod fmath;` dans `lib.rs`) :
+### Ce qui reste incertain
 
-```rust
-//! Fonctions transcendantes déterministes (libm pure Rust), pour un résultat identique sur tous les OS.
-#[inline] pub fn sin(x: f32) -> f32 { libm::sinf(x) }
-#[inline] pub fn cos(x: f32) -> f32 { libm::cosf(x) }
-#[inline] pub fn tan(x: f32) -> f32 { libm::tanf(x) }
-#[inline] pub fn acos(x: f32) -> f32 { libm::acosf(x) }
-#[inline] pub fn atan2(y: f32, x: f32) -> f32 { libm::atan2f(y, x) }
-#[inline] pub fn exp(x: f32) -> f32 { libm::expf(x) }
-#[inline] pub fn powf(x: f32, y: f32) -> f32 { libm::powf(x, y) }
-#[inline] pub fn ln64(x: f64) -> f64 { libm::log(x) }
-#[inline] pub fn cos64(x: f64) -> f64 { libm::cos(x) }
-```
+La preuve est le job `determinism-compare` : il n'a pas pu être exécuté sous Windows ici (seul `cargo check --target x86_64-pc-windows-msvc` a été fait). Restent à surveiller : `f32::sqrt` est exact partout, mais un futur code utilisant `f32::sin` etc. directement réintroduirait la divergence (le garde-fou le détecte seulement dans `dendro-core/src`) ; les sauvegardes embarquent un hachage d'état, qui détectera aussi toute dérive entre plateformes ou versions.
 
-3. Remplacer chaque `x.sin()` par `fmath::sin(x)`, etc., dans les fichiers listés ci-dessus (une centaine de sites, mécanique ; `rng.rs` : `ln` et `cos` en f64). Le plus sûr : remplacement guidé par le compilateur, puis `cargo test` ; la calibration bouge au dernier bit, il faudra relancer les tests de réalisme.
-4. Garde-fou CI : étendre `no-species-code` ou ajouter un `grep -rnE '\.(sin|cos|tan|acos|atan2|exp|ln|powf)\(' crates/dendro-core/src` hors `fmath.rs` qui échoue.
-5. En complément (ou en secours), les sauvegardes embarquent déjà un hachage d'état : un instantané d'état plutôt qu'un rejeu éviterait la dépendance au déterminisme pour les parties sauvegardées.
+### Règle pour les contributeurs
+
+Dans `dendro-core/src`, jamais de `.sin()`, `.cos()`, `.exp()`, `.ln()`, `.powf()`, `.powi()`... bruts : importer `crate::fmath::DMath` et utiliser `.dsin()`, `.dcos()`, `.dexp()`, `.dln()`, `.dpowf()`, `.dpowi()`. N'ajouter une nouvelle fonction qu'en l'enveloppant dans `fmath.rs` (libm) ; ne jamais itérer sur un `HashMap`/`HashSet`, ne pas utiliser de FMA/fast-math ni `target-cpu=native`, ne jamais comparer un test à un hachage d'état figé.

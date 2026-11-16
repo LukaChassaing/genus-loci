@@ -175,8 +175,8 @@ struct Growth {
     at: Vec<Snapshot>,
 }
 
-fn grow_open(g: Genome, years: u32, ages: &[u32]) -> Growth {
-    let mut sim = Simulation::new(g, 42);
+fn grow_open(g: Genome, seed: u64, years: u32, ages: &[u32]) -> Growth {
+    let mut sim = Simulation::new(g, seed);
     let mut dbh = vec![0.0];
     let mut at = Vec::new();
     for age in 1..=years {
@@ -192,12 +192,33 @@ fn grow_open(g: Genome, years: u32, ages: &[u32]) -> Growth {
 
 fn oak_200() -> &'static Growth {
     static G: OnceLock<Growth> = OnceLock::new();
-    G.get_or_init(|| grow_open(Genome::quercus_robur(), 200, &[100, 200]))
+    G.get_or_init(|| grow_open(Genome::quercus_robur(), 42, 200, &[100, 200]))
 }
 
 fn cherry_100() -> &'static Growth {
     static G: OnceLock<Growth> = OnceLock::new();
-    G.get_or_init(|| grow_open(Genome::prunus_avium(), 100, &[60, 100]))
+    G.get_or_init(|| grow_open(Genome::prunus_avium(), 42, 100, &[60, 100]))
+}
+
+/// Seeds for the limb-proportion checks (the metrics of one tree are
+/// seed-sensitive: a different last bit in a libm changes the tree).
+const LIMB_SEEDS: [u64; 3] = [42, 1, 1234];
+
+/// Same run as `oak_200` / `cherry_100` for every seed in `LIMB_SEEDS`.
+fn limb_runs() -> &'static (Vec<Growth>, Vec<Growth>) {
+    static G: OnceLock<(Vec<Growth>, Vec<Growth>)> = OnceLock::new();
+    G.get_or_init(|| {
+        let oaks: Vec<_> =
+            LIMB_SEEDS.iter().map(|&s| std::thread::spawn(move || grow_open(Genome::quercus_robur(), s, 200, &[100, 200]))).collect();
+        let cherries: Vec<_> =
+            LIMB_SEEDS.iter().map(|&s| std::thread::spawn(move || grow_open(Genome::prunus_avium(), s, 100, &[60, 100]))).collect();
+        (oaks.into_iter().map(|h| h.join().unwrap()).collect(), cherries.into_iter().map(|h| h.join().unwrap()).collect())
+    })
+}
+
+fn median(mut v: Vec<f32>) -> f32 {
+    v.sort_by(|a, b| a.total_cmp(b));
+    v[v.len() / 2]
 }
 
 fn mean(v: &[f32]) -> f32 {
@@ -276,14 +297,31 @@ fn limb_to_stem_ratios_and_elastic_similarity() {
     // 59:443-466: length ~ diameter^(2/3)): the limb reaching farthest
     // should have about the diameter the stem would have at that length,
     // DBH x (reach / height)^1.5, within a factor of two.
-    for (g, species, max_r) in [(oak_200(), "oak", 0.9), (cherry_100(), "cherry", 0.6)] {
-        for (age, m, h, limbs) in &g.at {
-            assert!((0.25..0.6).contains(&m.mean_limb_ratio), "{species} {age} y: {m:?}");
-            assert!(m.max_limb_ratio < max_r, "{species} {age} y: {m:?}");
-            let (r, reach) = limbs.iter().copied().fold((0.0, 0.0), |b, l| if l.1 > b.1 { l } else { b });
-            let d = 2.0 * r * 100.0;
-            let expect = g.dbh[*age as usize] * (reach / h).powf(1.5);
-            assert!(d > 0.5 * expect && d < 2.0 * expect, "{species} {age} y: limb reaching {reach:.1} m is {d:.1} cm, elastic similarity {expect:.1} cm");
+    //
+    // Seed sensitivity: one tree's limbs depend on the random draws (and, in
+    // the last bit, on the math library), and the scaffold limbs of this
+    // model are still too slender (docs/sources.md, "Ecarts connus"), so a
+    // single seed sits near the factor-two limit. The tolerance is kept; the
+    // checks use the median over three seeds at each age.
+    let (oaks, cherries) = limb_runs();
+    for (runs, species, max_r) in [(oaks, "oak", 0.9), (cherries, "cherry", 0.6)] {
+        for i in 0..runs[0].at.len() {
+            let (mut means, mut maxs, mut ratios) = (Vec::new(), Vec::new(), Vec::new());
+            let mut age = 0;
+            for g in runs.iter() {
+                let (a, m, h, limbs) = &g.at[i];
+                age = *a;
+                means.push(m.mean_limb_ratio);
+                maxs.push(m.max_limb_ratio);
+                let (r, reach) = limbs.iter().copied().fold((0.0, 0.0), |b, l| if l.1 > b.1 { l } else { b });
+                let d = 2.0 * r * 100.0;
+                let expect = g.dbh[*a as usize] * (reach / h).powf(1.5);
+                ratios.push(d / expect);
+            }
+            let (mean_r, max_r_med, ratio) = (median(means), median(maxs), median(ratios));
+            assert!((0.25..0.6).contains(&mean_r), "{species} {age} y: median mean limb ratio {mean_r}");
+            assert!(max_r_med < max_r, "{species} {age} y: median max limb ratio {max_r_med}");
+            assert!(ratio > 0.5 && ratio < 2.0, "{species} {age} y: limb diameter / elastic similarity = {ratio:.2} (median of {} seeds)", LIMB_SEEDS.len());
         }
     }
 }

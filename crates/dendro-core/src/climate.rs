@@ -25,6 +25,7 @@
 //! Full Penman-Monteith would need radiation, humidity and wind that this
 //! generator does not produce honestly.
 
+use crate::fmath::DMath;
 use crate::rng::{self, S_RAIN, S_RAIN_AMT, S_TEMP, S_YEAR};
 use serde::{Deserialize, Serialize};
 use std::f32::consts::TAU;
@@ -138,10 +139,10 @@ pub struct Climate {
 /// declination expression here is the common sinusoidal approximation, not
 /// their exact CBM formula.
 pub fn photoperiod_h(latitude_deg: f32, doy: u32) -> f32 {
-    let decl = 23.44_f32.to_radians() * (TAU * (284.0 + doy as f32 + 1.0) / 365.0).sin();
+    let decl = 23.44_f32.to_radians() * (TAU * (284.0 + doy as f32 + 1.0) / 365.0).dsin();
     let lat = latitude_deg.to_radians();
-    let c = ((-0.833_f32).to_radians().sin() - lat.sin() * decl.sin()) / (lat.cos() * decl.cos());
-    let h = c.clamp(-1.0, 1.0).acos();
+    let c = ((-0.833_f32).to_radians().dsin() - lat.dsin() * decl.dsin()) / (lat.dcos() * decl.dcos());
+    let h = c.clamp(-1.0, 1.0).dacos();
     24.0 * h / std::f32::consts::PI
 }
 
@@ -152,13 +153,13 @@ pub fn photoperiod_h(latitude_deg: f32, doy: u32) -> f32 {
 pub fn extraterrestrial_radiation_mj(latitude_deg: f32, doy: u32) -> f32 {
     let j = doy as f32 + 1.0;
     let phi = latitude_deg.to_radians();
-    let dr = 1.0 + 0.033 * (TAU * j / 365.0).cos();
-    let decl = 0.409 * (TAU * j / 365.0 - 1.39).sin();
-    let ws = (-phi.tan() * decl.tan()).clamp(-1.0, 1.0).acos();
+    let dr = 1.0 + 0.033 * (TAU * j / 365.0).dcos();
+    let decl = 0.409 * (TAU * j / 365.0 - 1.39).dsin();
+    let ws = (-phi.dtan() * decl.dtan()).clamp(-1.0, 1.0).dacos();
     let ra = 24.0 * 60.0 / std::f32::consts::PI
         * 0.0820
         * dr
-        * (ws * phi.sin() * decl.sin() + phi.cos() * decl.cos() * ws.sin());
+        * (ws * phi.dsin() * decl.dsin() + phi.dcos() * decl.dcos() * ws.dsin());
     ra.max(0.0)
 }
 
@@ -220,7 +221,7 @@ impl Climate {
         let s = self.seed;
 
         // Temperature.
-        let seasonal = p.mean_temp_c - p.temp_amplitude_c * (TAU * (d - p.coldest_doy) / 365.0).cos();
+        let seasonal = p.mean_temp_c - p.temp_amplitude_c * (TAU * (d - p.coldest_doy) / 365.0).dcos();
         let rho = p.daily_temp_autocorr;
         let eps = rng::normal(rng::hash(s, S_TEMP, year as u64, doy as u64));
         self.ar = rho * self.ar + (1.0 - rho * rho).sqrt() * p.daily_temp_sd * eps;
@@ -236,7 +237,7 @@ impl Climate {
         // Precipitation: wetter autumn-winter (oceanic regime; Rennes has
         // ~73 mm/month in Oct-Dec against ~44 mm in Jul-Aug). Calibration:
         // peak in mid-December, +-18 % wet-day frequency and +-10 % amount.
-        let season = (TAU * (d - 350.0) / 365.0).cos();
+        let season = (TAU * (d - 350.0) / 365.0).dcos();
         let mut p_wet = p.wet_day_prob * (1.0 + 0.18 * season);
         let mean_amount = p.annual_precip_mm / (365.0 * p.wet_day_prob) * (1.0 + 0.10 * season);
         let mut mult = a.precip_mult;
@@ -256,7 +257,7 @@ impl Climate {
         // have a smaller range than clear dry days. Calibration: wet days
         // get 0.75 x the seasonal range and dry days are raised so that the
         // seasonal mean is kept (no source for the 0.75).
-        let dtr_season = p.dtr_mean_c - p.dtr_amplitude_c * (TAU * d / 365.0).cos();
+        let dtr_season = p.dtr_mean_c - p.dtr_amplitude_c * (TAU * d / 365.0).dcos();
         let pw = p_wet.clamp(0.0, 0.9);
         let dtr = if wet { 0.75 * dtr_season } else { dtr_season * (1.0 - 0.75 * pw) / (1.0 - pw) };
         let dtr = dtr.max(1.0);

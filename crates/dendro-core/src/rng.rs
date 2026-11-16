@@ -5,6 +5,8 @@
 //! independent of evaluation order and of how many days are advanced per
 //! call, which is what guarantees `advance_days(365) == 365 x advance_days(1)`.
 
+use crate::fmath::DMath;
+
 #[inline]
 pub(crate) fn mix(mut z: u64) -> u64 {
     z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -36,13 +38,13 @@ fn unit_open(h: u64) -> f64 {
 pub(crate) fn normal(h: u64) -> f32 {
     let u1 = unit_open(h);
     let u2 = unit_open(mix(h));
-    ((-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()) as f32
+    ((-2.0 * u1.dln()).sqrt() * (std::f64::consts::TAU * u2).dcos()) as f32
 }
 
 /// Exponential deviate with mean 1.
 #[inline]
 pub(crate) fn exponential(h: u64) -> f32 {
-    (-unit_open(h).ln()) as f32
+    (-unit_open(h).dln()) as f32
 }
 
 // Stream identifiers (arbitrary distinct constants).

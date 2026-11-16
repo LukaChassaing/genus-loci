@@ -48,6 +48,7 @@
 //!   delivers part of the P, N and (a little) water, and receives carbon
 //!   (see `SymbiosisTraits` and the species RON files for sources).
 
+use crate::fmath::DMath;
 use crate::genome::MycorrhizaType;
 use crate::growth::ShootSystem;
 use crate::math::Vec3;
@@ -587,7 +588,7 @@ impl Simulation {
         s.root_hypoxia = hyp;
         let t_air = w.temp_c;
         let t_soil = 0.4 * t_air + 0.6 * SOIL_T_MEAN;
-        let q = |t: f32| Q10.powf((t - 15.0) / 10.0);
+        let q = |t: f32| Q10.dpowf((t - 15.0) / 10.0);
 
         // --- photosynthesis ---
         // Same factors as the simulation's daily productivity index (light
@@ -921,7 +922,7 @@ impl Simulation {
         let e = g.wood.pipe_exponent.max(2.0);
         let boost_max = g.wood.limb_draw_boost.max(1.0);
         let drawn = |rs: f32| {
-            let pipe = (r_ref / rs.max(1e-6)).powf(1.0 - 2.0 / e);
+            let pipe = (r_ref / rs.max(1e-6)).dpowf(1.0 - 2.0 / e);
             let fade = ((rs - 0.005) / 0.035).clamp(0.0, 1.0);
             let cap = 1.0 + (boost_max - 1.0) * fade * fade * (3.0 - 2.0 * fade);
             rs * pipe.min(cap).max(1.0)
@@ -1005,7 +1006,7 @@ impl Simulation {
             if i == 0 {
                 nd.radius()
             } else {
-                (nd.radius() * (1.0 + k_taper * (-d).exp())).min(r_max.max(nd.radius()))
+                (nd.radius() * (1.0 + k_taper * (-d).dexp())).min(r_max.max(nd.radius()))
             }
         };
         let sink = |p: Vec3, r: f32| Vec3::new(p.x, p.y.min(-1.1 * r), p.z);
@@ -1148,7 +1149,7 @@ impl Simulation {
             let b = nd.dir.cross(a);
             let ang = u(1) * std::f32::consts::TAU;
             let along = nd.start + nd.dir * ((nd.end(ext) - nd.start).length() * u(2));
-            let p = along + (a * ang.cos() + b * ang.sin()) * drawn(nd.radius());
+            let p = along + (a * ang.dcos() + b * ang.dsin()) * drawn(nd.radius());
             out.gas_sites.push(GasSite {
                 pos: p.to_array(),
                 kind: GasSiteKind::Wood,

@@ -5,6 +5,7 @@
 //! species (e.g. *Prunus avium*) is obtained by writing a new RON file, not by
 //! changing code. Units are given in each field's doc comment.
 
+use crate::fmath::DMath;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -407,7 +408,7 @@ impl PhenologyTraits {
     /// Smith 1983; Murray, Cannell & Smith 1989).
     pub fn chill_penalty_gdd(&self, chill_days: f32) -> f32 {
         let r = 3.0 / self.chilling_requirement_days.max(1.0);
-        self.chill_forcing_gdd * (-r * chill_days.max(0.0)).exp()
+        self.chill_forcing_gdd * (-r * chill_days.max(0.0)).dexp()
     }
 
     /// Thermal time to budburst (degC.day from `forcing_start_doy`) after

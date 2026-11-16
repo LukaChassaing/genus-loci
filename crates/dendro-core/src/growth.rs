@@ -61,6 +61,7 @@
 //! * Natural pruning of the lower stem (clear bole) and a bounded, locked-in
 //!   sag of heavy inclined limbs (`sag`).
 
+use crate::fmath::DMath;
 use crate::genome::Genome;
 use crate::math::{Quat, Vec3};
 use crate::rng::{self, S_BUD, S_RETRENCH, S_SHOOT};
@@ -206,7 +207,7 @@ fn pow_k(x: f32, k: f32) -> f32 {
     } else if k == 1.0 {
         x
     } else {
-        x.powf(k)
+        x.dpowf(k)
     }
 }
 
@@ -788,7 +789,7 @@ impl ShootSystem {
             let az = (a.phyllotaxis_deg * (k as f32 + (parent.id % 5) as f32)).to_radians()
                 + 0.6 * (rng::unit(h(1)) - 0.5);
             let beta = a.branching_angle_deg.to_radians() * (0.85 + 0.3 * rng::unit(h(2)));
-            d = parent.dir * beta.cos() + (u * az.cos() + w * az.sin()) * beta.sin();
+            d = parent.dir * beta.dcos() + (u * az.dcos() + w * az.dsin()) * beta.dsin();
         }
         let limb_base_y = if order == 0 {
             0.0
@@ -811,7 +812,7 @@ impl ShootSystem {
         // distance (the summed path would also count sinuosity, which keeps
         // growing even when the crown no longer expands).
         let dist = parent.end(1.0).length();
-        let hydraulic = (1.0 - (dist / a.hydraulic_path_max_m).max(0.0).powf(a.hydraulic_exponent)).clamp(0.03, 1.0);
+        let hydraulic = (1.0 - (dist / a.hydraulic_path_max_m).max(0.0).dpowf(a.hydraulic_exponent)).clamp(0.03, 1.0);
         let length = (a.internode_length_m * metamers * hydraulic).max(0.015);
         // All direction changes below are per shoot; scale them with the
         // shoot length so curvature per metre stays similar when shoots get
@@ -823,15 +824,15 @@ impl ShootSystem {
             let u = d.any_perpendicular();
             let w = d.cross(u);
             let az = std::f32::consts::TAU * rng::unit(h(7));
-            let side = u * az.cos() + w * az.sin();
+            let side = u * az.dcos() + w * az.dsin();
             // Weak (short) shoots make smaller elbows, so fine twigs do not
             // zigzag at the scale of the crown.
             let ang = a.leader_loss_angle_deg.to_radians() * (0.6 + 0.8 * rng::unit(h(8))) * bend;
-            d = d * ang.cos() + side * ang.sin();
+            d = d * ang.dcos() + side * ang.dsin();
         }
         // Random deviation (sinuosity): random unit vector scaled by tan(angle).
         let wig = Vec3::new(rng::normal(h(3)), rng::normal(h(4)), rng::normal(h(5))).normalize_or(Vec3::ZERO)
-            * (a.sinuosity_deg.to_radians().tan() * bend);
+            * (a.sinuosity_deg.to_radians().dtan() * bend);
         // Gravitropic correction towards the set-point angle of the axis.
         let (grav, setpoint) = if order == 0 {
             (a.gravitropism, 0.0)
@@ -866,7 +867,7 @@ impl ShootSystem {
         } else {
             let hz = Vec3::new(d.x, 0.0, d.z).normalize_or(parent.dir.any_perpendicular());
             let sp = setpoint.to_radians();
-            hz * sp.sin() + Vec3::Y * sp.cos()
+            hz * sp.dsin() + Vec3::Y * sp.dcos()
         };
         // Light comes from above the horizon: the shadow gradient may point
         // sideways but never downward.
@@ -1010,7 +1011,7 @@ impl ShootSystem {
         for &(dx, dz, w) in SKY_DIRS.iter() {
             above.iter_mut().for_each(|v| *v = 0.0);
             let path = ((1 + dx * dx + dz * dz) as f32).sqrt();
-            let decay = SHADOW_DECAY.powf(path);
+            let decay = SHADOW_DECAY.dpowf(path);
             let to_sky = Vec3::new(-dx as f32, 1.0, -dz as f32) * (1.0 / path);
             iso_up += w * to_sky.y;
             let src_off = dz as isize * px as isize + dx as isize;
@@ -1093,7 +1094,7 @@ impl ShootSystem {
         let face = self.voxel * self.voxel;
         for n in self.nodes.iter_mut() {
             n.foliage = if n.leafy {
-                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).powf(exponent)).max(0.08);
+                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).dpowf(exponent)).max(0.08);
                 n.light * face * eff
             } else {
                 0.0
@@ -1217,8 +1218,8 @@ impl ShootSystem {
         let max_rot = a.sag_max_deg_per_year.to_radians();
         let max_total = a.sag_max_total_deg.to_radians();
         let min_r = a.sag_min_radius_mm * 0.001;
-        let min_y = -a.sag_max_droop_deg.to_radians().sin();
-        let max_up = a.sag_min_inclination_deg.to_radians().cos();
+        let min_y = -a.sag_max_droop_deg.to_radians().dsin();
+        let max_up = a.sag_min_inclination_deg.to_radians().dcos();
         // Single forward pass (parent < child): decide each segment's sag
         // increment, compose rotations down the tree and move the nodes.
         // `path` = sag accumulated from the stem to the segment; the total
@@ -1238,7 +1239,7 @@ impl ShootSystem {
                 } else {
                     rd
                 };
-                let ang = rd.dot(pd).clamp(-1.0, 1.0).acos();
+                let ang = rd.dot(pd).clamp(-1.0, 1.0).dacos();
                 if ang > st_keep {
                     let axis = rd.cross(pd);
                     if axis.length() > 1e-6 {
@@ -1442,7 +1443,7 @@ impl ShootSystem {
             if r <= 0.0 {
                 continue;
             }
-            let ang = e.z.atan2(e.x) + PI;
+            let ang = e.z.datan2(e.x) + PI;
             let s = ((ang / (2.0 * PI) * 8.0) as usize).min(7);
             sectors[s] = sectors[s].max(r);
         }
@@ -1458,7 +1459,7 @@ mod tests {
     fn fast_exp_is_accurate() {
         for i in 0..2000 {
             let x = i as f32 * 0.01;
-            let (a, b) = (exp_neg(x), (-x).exp());
+            let (a, b) = (exp_neg(x), (-x).dexp());
             assert!((a - b).abs() <= 2e-4 * b + 1e-7, "exp(-{x}): {a} vs {b}");
         }
     }

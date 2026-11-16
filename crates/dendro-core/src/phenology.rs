@@ -28,6 +28,7 @@
 //!   before, with or after leaf-out; late frost on open flowers reduces the
 //!   year's fruit set; fruits develop, ripen and are gone after a few weeks.
 
+use crate::fmath::DMath;
 use crate::climate::Weather;
 use crate::genome::{Genome, Pigments, ReproductionTraits};
 
@@ -409,7 +410,7 @@ pub fn leaf_colour(p: &Pigments, expansion: f32, colouring: f32) -> [f32; 3] {
     const BROWN: [f32; 3] = [0.40, 0.26, 0.12];
     let c = colouring.clamp(0.0, 1.0);
     let e = expansion.clamp(0.0, 1.0);
-    let chl = p.chlorophyll * (1.0 - c).powi(2) * (0.3 + 0.7 * e);
+    let chl = p.chlorophyll * (1.0 - c).dpowi(2) * (0.3 + 0.7 * e);
     let young = (1.0 - e) * 0.8;
     let car = p.carotenoids * (0.08 + 1.4 * c * (1.0 - c) + 0.3 * c);
     // Senescence anthocyanins peak at c = 0.5; past the peak a share
@@ -419,7 +420,7 @@ pub fn leaf_colour(p: &Pigments, expansion: f32, colouring: f32) -> [f32; 3] {
         sen += p.anthocyanin_persistence.min(1.0) * (0.75 - sen);
     }
     let anth = p.anthocyanins * (sen + 0.6 * (1.0 - e));
-    let brown = p.tannins * c.powf(2.5) * 1.6;
+    let brown = p.tannins * c.dpowf(2.5) * 1.6;
     let w = [chl * 2.0, young, car, anth * 1.5, brown];
     let cols = [GREEN, YOUNG, YELLOW, p.anthocyanin_color, BROWN];
     let total: f32 = w.iter().sum::<f32>().max(1e-6);

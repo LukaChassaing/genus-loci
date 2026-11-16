@@ -26,6 +26,7 @@
 
 pub mod climate;
 pub mod flux;
+pub mod fmath;
 pub mod genome;
 mod growth;
 mod math;

@@ -29,6 +29,7 @@
 //!   0..1 (0 in spring, summer and on winter's dead leaves), so a renderer
 //!   can treat autumn hues (picked as display colours) differently.
 
+use crate::fmath::DMath;
 use crate::math::Vec3;
 use crate::rng;
 
@@ -440,13 +441,13 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
         };
         for j in 0..=radial {
             let th = std::f32::consts::TAU * j as f32 / radial as f32;
-            let (s, c) = th.sin_cos();
+            let (s, c) = th.dsin_cos();
             let dirv = normal * c + binormal * s;
             let mut r = ring.radius;
             if w > 0.0 {
                 let lobe = if flare.lobe_count > 0 {
                     // Lobes centred on the given world azimuths.
-                    let az = dirv.z.atan2(dirv.x);
+                    let az = dirv.z.datan2(dirv.x);
                     let mut best = 0.0f32;
                     for &la in &flare.lobe_azimuths[..flare.lobe_count as usize] {
                         let mut d = (az - la).abs() % std::f32::consts::TAU;
@@ -458,7 +459,7 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
                     }
                     0.35 + 0.65 * best
                 } else if flare.buttress_lobes > 0 {
-                    let x = 0.5 + 0.5 * (th * flare.buttress_lobes as f32).cos();
+                    let x = 0.5 + 0.5 * (th * flare.buttress_lobes as f32).dcos();
                     0.35 + 0.65 * x * x
                 } else {
                     1.0
@@ -469,7 +470,7 @@ fn emit_rings(mesh: &mut MeshData, rings: &[Ring], radial: usize, flare: TubeSty
                 // Fluted, slightly out-of-round old wood (low harmonics, fixed
                 // per axis so the bumps run along it as ridges).
                 let k = ((ring.radius - 0.03) / 0.1).min(1.0);
-                r *= 1.0 + irregular * k * (0.6 * (2.0 * th + phase).sin() + 0.4 * (3.0 * th + 1.7 * phase).sin());
+                r *= 1.0 + irregular * k * (0.6 * (2.0 * th + phase).dsin() + 0.4 * (3.0 * th + 1.7 * phase).dsin());
             }
             mesh.vert(ring.center + dirv * r, dirv, [j as f32 / radial as f32, v], ring.color);
         }
@@ -556,8 +557,8 @@ pub(crate) fn build_leaves(clusters: &[LeafCluster], tri_budget: usize) -> MeshD
         let spin = rng::unit(rng::mix(c.key)) * std::f32::consts::PI;
         // Card k is rotated by k x 180/cards deg: rotate (sin, cos) instead
         // of evaluating them per card (this loop runs ~10^5 times).
-        let (mut sa, mut ca) = spin.sin_cos();
-        let (sr, cr) = (std::f32::consts::PI / cards as f32).sin_cos();
+        let (mut sa, mut ca) = spin.dsin_cos();
+        let (sr, cr) = (std::f32::consts::PI / cards as f32).dsin_cos();
         let mid_k = 0.5 * (cards as f32 - 1.0);
         for k in 0..cards {
             if k > 0 {

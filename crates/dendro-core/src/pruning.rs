@@ -79,6 +79,7 @@
 //! approximated by stump sprouts), lammas regrowth after summer pruning,
 //! wound dressings, natural self-pruning knots.
 
+use crate::fmath::DMath;
 use crate::growth::NONE;
 use crate::math::Vec3;
 use crate::mesh::{self, MeshData, TubeSeg, TubeStyle};
@@ -1326,7 +1327,7 @@ impl Simulation {
         }
         let size = (2.0 * radius / 0.1).clamp(0.1, 4.0);
         let p_year = (tr.decay_infection_rate * size * plan.kind.infection_factor() * (1.0 - 0.7 * tr.compartmentalization)).min(1.0);
-        let decay_risk = 1.0 - (1.0 - p_year).powf(closure_years.min(60.0));
+        let decay_risk = 1.0 - (1.0 - p_year).dpowf(closure_years.min(60.0));
         let doy = self.day_of_year();
         let infection_risk = (pathogen_season(tr, doy) * (2.0 * radius / 0.05).clamp(0.3, 2.5)).min(1.0);
         let phase = self.phen.phase;
@@ -1855,10 +1856,10 @@ fn push_disc(m: &mut MeshData, center: Vec3, normal: Vec3, rings: &[(f32, f32, [
         };
         for j in 0..=SEG {
             let th = phase + std::f32::consts::TAU * j as f32 / SEG as f32;
-            let (s, co) = th.sin_cos();
+            let (s, co) = th.dsin_cos();
             let radial = u * co + v * s;
             // Slightly irregular outline.
-            let wob = 1.0 + 0.06 * (3.0 * th + phase).sin();
+            let wob = 1.0 + 0.06 * (3.0 * th + phase).dsin();
             // Stretch the outline along `axis` (projected into the disc plane).
             let ax = (axis - nrm * axis.dot(nrm)).normalize_or(u);
             let radial_s = radial + ax * (radial.dot(ax) * (stretch - 1.0));

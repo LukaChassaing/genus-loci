@@ -1,5 +1,6 @@
 //! Minimal 3-D vector maths (f32). Kept in-crate to avoid a dependency.
 
+use crate::fmath::DMath;
 use std::ops::{Add, AddAssign, Mul, Neg, Sub};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -107,7 +108,7 @@ impl Quat {
 
     /// Rotation of `angle` radians about the unit `axis` (right-handed).
     pub fn from_axis_angle(axis: Vec3, angle: f32) -> Quat {
-        let (s, c) = (angle * 0.5).sin_cos();
+        let (s, c) = (angle * 0.5).dsin_cos();
         Quat { w: c, x: axis.x * s, y: axis.y * s, z: axis.z * s }
     }
 

@@ -14,6 +14,7 @@
 //! Flowering and fruiting run alongside (see [`crate::phenology`]); they do
 //! not feed back into growth (no reproductive cost, a simplification).
 
+use crate::fmath::DMath;
 use crate::climate::{Climate, ClimateParams, Weather};
 use crate::genome::Genome;
 use crate::growth::ShootSystem;
@@ -47,7 +48,7 @@ const P_SUMMER_REF: f32 = 70.0;
 /// Drawn (mesh) radius of a branch of simulated radius `rs` (see
 /// `Simulation::wood_mesh`); shared with the pruning picker and wound mesh.
 pub(crate) fn draw_radius(rs: f32, r_ref: f32, e: f32, boost_max: f32) -> f32 {
-    let pipe = (r_ref / rs.max(1e-6)).powf(1.0 - 2.0 / e);
+    let pipe = (r_ref / rs.max(1e-6)).dpowf(1.0 - 2.0 / e);
     let fade = ((rs - 0.005) / 0.035).clamp(0.0, 1.0);
     let cap = 1.0 + (boost_max - 1.0) * fade * fade * (3.0 - 2.0 * fade);
     rs * pipe.min(cap).max(1.0)
@@ -983,7 +984,7 @@ impl Simulation {
             .enumerate()
             .map(|(i, n)| {
                 let d = n.start.horizontal_len();
-                let r = if i == 0 { n.radius() } else { (n.radius() * (1.0 + k * (-d).exp())).min(r_max.max(n.radius())) };
+                let r = if i == 0 { n.radius() } else { (n.radius() * (1.0 + k * (-d).dexp())).min(r_max.max(n.radius())) };
                 TubeSeg {
                     parent: n.parent,
                     start: if i == 0 { n.start } else { sink(n.start, r) },
