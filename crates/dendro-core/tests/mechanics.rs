@@ -113,8 +113,8 @@ fn symmetric_branches_do_not_bend_the_stem() {
         segs.extend(b);
     }
     let s = MechanicsModel::from_segments(&segs, traits(), bare_site(0.24)).evaluate(&WindLoad::new(0.0));
-    for i in 0..4 {
-        assert!(s.segment_moment_nm[i] < 1e-2, "stem segment {i} bent by {} N m", s.segment_moment_nm[i]);
+    for (i, m) in s.segment_moment_nm.iter().take(4).enumerate() {
+        assert!(*m < 1e-2, "stem segment {i} bent by {m} N m");
     }
     assert!(s.segment_moment_nm[4] > 100.0, "the branches themselves are loaded");
 }
