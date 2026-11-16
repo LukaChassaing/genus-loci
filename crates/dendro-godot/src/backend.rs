@@ -13,6 +13,9 @@ use dendro_core::{ClimateParams, Genome, HorizonKind, Phase, Simulation, SoilPro
 /// Pruning timeline (undo, rewind, control tree).
 #[path = "prune.rs"]
 mod prune;
+/// Save / load (recipe files, replay on a worker thread).
+#[path = "save_load.rs"]
+pub(crate) mod save_load;
 
 /// Converts mesh data to an `ArrayMesh` (one surface, or none when the mesh is empty).
 /// Packed arrays are built in bulk.
@@ -62,6 +65,8 @@ pub struct Backend {
     species: usize,
     /// Pruning timeline: checkpoints and control tree (see `prune.rs`).
     timeline: prune::Timeline,
+    /// Load in progress / last load outcome (see `save_load.rs`).
+    load: save_load::LoadState,
 }
 
 impl Backend {
@@ -79,7 +84,7 @@ impl Backend {
         let species = if species < genomes.len() { species } else { 0 };
         let genome = genomes.swap_remove(species);
         let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
-        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default() };
+        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default() };
         b.timeline_reset();
         b
     }

@@ -1,9 +1,11 @@
 //! Checks of the literature-aligned behaviours (see docs/sources.md):
 //! budburst model, PET, pipe exponent, age-dependent shade tolerance,
-//! waterlogging thresholds and oak root extent.
+//! waterlogging thresholds, oak root extent, stem diameter against age and
+//! limb/stem proportions.
 
 use dendro_core::climate::{extraterrestrial_radiation_mj, hargreaves_pet_mm, Climate};
-use dendro_core::{ClimateParams, Genome, Phase, ReproStage, Simulation};
+use dendro_core::{ClimateParams, Genome, Phase, ReproStage, ShapeMetrics, Simulation};
+use std::sync::OnceLock;
 
 /// Mean (budburst day, bloom-onset day) over `years` years after a 10-year
 /// establishment (0-based days of year).
@@ -159,4 +161,143 @@ fn oak_root_extent_at_150_years() {
     assert!(s.root_spread_m > 5.0 * s.root_depth_m);
     let (_, total) = sim.root_length_fraction_above(0.6);
     assert!(total > 0.7, "{:.0} % of root length in the top 0.6 m", total * 100.0);
+}
+
+/// State at one age: (age, shape metrics, height m, (base radius m,
+/// horizontal reach m) of each first-order limb).
+type Snapshot = (u32, ShapeMetrics, f32, Vec<(f32, f32)>);
+
+/// One open-grown run on deep loam (seed 42): yearly DBH, ring widths and
+/// snapshots at chosen ages.
+struct Growth {
+    dbh: Vec<f32>,
+    rings: Vec<f32>,
+    at: Vec<Snapshot>,
+}
+
+fn grow_open(g: Genome, years: u32, ages: &[u32]) -> Growth {
+    let mut sim = Simulation::new(g, 42);
+    let mut dbh = vec![0.0];
+    let mut at = Vec::new();
+    for age in 1..=years {
+        sim.advance_years(1);
+        dbh.push(sim.dbh_cm());
+        if ages.contains(&age) {
+            let limbs = sim.debug_limbs().into_iter().map(|l| (l.1, l.2)).collect();
+            at.push((age, sim.shape_metrics(), sim.height_m(), limbs));
+        }
+    }
+    Growth { dbh, rings: sim.rings().iter().map(|r| r.width_mm).collect(), at }
+}
+
+fn oak_200() -> &'static Growth {
+    static G: OnceLock<Growth> = OnceLock::new();
+    G.get_or_init(|| grow_open(Genome::quercus_robur(), 200, &[100, 200]))
+}
+
+fn cherry_100() -> &'static Growth {
+    static G: OnceLock<Growth> = OnceLock::new();
+    G.get_or_init(|| grow_open(Genome::prunus_avium(), 100, &[60, 100]))
+}
+
+fn mean(v: &[f32]) -> f32 {
+    v.iter().sum::<f32>() / v.len().max(1) as f32
+}
+
+/// Basal-area increment (cm2/y) between two ages.
+fn bai(g: &Growth, a: usize, b: usize) -> f32 {
+    std::f32::consts::FRAC_PI_4 * (g.dbh[b] * g.dbh[b] - g.dbh[a] * g.dbh[a]) / (b - a) as f32
+}
+
+#[test]
+fn open_grown_oak_dbh_follows_white_1998() {
+    // White 1998, "Estimating the age of large and veteran trees in
+    // Britain", Forestry Commission Information Note 12, Tables 1a and 2
+    // (common/sessile oak): even "core" rings until the crown reaches its
+    // optimum size, then a constant basal-area increment (CAI).
+    //   average site, parkland  100 y x 3.5 mm, then CAI  76.6 cm2/y
+    //   good site, open grown    80 y x 4 mm,   then CAI  79.9 cm2/y
+    //   champion potential       70 y x 5 mm,   then CAI 109.2 cm2/y
+    // giving DBH (cm) 14/16/20 @20, 28/32/40 @40, 42/48/60 @60,
+    // 70/78/95 @100, 99/106/127 @150, 121/128/152 @200. Mitchell's rule
+    // (2.5 cm of girth a year, open-grown broadleaves with a full crown) is
+    // an upper bound: 64 cm @80, 159 cm @200.
+    let g = oak_200();
+    for (age, lo, hi) in [(20, 10.0, 22.0), (40, 26.0, 42.0), (60, 40.0, 62.0), (100, 66.0, 96.0), (150, 92.0, 132.0), (200, 112.0, 156.0)] {
+        let d = g.dbh[age];
+        assert!((lo..=hi).contains(&d), "oak DBH at {age} y = {d:.1} cm, expected {lo}-{hi}");
+        assert!(d * std::f32::consts::PI <= 2.5 * age as f32 + 10.0, "oak girth at {age} y beyond Mitchell's rule");
+    }
+    // Rings: wide and even in the formative phase (3.5-5 mm in White's
+    // table; ring widths of open-grown oak are typically 2-5 mm), narrower
+    // once the constant CAI is spread over a large girth.
+    let young = mean(&g.rings[10..60]);
+    let old = mean(&g.rings[150..200]);
+    assert!((3.0..6.0).contains(&young), "oak rings 10-60 y: {young:.2} mm");
+    assert!((1.2..3.0).contains(&old), "oak rings 150-200 y: {old:.2} mm");
+    // CAI plateau instead of a CAI that keeps climbing with crown size.
+    let (mid, late) = (bai(g, 80, 100), bai(g, 150, 200));
+    assert!((60.0..120.0).contains(&late), "oak CAI 150-200 y: {late:.1} cm2/y");
+    assert!(late > 0.7 * mid && late < 1.4 * mid, "oak CAI 80-100 y {mid:.1} -> 150-200 y {late:.1} cm2/y");
+}
+
+#[test]
+fn open_grown_cherry_dbh_follows_free_growth() {
+    // Pryor 1988, "The silviculture and yield of wild cherry", Forestry
+    // Commission Bulletin 75, Table 7 (free growth, crowns kept isolated,
+    // 110-690 stems/ha): mean DBH 14 cm @15, 23 @30, 30 @40, 44 @60,
+    // 50 @70. A lone tree grows at least as fast; upper bound 60 cm in
+    // 50-60 y on favourable sites (Evans 1984, as cited by the Future Trees
+    // Trust monograph). Old cherries reach 90-120 cm at most (Welk et al.
+    // 2016, European Atlas of Forest Tree Species).
+    let g = cherry_100();
+    for (age, lo, hi) in [(15, 10.0, 20.0), (30, 22.0, 36.0), (40, 28.0, 46.0), (60, 44.0, 64.0), (100, 60.0, 100.0)] {
+        let d = g.dbh[age];
+        assert!((lo..=hi).contains(&d), "cherry DBH at {age} y = {d:.1} cm, expected {lo}-{hi}");
+    }
+    // Wide juvenile rings (Pryor: ~4.7 mm a year to 15 y).
+    let young = mean(&g.rings[10..30]);
+    assert!((4.0..7.5).contains(&young), "cherry rings 10-30 y: {young:.2} mm");
+}
+
+#[test]
+fn limb_to_stem_ratios_and_elastic_similarity() {
+    // Simulated areas obey Leonardo's rule with exponent 2 (Pressler), so
+    // the limb/stem ratio follows the share of foliage a limb carries:
+    // scaffold limbs of open-grown trees are about a third to a half of the
+    // stem diameter where they leave it, none matching it (Gilman 2003,
+    // "Branch-to-stem diameter ratio affects strength of attachment",
+    // J Arboric 29(5):291-294: attachment strength falls as the ratio
+    // rises and co-dominant stems split far more easily, red maple).
+    // Calibration (regression guard, no measured band found for these
+    // species): mean 0.25-0.6, max < 0.9 (oak) / 0.6 (excurrent cherry).
+    // Elastic similarity (McMahon & Kronauer 1976, "Tree structures:
+    // deducing the principle of mechanical design", J Theor Biol
+    // 59:443-466: length ~ diameter^(2/3)): the limb reaching farthest
+    // should have about the diameter the stem would have at that length,
+    // DBH x (reach / height)^1.5, within a factor of two.
+    for (g, species, max_r) in [(oak_200(), "oak", 0.9), (cherry_100(), "cherry", 0.6)] {
+        for (age, m, h, limbs) in &g.at {
+            assert!((0.25..0.6).contains(&m.mean_limb_ratio), "{species} {age} y: {m:?}");
+            assert!(m.max_limb_ratio < max_r, "{species} {age} y: {m:?}");
+            let (r, reach) = limbs.iter().copied().fold((0.0, 0.0), |b, l| if l.1 > b.1 { l } else { b });
+            let d = 2.0 * r * 100.0;
+            let expect = g.dbh[*age as usize] * (reach / h).powf(1.5);
+            assert!(d > 0.5 * expect && d < 2.0 * expect, "{species} {age} y: limb reaching {reach:.1} m is {d:.1} cm, elastic similarity {expect:.1} cm");
+        }
+    }
+}
+
+#[test]
+fn ring_view_matches_stem_diameter() {
+    // The ring panel draws the recorded ring widths: twice their sum must
+    // give the stem diameter (rings of the first years are measured at the
+    // collar until the stem passes 1.3 m, hence the 10 % tolerance).
+    for (g, species, ages) in [(oak_200(), "oak", [100usize, 200]), (cherry_100(), "cherry", [60, 100])] {
+        for age in ages {
+            let d_rings = 2.0 * g.rings[..age].iter().sum::<f32>() * 0.1;
+            let d = g.dbh[age];
+            assert!((d_rings - d).abs() < 0.1 * d, "{species} {age} y: rings give {d_rings:.1} cm, DBH {d:.1} cm");
+        }
+    }
 }

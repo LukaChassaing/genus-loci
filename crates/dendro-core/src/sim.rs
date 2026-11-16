@@ -494,6 +494,11 @@ impl Simulation {
         self.seed
     }
 
+    /// Climate parameters of the site (saved with the tree, see `crate::save`).
+    pub fn climate_params(&self) -> &ClimateParams {
+        self.climate.params()
+    }
+
     /// Days simulated since the start (Jan 1 of year 0).
     pub fn days_elapsed(&self) -> u64 {
         self.day
@@ -770,6 +775,37 @@ impl Simulation {
             }
         }
         out
+    }
+
+    /// Diagnostics: `(light-weighted foliage carried by the collar, in m2 of
+    /// crown cells, foliage-weighted mean path length m)` from the last
+    /// foliage pass.
+    #[doc(hidden)]
+    pub fn debug_foliage(&self) -> (f32, f32) {
+        let f = self.shoots.nodes[0].foliage;
+        (f, if f > 0.0 { self.shoots.area_per_foliage(1.0).recip() } else { 0.0 })
+    }
+
+    /// Diagnostics: da Vinci area ratio `sum(child areas) / parent area` at
+    /// living branch points whose parent radius is at least `min_r` (m):
+    /// `(mean, count)`. 1 = area preserving (pipe exponent 2).
+    #[doc(hidden)]
+    pub fn debug_area_ratio(&self, min_r: f32) -> (f32, usize) {
+        let nodes = &self.shoots.nodes;
+        let mut sum = vec![0.0f32; nodes.len()];
+        let mut kids = vec![0u32; nodes.len()];
+        for nd in nodes.iter().skip(1).filter(|n| !n.is_snag()) {
+            sum[nd.parent as usize] += nd.area;
+            kids[nd.parent as usize] += 1;
+        }
+        let (mut acc, mut n) = (0.0f32, 0usize);
+        for (i, nd) in nodes.iter().enumerate() {
+            if kids[i] >= 2 && nd.radius() >= min_r && !nd.is_snag() {
+                acc += sum[i] / nd.area;
+                n += 1;
+            }
+        }
+        (if n > 0 { acc / n as f32 } else { 0.0 }, n)
     }
 
     /// Diagnostics: along the thickest first-order limb (followed through

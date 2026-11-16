@@ -7,8 +7,8 @@ const MAIN_SCENE: String = "res://main.tscn"
 const TITLE_SCENE: String = "res://title.tscn"
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 const UI_SCALES: Array[float] = [0.85, 1.0, 1.15, 1.3]
-const AUTOMATION_VARS: Array[String] = ["DENDRO_SHOT", "DENDRO_SELFTEST", "DENDRO_BENCH", "DENDRO_YEARS"]
-const SHELL_SCREENS: Array[String] = ["title", "setup", "plate0", "plate1", "options"]
+const AUTOMATION_VARS: Array[String] = ["DENDRO_SHOT", "DENDRO_SELFTEST", "DENDRO_BENCH", "DENDRO_YEARS", "DENDRO_SAVE", "DENDRO_LOAD"]
+const SHELL_SCREENS: Array[String] = ["title", "setup", "plate0", "plate1", "options", "load", "load_confirm"]
 
 var settings: Dictionary = default_settings()
 ## Choice made on the setup screen, consumed once by main.gd. Empty = nothing chosen (env vars / defaults).
@@ -113,6 +113,13 @@ func apply_aa(vp: Viewport) -> void:
 ## Launches the simulation with an arboretum choice: species, soil, seed (-1 = random), start age in years.
 func start_simulation(species: int, soil: int, seed_value: int, years: int) -> void:
 	pending = {"species": species, "soil": soil, "seed": seed_value, "years": years}
+	get_tree().paused = false
+	get_tree().change_scene_to_file(MAIN_SCENE)
+
+
+## Opens a saved tree (absolute path of a .ron in user://saves/): the simulation scene regrows it by replay.
+func load_save(path: String) -> void:
+	pending = {"load": path}
 	get_tree().paused = false
 	get_tree().change_scene_to_file(MAIN_SCENE)
 

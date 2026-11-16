@@ -439,10 +439,16 @@ pub struct WoodTraits {
     /// -> large values).
     #[serde(default = "five_hundred_f32")]
     pub snag_years_per_m: f32,
-    /// Pressler coefficient: m2 of new sapwood per m2 of light-weighted
-    /// foliage above, per year, in an average year. Calibration: fitted to
-    /// the target DBH-age curves, not a published constant; the proportional
-    /// foliage-to-sapwood idea is the pipe model (Shinozaki et al. 1964).
+    /// Annual wood budget: m3 of new wood per m2 of light-weighted foliage,
+    /// in an average year. The tree's budget (this x total foliage) is
+    /// spread over all segments by Pressler's law, area increment
+    /// proportional to the foliage above (`ShootSystem::area_per_foliage`;
+    /// Larson 1963, "Stem form development of forest trees", Forest Science
+    /// Monographs 5; whole-tree budget as in LIGNUM, Perttunen et al. 1996,
+    /// Ann Bot 77:87-98). Calibration: fitted to published open-grown
+    /// DBH-age curves (White 1998 for oak, Pryor 1988 for cherry), not a
+    /// published constant; the proportional foliage-to-sapwood idea is the
+    /// pipe model (Shinozaki et al. 1964).
     pub growth_coefficient: f32,
     /// Radius of a new current-year shoot (mm).
     pub twig_radius_mm: f32,

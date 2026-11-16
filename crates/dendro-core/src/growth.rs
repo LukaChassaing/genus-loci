@@ -31,11 +31,14 @@
 //!   brachyblast), so weak branches persist instead of dying at once.
 //! * Shedding (self-pruning): a branch dies when none of its foliage is
 //!   adequately lit, or when it carries no foliage at all.
-//! * Secondary growth (Pressler's law / pipe model): each year, the
-//!   cross-section increment of a segment is proportional to the
-//!   (light-weighted) foliage it supports, scaled by the year's productivity.
-//!   This yields the pipe model (Shinozaki et al. 1964) as a consequence while
-//!   letting climate modulate ring width.
+//! * Secondary growth (Pressler's law / pipe model): each year the tree
+//!   makes a wood volume proportional to its (light-weighted) foliage and to
+//!   the year's productivity, and spreads it over the whole shoot system so
+//!   that the cross-section increment of a segment is proportional to the
+//!   foliage it supports (see `ShootSystem::area_per_foliage`). This yields
+//!   the pipe model (Shinozaki et al. 1964) as a consequence, lets climate
+//!   modulate ring width, and gives the even juvenile rings then constant
+//!   basal-area increment of open-grown trees (White 1998).
 //!
 //! Level of detail (a stylisation, not biology): the voxel size scales with
 //! tree height, and a leafy shoot unit shorter than ~a voxel is extended in
@@ -251,6 +254,11 @@ pub(crate) struct ShootSystem {
     /// Tree height at the last flush (m).
     tree_h: f32,
     grid: Vec<f32>,
+    /// Foliage-weighted wood length `sum_j F_j L_j` (m3-like: foliage
+    /// carried by each segment times its length) from the last foliage
+    /// pass; the denominator of the Pressler distribution of the annual
+    /// wood budget (see [`ShootSystem::area_per_foliage`]).
+    foliage_path: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -301,7 +309,7 @@ impl ShootSystem {
             foliage: 0.0,
             dead: false,
         };
-        ShootSystem { nodes: vec![seedling], next_id: 1, ext: 1.0, voxel: 0.1, break_boost: 1.0, tree_h: 0.03, grid: Vec::new() }
+        ShootSystem { nodes: vec![seedling], next_id: 1, ext: 1.0, voxel: 0.1, break_boost: 1.0, tree_h: 0.03, grid: Vec::new(), foliage_path: 0.0 }
     }
 
     /// Basipetal sums of bud light (main/lateral) and of leafy-shoot light.
@@ -1095,17 +1103,52 @@ impl ShootSystem {
             let (p, f) = (self.nodes[i].parent as usize, self.nodes[i].foliage);
             self.nodes[p].foliage += f;
         }
+        self.foliage_path = self.nodes.iter().map(|n| n.foliage * n.length).sum();
         self.nodes[0].foliage
     }
 
-    /// Secondary growth: add `coef * foliage * factor` m2 of wood to every
-    /// segment (Pressler), capping the radial increment. Returns the area
+    /// Area increment (m2) per unit of foliage carried, in an average year,
+    /// when the tree's annual wood budget `coef x F_total` (m3; `coef` =
+    /// wood volume per unit of light-weighted foliage, `WoodTraits::
+    /// growth_coefficient`) is spread over the whole shoot system by
+    /// Pressler's law (area increment of a segment proportional to the
+    /// foliage above it): `dA_i = F_i x coef x F_total / sum_j F_j L_j`.
+    ///
+    /// The denominator is the total foliage times its mean hydraulic path
+    /// length, so the same production is laid over ever more cambium as the
+    /// tree grows: wide, even rings in the young tree, then a roughly
+    /// constant basal-area increment (CAI) once the crown stops expanding,
+    /// as observed in open-grown oak (White 1998, "Estimating the age of
+    /// large and veteran trees in Britain", Forestry Commission Information
+    /// Note 12, Tables 1a-2). A fixed area increment
+    /// per foliage (the former rule) instead made the stem thin while young
+    /// and its CAI climb with crown size for 200 years.
+    ///
+    /// Pressler's law and its pipe-model reading: Larson 1963, "Stem form
+    /// development of forest trees", Forest Science Monographs 5; whole-tree
+    /// wood budget distributed over the woody structure as in LIGNUM:
+    /// Perttunen et al. 1996, "LIGNUM: a tree model based on simple
+    /// structural units", Ann Bot 77:87-98.
+    pub fn area_per_foliage(&self, coef: f32) -> f32 {
+        // Calibration: the mean path is floored at 1 m so the first-year
+        // seedling (a few cm of stem) does not concentrate its whole budget
+        // on a 3 cm shoot.
+        let total = self.nodes[0].foliage;
+        if total <= 0.0 {
+            return 0.0;
+        }
+        coef * total / self.foliage_path.max(total * 1.0)
+    }
+
+    /// Secondary growth: add `area_per_foliage(coef) * foliage * factor` m2
+    /// of wood to every segment (Pressler), capping the radial increment. Returns the area
     /// increment at the collar.
     pub fn thicken(&mut self, coef: f32, factor: f32, max_dr: f32) -> f32 {
+        let k = self.area_per_foliage(coef) * factor;
         let mut collar = 0.0;
         for (i, n) in self.nodes.iter_mut().enumerate() {
             let r0 = n.radius();
-            let a1 = n.area + coef * n.foliage * factor;
+            let a1 = n.area + k * n.foliage;
             let r1 = (a1 / PI).sqrt().min(r0 + max_dr);
             let new_area = PI * r1 * r1;
             if i == 0 {

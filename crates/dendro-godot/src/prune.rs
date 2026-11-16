@@ -311,6 +311,17 @@ impl Backend {
 }
 
 impl Backend {
+    /// A fresh timeline for a loaded tree: its day-0 seedling and the replay's checkpoints
+    /// (oldest first, taken at the start of cut days like `checkpoint_today`).
+    pub(crate) fn timeline_install(&mut self, base: Simulation, checkpoints: Vec<Simulation>) {
+        self.timeline.stop_worker();
+        self.timeline = Timeline::default();
+        self.timeline.base = Some(base);
+        self.timeline.checkpoints = checkpoints;
+    }
+}
+
+impl Backend {
     pub fn control_version(&self) -> i64 {
         self.timeline.control_version
     }

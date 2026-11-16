@@ -74,7 +74,9 @@
         sag_min_inclination_deg: 50.0,
         straightening_deg_per_year: 1.5,
         straightening_keep_deg: 6.0,
-        straightening_min_radius_mm: 15.0,
+        // Calibration: 15 -> 25 mm with the thicker juvenile wood of the
+        // wood budget (see the oak genome).
+        straightening_min_radius_mm: 25.0,
         // Strongly light-demanding (shade-intolerant pioneer): shaded
         // branches die within a couple of years, so the lower crown is
         // shed quickly and a natural clear bole forms (calibrated).
@@ -185,9 +187,14 @@
         ring_porous: false,
         earlywood_share: 0.4,
         ring_contrast: 0.3,
-        // Pressler coefficient (calibrated on DBH targets); wide juvenile
-        // rings (up to ~1 cm on vigorous young trees).
-        growth_coefficient: 0.0000330,
+        // Wood volume per unit of light-weighted foliage and year (see the
+        // oak genome). Calibration: free-growth cherry, Pryor 1988 (FC
+        // Bulletin 75, Table 7: 14 cm @15, 30 @40, 44 @60, 50 @70) to 60 cm
+        // in 50-60 y on favourable sites (Evans 1984, cited by the Future
+        // Trees Trust). Model: 14 @15, 37-39 @40, 52-54 @60, 76-78 @100.
+        // Juvenile rings ~5.5-6.5 mm (up to ~1 cm on vigorous young trees).
+        // Was 3.3e-5 (8 cm @15, 26 @40, 40 @60).
+        growth_coefficient: 0.000620,
         twig_radius_mm: 2.5,
         max_ring_width_mm: 12.0,
         // Mesh: slender limbs, round stem, a modest root collar flare.

@@ -1,6 +1,7 @@
 class_name PauseMenu
 extends CanvasLayer
-## In-game pause overlay (Esc): Reprendre, Planche de l'espèce, Options, Retour au menu, Quitter.
+## In-game pause overlay (Esc): Reprendre, Sauvegarder, Charger, Planche de l'espèce, Options, Retour au menu
+## (autosaves first), Quitter.
 ## Dims and blurs the frozen game view, or shows godot/art/pause_backdrop.* when that image exists.
 
 signal resumed
@@ -59,6 +60,11 @@ func _ready() -> void:
 	_panel.add_theme_stylebox_override("panel", UiStyle.box(Color(UiStyle.PANEL.r, UiStyle.PANEL.g, UiStyle.PANEL.b, 0.94), UiStyle.LINE, 1, 34.0, 28.0))
 	root.add_child(_panel)
 	_show_menu()
+	match OS.get_environment("DENDRO_SCREEN"):  # screenshot hooks
+		"pause_save":
+			_open_sub(_make_browser("save"))
+		"pause_load":
+			_open_sub(_make_browser("load"))
 
 
 func _show_menu() -> void:
@@ -79,7 +85,7 @@ func _show_menu() -> void:
 	var sp: Control = Control.new()
 	sp.custom_minimum_size = Vector2(0, 6)
 	_menu_box.add_child(sp)
-	var entries: Array = [["Reprendre", "resume"], ["Planche de l'espèce", "plate"], ["Options", "options"], ["Retour au menu", "title"], ["Quitter", "quit"]]
+	var entries: Array = [["Reprendre", "resume"], ["Sauvegarder", "save"], ["Charger", "load"], ["Planche de l'espèce", "plate"], ["Options", "options"], ["Retour au menu", "title"], ["Quitter", "quit"]]
 	for e: Array in entries:
 		var b: Button = UiStyle.button(e[0], 19)
 		b.custom_minimum_size = Vector2(0, 44)
@@ -104,10 +110,31 @@ func _on_entry(which: String) -> void:
 			wrap.add_child(o)
 			_open_sub(wrap)
 			o.focus_first()
+		"save", "load":
+			_open_sub(_make_browser(which))
 		"title":
+			var sf: SaveFlow = get_parent().get("save_flow") as SaveFlow if get_parent() != null else null
+			if sf != null:
+				sf.autosave()  # single rolling slot
 			Game.go_title()
 		"quit":
 			Game.quit_game()
+
+
+## Save / load page (SaveBrowser) inside the pause panel; the I/O goes through the scene's SaveFlow.
+func _make_browser(mode: String) -> Control:
+	var sf: SaveFlow = get_parent().get("save_flow") as SaveFlow if get_parent() != null else null
+	var dn: String = SaveFlow.default_name(sf.sim) if sf != null else "Arbre"
+	var sb: SaveBrowser = SaveBrowser.new(mode, "", dn)
+	sb.name = "SaveBrowser"
+	sb.custom_minimum_size = Vector2(500, 0)
+	sb.closed.connect(_show_menu_again)
+	sb.load_requested.connect(func(path: String) -> void: Game.load_save(path))
+	sb.save_requested.connect(func(save_name: String, path: String) -> void:
+		var err: String = sf.save_as(save_name, path) if sf != null else "pas de simulation"
+		sb.refresh()
+		sb.set_status("Arbre sauvegardé : « %s »." % save_name if err == "" else "Échec de la sauvegarde : %s" % err, err != ""))
+	return sb
 
 
 func _make_plate() -> Control:

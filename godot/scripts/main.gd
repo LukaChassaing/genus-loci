@@ -31,6 +31,7 @@ var bark_mat: StandardMaterial3D
 var root_mat: ShaderMaterial
 var flux_panel: FluxPanel        # per-kind flux toggles, legend and live values (shown with Flux)
 var prune_tool: PruneTool         # pruning tool « Taille » (T), wounds, control ghost
+var save_flow: SaveFlow           # save / load: F5 / F9, autosave, loading card (save_flow.gd)
 var flux: RootFlux               # root material + water / nutrient flux (dashes, motes)
 var _last_water_q: int = -1
 # Tree stats cached once per frame (the core getters walk the tree: crown radius is not free).
@@ -62,6 +63,8 @@ var mesh_dirty: bool = true
 var since_rebuild: float = 1.0
 var seed_value: int = 1
 var frame_count: int = 0
+var _root_spread: float = 0.0
+var _peak_h: float = 0.0       # tallest the live tree has been since the last reset (framing floor)
 var _last_phase: int = -1
 
 
@@ -79,7 +82,8 @@ func _ready() -> void:
 	# Arboretum choice from the title screen (the DENDRO_* variables above take precedence).
 	var cfg: Dictionary = Game.take_pending()
 	var start_days: float = 0.0
-	if not cfg.is_empty():
+	var load_path: String = SaveFlow.requested_load(cfg)  # « Charger » choice or DENDRO_LOAD
+	if not cfg.is_empty() and not cfg.has("load"):
 		if seed_env == "" and int(cfg["seed"]) >= 0:
 			seed_value = int(cfg["seed"])
 		if soil_env == "":
@@ -89,6 +93,10 @@ func _ready() -> void:
 		if int(cfg["years"]) > 0:
 			start_days = float(cfg["years"]) * 365.0 + 100.0  # start in spring of that year
 	sim.reset(seed_value)
+	# A save: reset to its species / soil / seed now, regrow it by replay in the background (SaveFlow).
+	var load_error: String = sim.begin_load(load_path) if load_path != "" else ""
+	if load_path != "" and load_error == "":
+		seed_value = sim.get_seed()
 	if start_days > 0.0:
 		_advance_days_direct(start_days)
 	_apply_window_overrides()
@@ -119,6 +127,11 @@ func _ready() -> void:
 	prune_tool = PruneTool.new()
 	add_child(prune_tool)
 	prune_tool.setup(self)
+	save_flow = SaveFlow.new()
+	save_flow.name = "SaveFlow"
+	add_child(save_flow)
+	save_flow.setup(self, load_path, load_error)
+	hud.side_panels.append(flux_panel)  # docked under the pruning panel (Hud.layout_side_panels)
 	guides.soil = soil
 	guides.cam = cam
 	cam.wedge_dir = soil.wedge_dir
@@ -129,12 +142,41 @@ func _ready() -> void:
 	hud.update_from(sim)
 	print("[dendro] TreeSim loaded: age=%.3f y, height=%.2f m, seed=%d" % [sim.get_age_years(), sim.get_height_m(), seed_value])
 	var shot: String = OS.get_environment("DENDRO_SHOT")
-	if OS.get_environment("DENDRO_SELFTEST") == "1":
+	if SaveFlow.env_hook_active():
+		save_flow.run_env_hooks()  # DENDRO_SAVE / DENDRO_LOAD
+	elif OS.get_environment("DENDRO_SELFTEST") == "1":
 		_run_selftest()
 	elif OS.get_environment("DENDRO_BENCH") != "":
 		_run_bench(float(OS.get_environment("DENDRO_BENCH")), shot)
 	elif shot != "":
 		_screenshot_and_quit(shot)
+
+
+## A saved tree replaced the seedling (SaveFlow, once the replay is done): the refresh of a new seed,
+## without resetting the simulation.
+func on_tree_loaded() -> void:
+	seed_value = sim.get_seed()
+	if "_peak_h" in self:
+		set("_peak_h", 0.0)
+	if prune_tool != null:
+		prune_tool.on_reset()
+	_apply_species_look()
+	hud.set_seed_text(seed_value)
+	hud.force_ring_refresh()
+	hud.drought_button.set_pressed_no_signal(sim.get_drought())
+	accumulator = 0.0
+	soil.reset()
+	cam.reset_view()
+	_stats_dirty = true
+	_litter_smooth = 0.0
+	_last_water_q = -1
+	_wood_ver = -1
+	_leaf_ver = -1
+	_flower_ver = -1
+	_root_ver = -1
+	mesh_dirty = true
+	_rebuild_meshes(true)
+	_settle_view()
 
 
 func _new_seed() -> void:
@@ -189,6 +231,7 @@ func _apply_species_look() -> void:
 func _apply_seed(new_seed: int) -> void:
 	seed_value = new_seed
 	sim.reset(seed_value)
+	_peak_h = 0.0
 	if prune_tool != null:
 		prune_tool.on_reset()
 	_apply_species_look()
@@ -388,6 +431,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				cam.toggle_root_view()
 			KEY_E:
 				cam.toggle_ensemble()
+			KEY_F5:
+				save_flow.quick_save()
+			KEY_F9:
+				save_flow.quick_load()
 			_:
 				return
 		get_viewport().set_input_as_handled()
@@ -410,7 +457,6 @@ func _process(delta: float) -> void:
 	_update_view_state(delta)
 	_frame_camera(delta)
 	flux.update(sim, delta, playing, cam.distance)
-	_place_flux_panel()
 	hud.update_from(sim)
 	guides.update_from(tree_h)
 	hud.set_legend_visible(soil.xray or cam.root_view)
@@ -426,12 +472,21 @@ func _refresh_tree_stats() -> void:
 	tree_h = sim.get_height_m()
 	tree_crown_r = sim.get_crown_radius_m()
 	tree_root_depth = sim.get_root_depth_m()
+	_root_spread = sim.get_root_spread_m()
 
 
 func _frame_camera(_delta: float) -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	cam.set_free_rect(hud.free_rect(view), view)
-	cam.fit_to(tree_h, tree_crown_r, soil.radius, soil.depth, soil.wedge_width, soil.keel_depth)
+	# The framed tree is the larger of: the live tree, the ghost control tree (when shown), and a floor of a
+	# quarter of the tallest the live tree has been or half its root spread (a coppiced or dead tree must not zoom in on empty space).
+	_peak_h = maxf(_peak_h, tree_h)
+	var fh: float = maxf(maxf(tree_h, 0.25 * _peak_h), 0.5 * _root_spread)
+	var fc: float = tree_crown_r
+	if prune_tool != null and prune_tool.ghost_on:
+		fh = maxf(fh, prune_tool.ghost_extent.y)
+		fc = maxf(fc, prune_tool.ghost_extent.x)
+	cam.fit_to(fh, fc, soil.radius, soil.depth, soil.wedge_width, soil.keel_depth)
 
 
 ## Snaps plug, season look and camera to the current tree (start-up, screenshots, tests).
@@ -584,6 +639,9 @@ func _simulate() -> void:
 #   DENDRO_MSAA=0|2|4, DENDRO_FXAA=1   anti-aliasing overrides
 #   DENDRO_BENCH=8        run 8 s at 10 years/s and print frame-time stats (with DENDRO_SHOT: also shoot)
 #   DENDRO_SELFTEST=1     scripted UI self-test, prints PASS/FAIL, exits non-zero on failure
+#   DENDRO_SAVE=/abs.ron, DENDRO_LOAD=/abs.ron   save / load-by-replay checks (see save_flow.gd)
+#   DENDRO_SCREEN=pause_save|pause_load|loading  save / load screens for DENDRO_SHOT
+#   DENDRO_UISCALE=1.3    interface scale (screenshots)
 # ---------------------------------------------------------------------------------------------
 
 func _apply_window_overrides() -> void:
@@ -599,6 +657,9 @@ func _apply_window_overrides() -> void:
 		var p: PackedStringArray = sz.split("x")
 		if p.size() == 2:
 			get_window().size = Vector2i(int(p[0]), int(p[1]))
+	var uis: String = OS.get_environment("DENDRO_UISCALE")  # screenshot hook: interface scale (see Game.UI_SCALES)
+	if uis != "" and DisplayServer.get_name() != "headless":
+		get_window().content_scale_factor = float(uis)
 
 
 ## Pause overlay (Esc). `freeze` pauses the scene tree; the DENDRO_SCREEN=pause screenshot shows it unfrozen.
@@ -644,6 +705,9 @@ func _screenshot_and_quit(path: String) -> void:
 	_settle_view()
 	cam.snap()
 	await prune_tool.prepare_shot()  # DENDRO_GHOST / DENDRO_PRUNE_HOVER
+	_frame_camera(0.0)  # the ghost's size is known only now
+	if not cam.use_override:
+		cam.snap()
 	hud.update_from(sim)
 	print("[dendro] view: h=%.1f crown_r=%.1f root_depth=%.1f spread=%.1f plug r=%.1f d=%.1f cam dist=%.1f target=%s" % [
 		sim.get_height_m(), sim.get_crown_radius_m(), sim.get_root_depth_m(), sim.get_root_spread_m(),
@@ -668,7 +732,7 @@ func _screenshot_and_quit(path: String) -> void:
 	if rz != "":
 		var rv: RingView = hud.get_ring_view()
 		rv._zoom_at(Vector2(rv.size.x * 0.5 + 40.0, (rv.size.y - RingView.TEXT_H) * 0.5 - 10.0), float(rz))
-	if OS.get_environment("DENDRO_SCREEN") == "pause":
+	if OS.get_environment("DENDRO_SCREEN").begins_with("pause"):  # pause, pause_save, pause_load
 		_open_pause_menu(false)
 	for i: int in 12:
 		await get_tree().process_frame
@@ -680,17 +744,6 @@ func _screenshot_and_quit(path: String) -> void:
 		var err: int = img.save_png(path)
 		print("[dendro] screenshot saved (%d, %dx%d) -> %s" % [err, img.get_width(), img.get_height(), path])
 	get_tree().quit()
-
-
-## Flux panel: top-right corner of the free view area (usually sky; bottom-right with the ring panel) (left of the ring panel when it is shown).
-func _place_flux_panel() -> void:
-	if not flux_panel.visible:
-		return
-	var fr: Rect2 = hud.free_rect(get_viewport().get_visible_rect().size)
-	flux_panel.size = flux_panel.get_combined_minimum_size()
-	# With the ring panel open the top of the free area is the crown: go to the bottom corner instead.
-	var y: float = fr.end.y - flux_panel.size.y if hud.is_rings_visible() else fr.position.y
-	flux_panel.position = Vector2(fr.end.x - flux_panel.size.x, y)
 
 
 func _apply_view_env() -> void:
@@ -964,6 +1017,7 @@ func _run_selftest() -> void:
 
 	# 5. Ring panel toggle + ring view interaction.
 	var view: Vector2 = get_viewport().get_visible_rect().size
+	hud.flux_button.button_pressed = false  # sections 5 and 7 measure the layout without the flux panel (it docks in the side column)
 	hud.rings_button.button_pressed = false
 	await get_tree().process_frame
 	var free_closed: Rect2 = hud.free_rect(view)
@@ -1087,6 +1141,8 @@ func _run_selftest() -> void:
 	soil.reset()
 	_check("soil reset on new seed", soil.radius < 1.0 and soil.depth < 0.6)
 	_check("wedge opens 110 degrees", is_equal_approx(rad_to_deg(soil.wedge_width), 110.0))
+
+	hud.flux_button.button_pressed = true
 
 	# 8. Camera: free 360-degree orbit (no yaw limit), pitch below the horizon, screen-space pan, zoom.
 	_apply_seed(5)

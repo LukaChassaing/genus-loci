@@ -2,6 +2,8 @@
 mod backend;
 /// Pruning (« Taille ») functions of `TreeSim`.
 mod prune_api;
+/// Save / load (« Sauvegarder », « Charger ») functions of `TreeSim`.
+mod save_api;
 
 use backend::{mesh_data_to_array_mesh, Backend};
 use godot::classes::ArrayMesh;

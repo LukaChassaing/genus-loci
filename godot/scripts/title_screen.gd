@@ -4,14 +4,14 @@ extends Control
 ## reached from it (arboretum setup, plates, options). Routes straight to the simulation when a debug /
 ## test hook is set (DENDRO_SHOT, DENDRO_SELFTEST, DENDRO_BENCH, DENDRO_YEARS).
 ##
-## Debug hook: DENDRO_SCREEN=title|setup|plate0|plate1|options (+ DENDRO_SHOT=<absolute png>, DENDRO_SIZE=WxH).
-## DENDRO_SCREEN=pause is handled by the simulation scene (it needs a running tree).
+## Debug hook: DENDRO_SCREEN=title|setup|plate0|plate1|options|load|load_confirm (+ DENDRO_SHOT=<absolute png>, DENDRO_SIZE=WxH).
+## DENDRO_SCREEN=pause|pause_save|pause_load|loading is handled by the simulation scene (it needs a running tree).
 
 const MENU_ENTRIES: Array = [
 	["Arboretum", "arboretum", true],
+	["Charger", "charger", true],
 	["Planches", "planches", true],
 	["Laboratoire", "laboratoire", false],
-	["Commandes", "commandes", false],
 	["Options", "options", true],
 	["Quitter", "quitter", true],
 ]
@@ -25,6 +25,7 @@ var menu_buttons: Array[Button] = []
 var setup: ArboretumSetup
 var options: OptionsPanel
 var plates: PlateView
+var saves: SaveBrowser
 var _title_block: Control
 var _info_block: Control
 var _col_content: Control
@@ -34,7 +35,7 @@ var embedded: bool = false
 
 func _ready() -> void:
 	var scr: String = OS.get_environment("DENDRO_SCREEN")
-	if not embedded and (scr == "pause" or (Game.shell_screen() == "" and Game.is_automation())):
+	if not embedded and (scr.begins_with("pause") or scr == "loading" or (Game.shell_screen() == "" and Game.is_automation())):
 		Game.start_simulation_direct.call_deferred()
 		return
 	theme = UiStyle.make_theme(18)
@@ -132,6 +133,7 @@ func _clear_column() -> void:
 	menu_buttons.clear()
 	setup = null
 	options = null
+	saves = null
 	if _info_block != null:
 		_info_block.queue_free()
 		_info_block = null
@@ -194,6 +196,8 @@ func _on_menu(which: String) -> void:
 	match which:
 		"arboretum":
 			show_setup()
+		"charger":
+			show_load()
 		"planches":
 			show_plates(0)
 		"options":
@@ -266,6 +270,19 @@ func _update_species_info(index: int) -> void:
 	_info_block = box
 
 
+## « Charger »: saved trees, newest first; loading opens the simulation scene, which regrows the tree.
+func show_load() -> void:
+	_clear_column()
+	_set_plates(false)
+	backdrop_setup.visible = false
+	page = "load"
+	_title_block.visible = true
+	saves = SaveBrowser.new("load")
+	saves.load_requested.connect(func(path: String) -> void: Game.load_save(path))
+	saves.closed.connect(show_menu)
+	_col_content.add_child(saves)
+
+
 func show_options() -> void:
 	_clear_column()
 	_set_plates(false)
@@ -312,6 +329,12 @@ func _run_screen_hook(scr: String) -> void:
 			show_setup()
 		"options":
 			show_options()
+		"load":
+			show_load()
+		"load_confirm":  # the deletion confirmation of the first save
+			show_load()
+			await get_tree().process_frame
+			saves._on_delete()
 		"plate0":
 			show_plates(0)
 		"plate1":

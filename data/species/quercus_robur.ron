@@ -89,11 +89,16 @@
         sag_max_droop_deg: 10.0,
         sag_min_inclination_deg: 50.0,
         // Autotropic straightening of limbs that were continued by a lateral
-        // (stylised rate): limbs > 1.5 cm radius straighten by up to
+        // (stylised rate): limbs > 2.5 cm radius straighten by up to
         // 1.5 deg/yr, keeping 12 deg of their elbows (sinuous, not kinked).
+        // Calibration: the radius gate was 15 mm while the simulated wood
+        // was ~1.5 x too thin in youth; with the wood budget (growth.rs,
+        // `area_per_foliage`) the same axes are now ~25 mm thick, and
+        // keeping 15 mm straightened more axes (+0.7 m height, -0.06 W/H
+        // at 200 y).
         straightening_deg_per_year: 1.5,
         straightening_keep_deg: 12.0,
-        straightening_min_radius_mm: 15.0,
+        straightening_min_radius_mm: 25.0,
         // Shade tolerance and self-pruning: no direct source; thresholds are
         // calibrated. Oak is light-demanding, but shade leaves of the lower and inner
         // crown persist down to ~9 % of open-sky light (calibrated; with the
@@ -218,8 +223,15 @@
         // Durable heartwood: dead oak limbs stand for decades (a 10 cm
         // radius bough ~50 years; stylised).
         snag_years_per_m: 500.0,
-        // Pressler law coefficient (calibrated on DBH targets).
-        growth_coefficient: 0.0000200,
+        // Wood volume made per unit of light-weighted foliage in an average
+        // year (m3/m2), spread over the shoot system by Pressler's law
+        // (growth.rs, `area_per_foliage`). Calibration: fitted to White
+        // 1998 (FC Information Note 12, Tables 1a-2), common oak "good
+        // site, open grown": 4 mm core rings to 80 y (DBH 32 cm @40,
+        // 48 @60), then CAI ~80 cm2/y (78 cm @100, 128 @200). Model: 32,
+        // 47, 76-81, 122-131 cm over three seeds. Was 2.0e-5 m2 of area
+        // per foliage, which left the stem thin before ~100 y (20 cm @40).
+        growth_coefficient: 0.000465,
         twig_radius_mm: 2.5,
         max_ring_width_mm: 9.0,
         // Mesh-only stylisation (not measured): visible branch collars, and

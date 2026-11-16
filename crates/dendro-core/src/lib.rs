@@ -35,6 +35,7 @@ pub mod pruning;
 pub mod rings;
 mod rng;
 mod roots;
+pub mod save;
 mod sim;
 pub mod soil;
 
@@ -51,6 +52,7 @@ pub use pruning::{
     Action, BoleMetrics, CutKind, CutPreview, CutSpec, JournalEntry, LogEvent, PickHit, PruneMetrics, PruningTraits, ShootInfo, WoundState,
 };
 pub use rings::Ring;
+pub use save::{Replay, ReplayResult, SaveError, SaveFile, SaveMeta, SAVE_VERSION};
 pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
 pub use sim::{
     ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, FLOWER_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET,

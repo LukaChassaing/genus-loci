@@ -358,15 +358,110 @@ func get_ring_view() -> RingView:
 ## ring panel (when shown), above the control bar. The 3D camera frames the tree inside it.
 func free_rect(view: Vector2) -> Rect2:
 	var left: float = _info_panel.position.x + _info_panel.size.x + 12.0
-	var right: float = view.x - 14.0
-	if _ring_panel.visible:
-		right = _ring_panel.global_position.x - 12.0
-	for sp: Control in side_panels:
-		if is_instance_valid(sp) and sp.visible:
-			right = minf(right, sp.global_position.x - 12.0)
 	var top: float = 14.0
 	var bottom: float = _bottom_panel.global_position.y - 10.0
+	var right: float = layout_side_panels(view, top, bottom)
 	return Rect2(left, top, maxf(right - left, 200.0), maxf(bottom - top, 200.0))
+
+
+const SIDE_GAP: float = 8.0
+const SIDE_EDGE: float = 14.0
+const RING_MAX: float = 360.0   # ring disc area (px) at natural size and when the dock is squeezed
+const RING_MIN: float = 60.0
+const RING_EXTRA: float = 60.0  # text strip under the disc
+
+
+## Docks the visible side panels (ring view, pruning panel, flux panel: in that order) in one right-hand column,
+## top to bottom, same width, no overlap. When the column would be taller than [top, bottom] it is compressed in
+## steps: the flux panel folds into its legend strip, then the ring disc shrinks, then the pruning panel's
+## scrolling text area. Returns the x of the column's left edge minus a gap (the right limit of the free 3-D area).
+func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
+	var stack: Array[Control] = []
+	if _ring_panel.visible:
+		stack.append(_ring_panel)
+	for sp: Control in side_panels:
+		if is_instance_valid(sp) and sp.visible:
+			stack.append(sp)
+	if stack.is_empty():
+		return view.x - SIDE_EDGE
+	var avail: float = bottom - top - SIDE_GAP * float(stack.size() - 1)
+	var flux: FluxPanel = null
+	var other: Array[Control] = []
+	for sp: Control in stack:
+		if sp is FluxPanel:
+			flux = sp
+		else:
+			other.append(sp)
+	# 1. Everything at natural size; the flux panel folds if the whole does not fit.
+	_ring_view.custom_minimum_size = Vector2(RING_MAX, RING_MAX + RING_EXTRA)
+	for sp: Control in other:
+		_dock(sp)
+		if sp.has_meta("dock_fit"):
+			(sp.get_meta("dock_fit") as Callable).call(100000.0)
+	var other_h: float = 0.0
+	for sp: Control in other:
+		other_h += sp.get_combined_minimum_size().y
+	if flux != null:
+		_dock(flux)
+		flux.set_auto_collapsed(false)
+		var fh: float = flux.get_combined_minimum_size().y
+		flux.full_height = fh
+		if other_h + fh > avail:
+			flux.set_auto_collapsed(true)
+			fh = flux.get_combined_minimum_size().y
+		other_h += fh
+	# 2. Still too tall: shrink the ring disc, then the pruning panel's text area.
+	var over: float = other_h - avail
+	if over > 0.0 and _ring_panel.visible:
+		var cut: float = minf(over, RING_MAX - RING_MIN)
+		_ring_view.custom_minimum_size = Vector2(RING_MAX - cut, RING_MAX - cut + RING_EXTRA)
+		over -= cut
+	if over > 0.0:
+		for sp: Control in other:
+			if sp.has_meta("dock_fit"):
+				var h: float = sp.get_combined_minimum_size().y
+				(sp.get_meta("dock_fit") as Callable).call(h - over)
+	# 3. Still too tall (large interface scale): the flux panel leaves the column, its legend is not worth the room.
+	var out_of_room: bool = false
+	if flux != null:
+		var rest: float = 0.0
+		for sp: Control in other:
+			rest += sp.get_combined_minimum_size().y
+		out_of_room = rest + flux.get_combined_minimum_size().y > avail + 0.5
+		flux.docked_out = out_of_room
+		if out_of_room:
+			stack.erase(flux)
+			flux.position = Vector2(-10000.0, -10000.0)
+	# 4. Stack: one width for the whole column.
+	var w: float = 0.0
+	for sp: Control in stack:
+		w = maxf(w, sp.get_combined_minimum_size().x)
+	var y: float = top
+	for sp: Control in stack:
+		var sz: Vector2 = Vector2(w, sp.get_combined_minimum_size().y)
+		sp.size = sz
+		sp.position = Vector2(view.x - SIDE_EDGE - w, y)
+		y += sz.y + SIDE_GAP
+	return view.x - SIDE_EDGE - w - 12.0
+
+
+func _dock(c: Control) -> void:
+	if not c.has_meta("docked"):
+		c.set_meta("docked", true)
+		c.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		c.grow_horizontal = Control.GROW_DIRECTION_END
+		c.grow_vertical = Control.GROW_DIRECTION_END
+
+
+## Screen rectangles (canvas units) of the visible docked side panels (tests).
+func side_panel_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if _ring_panel.visible:
+		out.append(Rect2(_ring_panel.position, _ring_panel.size))
+	for sp: Control in side_panels:
+		if is_instance_valid(sp) and sp.visible and not (sp is FluxPanel and (sp as FluxPanel).docked_out):
+			out.append(Rect2(sp.global_position, sp.size))
+	return out
 
 
 func reset_drought_button() -> void:

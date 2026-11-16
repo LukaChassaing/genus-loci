@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: 4.7.2-stable
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Règle du projet : « zéro branche par espèce » dans le cœur.
+  no-species-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aucune branche par espèce dans dendro-core
+        run: |
+          # Les seuls endroits autorisés à nommer une espèce : genome.rs (include_str! des RON
+          # et constructeurs de génomes intégrés).
+          pattern='(species|latin_name|\.name)\s*(==|!=)|match\s+[^{]*(species|latin_name)|"(quercus|prunus)|(quercus_robur|prunus_avium)\b|Quercus|Prunus'
+          # Les commentaires (sources scientifiques citant des espèces) sont ignorés.
+          hits="$(grep -rnEi "$pattern" crates/dendro-core/src --include='*.rs' --exclude=genome.rs | grep -Ev '^[^:]+:[0-9]+:[[:space:]]*//' || true)"
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Code propre à une espèce dans dendro-core (ajouter un trait générique au génome, pas une branche)."
+            exit 1
+          fi
+          echo "OK : aucun code par espèce hors genome.rs"
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Tests du cœur (release)
+        run: cargo test -p dendro-core --release
+      - name: Clippy
+        run: cargo clippy -p dendro-core -p dendro-godot --tests -- -D warnings
+
+  # Tests de performance (#[ignore]) : sensibles au bruit des runners partagés.
+  # Non bloquants (continue-on-error) ; le critère « < 2 s » reste à valider sur la machine cible.
+  perf:
+    name: perf (${{ matrix.os }}, non bloquant)
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p dendro-core --release -- --ignored
+
+  godot:
+    name: godot (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # L'éditeur charge la bibliothèque « debug » ; on construit aussi la « release » (artefact).
+      - name: Build de l'extension (debug)
+        run: cargo build -p dendro-godot
+      - name: Build de l'extension (release)
+        run: cargo build -p dendro-godot --release
+      - name: Télécharger Godot ${{ env.GODOT_VERSION }}
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}"
+          mkdir -p "$RUNNER_TEMP/godot"
+          cd "$RUNNER_TEMP/godot"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            asset="Godot_v${GODOT_VERSION}_win64.exe.zip"
+            expected=731980f9608d61333e5baf54a2ef17210acc7a538446c0cb9969f002aca1e953
+          else
+            asset="Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+            expected=cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4
+          fi
+          curl -fsSL --retry 3 -o godot.zip "$base/$asset"
+          echo "$expected  godot.zip" | sha256sum -c -
+          7z x -y godot.zip > /dev/null || unzip -o godot.zip
+          ls -la
+      - name: Localiser le binaire Godot
+        run: |
+          cd "$RUNNER_TEMP/godot"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            bin="$(ls Godot_v*_win64_console.exe | head -n1)"
+          else
+            bin="Godot_v${GODOT_VERSION}_linux.x86_64"
+            chmod +x "$bin"
+          fi
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/$bin" >> "$GITHUB_ENV"
+      - name: Version de Godot
+        run: '"$GODOT_BIN" --version'
+      - name: Import des ressources
+        run: '"$GODOT_BIN" --headless --path godot --import'
+      # --headless = pilote d'affichage et de rendu factices : ni GPU ni Vulkan requis.
+      # L'auto-test quitte avec le code 1 s'il échoue ; on exige en plus « ALL PASSED » dans la sortie.
+      - name: Auto-test Godot
+        run: |
+          DENDRO_SELFTEST=1 "$GODOT_BIN" --headless --path godot 2>&1 | tee selftest.log
+          grep -q "ALL PASSED" selftest.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dendro-godot-${{ runner.os }}
+          path: |
+            target/release/libdendro_godot.so
+            target/release/dendro_godot.dll
+          if-no-files-found: error
+
+  determinism:
+    name: determinism (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Hachage de l'état à 100 ans (chêne, merisier)
+        shell: bash
+        run: |
+          cargo run -q -p dendro-core --release --example state_hash | tr -d '\r' | tee state_hash.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: state-hash-${{ runner.os }}
+          path: state_hash.txt
+
+  determinism-compare:
+    needs: determinism
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: state-hash-*
+          path: hashes
+      - name: Les hachages Linux et Windows doivent être identiques
+        run: |
+          find hashes -type f
+          cat hashes/state-hash-Linux/state_hash.txt
+          cat hashes/state-hash-Windows/state_hash.txt
+          diff hashes/state-hash-Linux/state_hash.txt hashes/state-hash-Windows/state_hash.txt \
+            || { echo "::error::Déterminisme inter-plateformes rompu (voir docs/build.md, section Déterminisme)"; exit 1; }

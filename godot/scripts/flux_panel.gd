@@ -2,7 +2,8 @@ class_name FluxPanel
 extends PanelContainer
 ## Flux legend and controls (shown while the "Flux" master switch is on): one toggle per flux kind with
 ## its colour, and the day's value in real units (TreeSim.get_flux, read through TreeFluxView.values).
-## Placed by main.gd in the bottom-right corner of the free view area.
+## A dockable side panel: Hud.layout_side_panels stacks it under the ring and pruning panels. It collapses to
+## a one-line legend strip (click the header) and does so by itself when the column has no room for it.
 
 const ROWS: Array = [
 	["water", "Sève brute (xylème)", "Eau puisée par les racines, tirée jusqu'aux feuilles"],
@@ -19,6 +20,13 @@ var _checks: Dictionary = {}
 var _vals: Dictionary = {}
 var _foot: Label
 var _age: float = 10.0
+var _body: VBoxContainer
+var _strip: HBoxContainer      # collapsed legend: one colour dash per flux kind
+var _head: Button
+var user_collapsed: bool = false
+var auto_collapsed: bool = false
+var docked_out: bool = false   # no room left in the column even folded: parked off screen by the dock
+var full_height: float = 0.0   # height when expanded, measured the last time it was (for the dock's budget)
 
 
 func _init(v: TreeFluxView) -> void:
@@ -36,12 +44,33 @@ func _ready() -> void:
 	var col: VBoxContainer = VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
 	m.add_child(col)
-	col.add_child(UiStyle.caps_label("FLUX DE L'ARBRE · AUJOURD'HUI", 12))
+	_head = Button.new()
+	_head.flat = true
+	_head.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_head.focus_mode = Control.FOCUS_NONE
+	_head.add_theme_font_size_override("font_size", 12)
+	_head.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
+	_head.tooltip_text = "Replier / déplier le panneau des flux"
+	_head.pressed.connect(func() -> void: set_user_collapsed(not user_collapsed))
+	col.add_child(_head)
+	_strip = HBoxContainer.new()
+	_strip.add_theme_constant_override("separation", 5)
+	for r: Array in ROWS:
+		var d: ColorRect = ColorRect.new()
+		d.color = TreeFluxView.COLORS[r[0]]
+		d.custom_minimum_size = Vector2(22, 5)
+		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		d.tooltip_text = r[1]
+		_strip.add_child(d)
+	col.add_child(_strip)
+	_body = VBoxContainer.new()
+	_body.add_theme_constant_override("separation", 2)
+	col.add_child(_body)
 	var grid: GridContainer = GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 1)
-	col.add_child(grid)
+	_body.add_child(grid)
 	for r: Array in ROWS:
 		var kind: String = r[0]
 		var cb: CheckBox = CheckBox.new()
@@ -75,7 +104,30 @@ func _ready() -> void:
 	_foot = Label.new()
 	_foot.add_theme_font_size_override("font_size", 12)
 	_foot.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
-	col.add_child(_foot)
+	_body.add_child(_foot)
+	_apply_collapse()
+
+
+func is_collapsed() -> bool:
+	return user_collapsed or auto_collapsed
+
+
+func set_user_collapsed(on: bool) -> void:
+	user_collapsed = on
+	_apply_collapse()
+
+
+func set_auto_collapsed(on: bool) -> void:
+	if on != auto_collapsed:
+		auto_collapsed = on
+		_apply_collapse()
+
+
+func _apply_collapse() -> void:
+	var c: bool = is_collapsed()
+	_body.visible = not c
+	_strip.visible = c
+	_head.text = ("▸ " if c else "▾ ") + "FLUX DE L'ARBRE" + ("" if c else " · AUJOURD'HUI")
 
 
 ## Syncs the checkboxes with the view (env hooks, tests) without emitting.

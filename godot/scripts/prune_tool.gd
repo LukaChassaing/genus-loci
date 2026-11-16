@@ -40,6 +40,7 @@ var hud: Hud
 var active: bool = false
 var flush_mode: bool = false
 var ghost_on: bool = false
+var ghost_extent: Vector2 = Vector2.ZERO   # (horizontal reach m, height m) of the visible ghost, else zero
 
 var wound_mi: MeshInstance3D
 var preview_mi: MeshInstance3D
@@ -63,6 +64,8 @@ var _tip: PanelContainer
 var _tip_text: RichTextLabel
 var panel: PanelContainer
 var _journal: RichTextLabel
+var _scroll: ScrollContainer
+var _scroll_body: VBoxContainer
 var _compare: RichTextLabel
 var _flush_btn: Button
 var _ghost_btn: Button
@@ -110,6 +113,15 @@ func setup(main: Node3D) -> void:
 	add_child(ghost_mi)
 	_build_ui()
 	hud.prune_toggled.connect(set_active)
+
+
+## Size of the control tree's silhouette for the camera framing (x: horizontal reach, y: height), zero while the
+## ghost is hidden or not computed yet.
+func _measure_ghost() -> void:
+	ghost_extent = Vector2.ZERO
+	if ghost_on and ghost_mi.mesh != null and ghost_mi.mesh.get_surface_count() > 0:
+		var bb: AABB = ghost_mi.mesh.get_aabb()
+		ghost_extent = Vector2(maxf(maxf(absf(bb.position.x), absf(bb.end.x)), maxf(absf(bb.position.z), absf(bb.end.z))), bb.end.y)
 
 
 func _overlay_mat(c: Color, prio: int) -> StandardMaterial3D:
@@ -194,6 +206,16 @@ func _build_ui() -> void:
 		var arg: float = o[2]
 		b.pressed.connect(func() -> void: run_op(op, arg))
 	v.add_child(UiStyle.rule())
+	# Comparison + journal scroll when the dock is short of height (Hud.layout_side_panels -> dock_fit).
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(_scroll)
+	var body: VBoxContainer = VBoxContainer.new()
+	body.add_theme_constant_override("separation", 5)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(body)
+	_scroll_body = body
+	panel.set_meta("dock_fit", dock_fit)
 	_compare = RichTextLabel.new()
 	_compare.bbcode_enabled = true
 	_compare.fit_content = true
@@ -201,8 +223,8 @@ func _build_ui() -> void:
 	_compare.custom_minimum_size = Vector2(320, 0)
 	_compare.add_theme_font_size_override("normal_font_size", 13)
 	_compare.add_theme_font_size_override("bold_font_size", 13)
-	v.add_child(_compare)
-	v.add_child(UiStyle.rule())
+	body.add_child(_compare)
+	body.add_child(UiStyle.rule())
 	_journal = RichTextLabel.new()
 	_journal.bbcode_enabled = true
 	_journal.fit_content = true
@@ -210,7 +232,7 @@ func _build_ui() -> void:
 	_journal.custom_minimum_size = Vector2(320, 0)
 	_journal.add_theme_font_size_override("normal_font_size", 13)
 	_journal.add_theme_font_size_override("bold_font_size", 13)
-	v.add_child(_journal)
+	body.add_child(_journal)
 
 	# Tooltip last: drawn above the panel.
 	_tip = PanelContainer.new()
@@ -229,6 +251,15 @@ func _build_ui() -> void:
 	_tip.add_child(_tip_text)
 
 
+## Dock protocol: make the panel at most `max_h` tall by shortening the scrolling area (never below ~3 lines).
+func dock_fit(max_h: float) -> void:
+	var nat: float = _scroll_body.get_combined_minimum_size().y
+	_scroll.custom_minimum_size.y = nat
+	var over: float = panel.get_combined_minimum_size().y - max_h
+	if over > 0.0:
+		_scroll.custom_minimum_size.y = maxf(nat - over, 30.0)
+
+
 func _btn(parent: Control, text: String, tip: String) -> Button:
 	var b: Button = Button.new()
 	b.text = text
@@ -243,8 +274,6 @@ func set_active(on: bool) -> void:
 	panel.visible = on
 	if hud.prune_button.button_pressed != on:
 		hud.prune_button.set_pressed_no_signal(on)
-	if on and hud.is_rings_visible():
-		hud.set_rings_visible(false)  # one right-hand panel at a time
 	if not on:
 		_clear_hover()
 	_panel_age = 1.0
@@ -253,6 +282,10 @@ func set_active(on: bool) -> void:
 func set_ghost(on: bool) -> void:
 	ghost_on = on
 	ghost_mi.visible = on
+	if not on:
+		ghost_extent = Vector2.ZERO
+	else:
+		_measure_ghost()
 	if _ghost_btn.button_pressed != on:
 		_ghost_btn.set_pressed_no_signal(on)
 	_ghost_ver = -1
@@ -265,6 +298,7 @@ func on_reset() -> void:
 	_wound_ver = -1
 	_journal_n = -1
 	ghost_mi.mesh = null
+	ghost_extent = Vector2.ZERO
 	_ghost_ver = -1
 
 
@@ -550,6 +584,7 @@ func _process(delta: float) -> void:
 				_ghost_ver = gv
 				_ghost_age = 0.0
 				ghost_mi.mesh = sim.build_control_wood_mesh()
+				_measure_ghost()
 	if active:
 		_panel_age += delta
 		if _panel_age >= 0.25:
@@ -691,6 +726,7 @@ func prepare_shot() -> void:
 			await get_tree().process_frame
 			frames += 1
 		ghost_mi.mesh = sim.build_control_wood_mesh()
+		_measure_ghost()
 		_refresh_panel()
 		print("[dendro][prune] control ready after %d frames" % frames)
 	# DENDRO_PRUNE_CAM=wound[:k[:dist[:pitch[:yaw]]]]  close-up on the wound of journal entry k (default the first)

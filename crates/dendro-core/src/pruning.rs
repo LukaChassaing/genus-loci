@@ -1313,7 +1313,7 @@ impl Simulation {
         // Expected radial growth of the host (Pressler, average year).
         let w = &self.genome.wood;
         let r_h = host.radius().max(1e-4);
-        let dr = (w.growth_coefficient * host_fol / (std::f32::consts::TAU * r_h)).min(w.max_ring_width_mm * 0.001);
+        let dr = (self.shoots.area_per_foliage(w.growth_coefficient) * host_fol / (std::f32::consts::TAU * r_h)).min(w.max_ring_width_mm * 0.001);
         let mut radius = plan.r;
         if plan.kind == CutKind::Flush {
             radius *= 1.35;

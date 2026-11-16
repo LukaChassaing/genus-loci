@@ -128,7 +128,12 @@ fn builtin_species() {
 }
 
 /// Open-grown wild cherry on deep loam: fast youth, 18-25 m at 60 y with a
-/// DBH of 35-60 cm, plateau at 20-28 m; shallow, wide-spreading roots.
+/// DBH of 44-64 cm, plateau at 20-28 m; shallow, wide-spreading roots.
+/// DBH: Pryor 1988, "The silviculture and yield of wild cherry", Forestry
+/// Commission Bulletin 75, Table 7 (free growth, crowns kept isolated: 14 cm
+/// at 15 y, 30 cm at 40 y, 44 cm at 60 y) to 60 cm in 50-60 y on favourable
+/// sites (Evans 1984, as cited by the Future Trees Trust monograph). Updated:
+/// was 35-60 cm.
 #[test]
 fn calibration_open_grown_cherry() {
     for (i, seed) in SEEDS.iter().enumerate() {
@@ -138,7 +143,8 @@ fn calibration_open_grown_cherry() {
         };
         check(15, "height", y[15].height_m, 8.0, 10.5);
         check(60, "height", y[60].height_m, 18.0, 25.0);
-        check(60, "dbh", y[60].dbh_cm, 35.0, 60.0);
+        check(15, "dbh", y[15].dbh_cm, 10.0, 20.0);
+        check(60, "dbh", y[60].dbh_cm, 44.0, 64.0);
         let peak = y[60..].iter().map(|s| s.height_m).fold(0.0, f32::max);
         check(130, "peak height", peak, 20.0, 28.0);
         // Much faster than the oak in youth.
@@ -211,9 +217,18 @@ fn cherry_declines_while_oak_grows() {
         let (c, o) = (cherry(i), oak(i));
         let ring = |r: &Run, a: usize, b: usize| mean(&r.ring_widths[a..b]);
         let (c_prime, c_old) = (ring(c, 20, 60), ring(c, 105, 115));
-        let (o_prime, o_old) = (ring(o, 20, 60), ring(o, 100, 110));
         assert!(c_old < 0.6 * c_prime, "seed {seed}: cherry rings {c_prime:.2} -> {c_old:.2} mm");
-        assert!(o_old > 0.9 * o_prime, "seed {seed}: oak rings {o_prime:.2} -> {o_old:.2} mm");
+        // The oak in its prime keeps (or raises) its basal-area increment;
+        // its rings, spread over a growing girth, slowly narrow (White 1998,
+        // FC Information Note 12: constant "mature state" CAI). Updated:
+        // the former check on ring width (>= 0.9 x the 20-60 y mean) held
+        // only while the stem was too thin in youth.
+        let bai = |r: &Run, a: usize, b: usize| {
+            let (da, db) = (r.yearly[a].dbh_cm, r.yearly[b].dbh_cm);
+            std::f32::consts::FRAC_PI_4 * (db * db - da * da) / (b - a) as f32
+        };
+        let (o_prime, o_old) = (bai(o, 40, 60), bai(o, 100, 110));
+        assert!(o_old > 0.9 * o_prime, "seed {seed}: oak BAI {o_prime:.1} -> {o_old:.1} cm2/y");
         let c_gain = c.yearly[110].height_m - c.yearly[100].height_m;
         let o_gain = o.yearly[110].height_m - o.yearly[100].height_m;
         assert!(c_gain < 0.4, "seed {seed}: cherry still gains {c_gain:.2} m in 100-110 y");
@@ -234,7 +249,13 @@ fn cherry_rings() {
         let (c, o) = (cherry(i), oak(i));
         let cj = mean(&c.ring_widths[8..30]);
         let oj = mean(&o.ring_widths[8..30]);
-        assert!(cj > 1.2 * oj, "seed {seed}: juvenile rings cherry {cj:.2} vs oak {oj:.2} mm");
+        // Open-grown oak lays even rings of ~4-5 mm in youth (White 1998,
+        // Table 1a: 4 mm "good site, open grown", 5 mm "champion"); free-
+        // growing cherry ~5-6 mm (Pryor 1988, FC Bulletin 75, Table 7: 14 cm
+        // DBH at 15 y; 60 cm in 50-60 y on favourable sites, Evans 1984 as
+        // cited by the Future Trees Trust). Updated: was 1.2 x, set when the
+        // oak's juvenile rings were too narrow (~2.5 mm).
+        assert!(cj > 1.1 * oj, "seed {seed}: juvenile rings cherry {cj:.2} vs oak {oj:.2} mm");
         assert!(cj > mean(&c.ring_widths[60..90]), "seed {seed}: rings not wider in youth");
     }
 }

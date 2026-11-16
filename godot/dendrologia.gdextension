@@ -6,3 +6,5 @@ reloadable = true
 [libraries]
 linux.debug.x86_64 = "res://../target/debug/libdendro_godot.so"
 linux.release.x86_64 = "res://../target/release/libdendro_godot.so"
+windows.debug.x86_64 = "res://../target/debug/dendro_godot.dll"
+windows.release.x86_64 = "res://../target/release/dendro_godot.dll"
