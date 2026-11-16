@@ -197,7 +197,7 @@ pub fn read_entry(p: &Path) -> SaveEntry {
         Ok(f) => SaveFileOrError::Ok(Box::new(f)),
         Err(e) => SaveFileOrError::Err(e.to_string()),
     };
-    SaveEntry { path: p.to_string_lossy().into_owned(), file, modified_unix }
+    SaveEntry { path: p.to_string_lossy().replace('\\', "/"), file, modified_unix }
 }
 
 /// Delete a save (only `.ron` files). True when removed.
