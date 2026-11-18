@@ -54,6 +54,46 @@ fn entry_text(e: &Entry) -> String {
     [e.conditions.extra.as_deref(), e.quote.as_deref(), e.note.as_deref()].into_iter().flatten().collect::<Vec<_>>().join(" ").to_lowercase()
 }
 
+/// Text of the conditions only (site + extra), lower case. Unlike
+/// `entry_text` it leaves out the quote and the note, which often talk about
+/// the neighbouring entry ("60-70 years in closed stands (next entry)").
+fn conditions_text(e: &Entry) -> String {
+    [e.conditions.site.as_deref(), e.conditions.extra.as_deref()].into_iter().flatten().collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
+/// The conditions describe trees grown in a stand (closed, dense, mature
+/// stand, plantation crop, field hedge), not an isolated tree.
+fn stand_condition(e: &Entry) -> bool {
+    let t = conditions_text(e);
+    if ["free-standing", "open-grown", "solitary", "isolé", "isolated"].iter().any(|k| t.contains(k)) {
+        return false;
+    }
+    ["dense stand", "closed stand", "in stands", "mature stand", "peuplement", "im bestand", "dense canopies", "haies de"].iter().any(|k| t.contains(k))
+}
+
+/// The conditions announce a maximum ("maximum", "up to 2 m"), not a typical
+/// size: the engine is read at its largest size over the simulated life.
+fn maximum_condition(e: &Entry) -> bool {
+    let t = conditions_text(e);
+    ["maximum", "maximal", "up to", "jusqu'à", "exceptionally"].iter().any(|k| t.contains(k))
+}
+
+/// Occurrences of `kw` at the start of a word that no negation precedes
+/// ("not ectomycorrhiza", "pas ectomycorhize", "contre l'arbuscule").
+fn affirmed(txt: &str, kws: &[&str]) -> bool {
+    const NEG: [&str; 9] = [" not ", " no ", " non ", " pas ", " contre ", " unlike ", " nicht ", " rather than ", " instead of "];
+    kws.iter().any(|kw| {
+        txt.match_indices(kw).any(|(i, _)| {
+            let word_start = txt[..i].chars().next_back().is_none_or(|c| !c.is_alphabetic());
+            // The 24 characters before, punctuation read as spaces.
+            let tail: String = txt[..i].chars().rev().take(24).collect::<Vec<_>>().into_iter().rev().collect();
+            let before = format!(" {}", tail.chars().map(|c| if c.is_alphanumeric() || c == '-' { c } else { ' ' }).collect::<String>());
+            let before = format!("{before} ");
+            word_start && !(NEG.iter().any(|n| before.contains(n)) || before.trim_end().ends_with("non-"))
+        })
+    })
+}
+
 /// Years of a run while the tree is standing (all of them on main).
 pub fn living(r: &TreeRun) -> &[YearRec] {
     match r.death_age {
@@ -70,7 +110,16 @@ impl SpeciesCtx {
     pub fn year(&self, age: u32, f: impl Fn(&YearRec) -> f64) -> Vec<f64> {
         self.runs.iter().filter(|r| alive_at(r, age)).filter_map(|r| r.years.get(age as usize - 1).map(&f)).collect()
     }
+    /// Detailed record at `age`; when no run sampled that exact age (the
+    /// reference "adult" age is not always in `sample_ages`), the nearest
+    /// sampled age stands in.
     pub fn at(&self, age: u32, f: impl Fn(&AgeRec) -> f64) -> Vec<f64> {
+        let sampled = self.runs.iter().any(|r| r.ages.contains_key(&age));
+        let age = if sampled {
+            age
+        } else {
+            self.runs.first().and_then(|r| r.ages.keys().copied().min_by_key(|k| k.abs_diff(age))).unwrap_or(age)
+        };
         self.runs.iter().filter(|r| alive_at(r, age)).filter_map(|r| r.ages.get(&age).map(&f)).collect()
     }
     fn lifetime_max(&self, f: impl Fn(&YearRec) -> f64) -> Vec<f64> {
@@ -134,9 +183,15 @@ const STAND: &str = "peuplement (le moteur simule un arbre isolé)";
 /// grafted-orchard entries are not comparable.
 pub fn species_entry(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
     let m = species_entry_raw(sp, cx, e);
-    let grafted = e.conditions.extra.as_deref().is_some_and(|x| x.trim_start().to_lowercase().starts_with("verger greffé"));
-    if grafted && m.comparable() {
+    let extra = e.conditions.extra.as_deref().map(|x| x.trim_start().to_lowercase()).unwrap_or_default();
+    if extra.starts_with("verger greffé") && m.comparable() {
         return m.nc("verger greffé sur porte-greffe : le moteur simule un arbre franc de semis, sans greffe ni taille");
+    }
+    if extra.starts_with("cultivar") && m.comparable() {
+        return m.nc("cultivar de verger : le moteur simule un arbre franc de semis, sans greffe ni conduite de verger");
+    }
+    if e.note.as_deref().is_some_and(|n| n.to_lowercase().contains("arbres de verger")) && m.comparable() {
+        return m.nc("la source décrit des arbres de verger (greffés, conduits), pas un franc de pied");
     }
     m
 }
@@ -177,11 +232,36 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             if id == "pretzsch_free_height_cap" {
                 return life_h();
             }
+            // Spruce minus fir at equal age: a difference of heights between
+            // two genomes, not a height.
+            if id == "utschig_gap" {
+                return height_gap(sp, cx, 100);
+            }
+            let ctext = conditions_text(e);
+            // Clear bole length (a stand quantity), not the tree height.
+            if ctext.contains("bole") || ctext.contains("fût") {
+                let a = age.unwrap_or(mat).min(sp.last_age());
+                let m = Measured::values(sp.at(a, |r| r.clear_bole_m), format!("hauteur du fût sans grosse branche, {a} ans"), Nature::Emergent);
+                return if stand_condition(e) { m.nc(STAND) } else { m };
+            }
+            if ctext.contains("dominant height") || ctext.contains("hauteur dominante") {
+                let a = age.unwrap_or(mat).min(sp.last_age());
+                return at_age_h(a).nc("hauteur dominante de peuplement (potentiel de station) : le moteur simule un arbre isolé");
+            }
+            if ctext.contains("maximum mai") {
+                return mature_h().nc("table de production de plantation, âge du MAI maximal non donné dans l'entrée");
+            }
             if e.spread_kind == "max_record" {
                 return life_h();
             }
+            if age.is_none() && maximum_condition(e) {
+                return life_h().warn("l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence");
+            }
             if let Some(a) = age {
                 return at_age_h(a.min(sp.last_age()));
+            }
+            if stand_condition(e) {
+                return mature_h().nc(STAND);
             }
             let m = mature_h();
             if id == "atlas_height_range" {
@@ -206,12 +286,21 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             if id == "pretzsch_dbh_70y_condition" {
                 return at_age_d(70).warn("arbres d'avenir fortement éclaircis : proches d'un arbre libre, pas identiques");
             }
+            if conditions_text(e).contains("maximum mai") {
+                return mature_d().nc("table de production de plantation (DBH à l'âge du MAI maximal, non donné dans l'entrée) : le moteur simule un arbre isolé");
+            }
             if e.spread_kind == "max_record" {
                 let m = life_d();
                 return if id == "atlas_dbh_max" { m.calib() } else { m };
             }
+            if age.is_none() && maximum_condition(e) {
+                return life_d().warn("l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence");
+            }
             if let Some(a) = age {
                 return at_age_d(a.min(sp.last_age()));
+            }
+            if stand_condition(e) {
+                return mature_d().nc(STAND);
             }
             mature_d()
         }
@@ -230,7 +319,12 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
                 "stoj_crown_dominant_59y" => Measured::values(sp.year(59, |y| 2.0 * y.crown_radius_m), "largeur de houppier à 59 ans", Nature::Emergent).nc(STAND),
                 _ => {
                     let a = age.unwrap_or(mat);
-                    Measured::values(sp.year(a, |y| 2.0 * y.crown_radius_m), format!("largeur de houppier à {a} ans"), Nature::Emergent)
+                    let m = Measured::values(sp.year(a, |y| 2.0 * y.crown_radius_m), format!("largeur de houppier à {a} ans"), Nature::Emergent);
+                    if stand_condition(e) {
+                        m.nc(STAND)
+                    } else {
+                        m
+                    }
                 }
             }
         }
@@ -265,7 +359,15 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             "stoj_rootdepth_erlbeck" => Measured::values(sp.lifetime_max(|y| y.root_depth_m), "profondeur racinaire maximale sur la vie (sol de référence)", Nature::Emergent).warn("source de seconde main ; sol « facilement pénétrable » vs sol brun de référence"),
             _ => Measured::not_measurable("qualitatif, sans profondeur chiffrée"),
         },
-        "root_spread_m" => Measured::values(sp.year(150, |y| y.root_spread_m), "rayon d'extension racinaire à 150 ans", Nature::Emergent),
+        "root_spread_m" => {
+            let a = 150.min(sp.last_age());
+            let m = Measured::values(sp.year(a, |y| y.root_spread_m), format!("rayon d'extension racinaire à {a} ans"), Nature::Emergent);
+            if stand_condition(e) {
+                m.nc("racines mesurées en peuplement (voisins) : le moteur simule un arbre isolé")
+            } else {
+                m
+            }
+        }
         "budburst_doy" => {
             let m = Measured::values(sp.mean_date(5, |y| y.budburst), "date moyenne de débourrement (jour, ans 5 et +), climat de Rennes", Nature::Emergent);
             if id.starts_with("eaton") || id.starts_with("cole") || id.starts_with("quick") || id == "wp_nl_budburst" {
@@ -312,6 +414,13 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
         "age_first_flowering_years" => {
             let m = Measured::values(sp.first_flowering(), "âge de la première floraison simulée", Nature::Emergent)
                 .warn(format!("piloté par le paramètre first_flowering_age_years = {} (± 1 an)", g.reproduction.first_flowering_age_years));
+            let ctext = conditions_text(e);
+            if stand_condition(e) {
+                return m.nc(STAND);
+            }
+            if ["rejets", "sprout", "coppice", "taillis"].iter().any(|k| ctext.contains(k)) {
+                return m.nc("arbres issus de rejets de souche : le moteur simule un semis");
+            }
             match id {
                 "wp_pl_first_fruit_stand" | "stoj_maturity" => m.nc(STAND),
                 "euf_first_flowering" | "pryor_first_flowering" | "atlas_first_fruiting" => m.calib(),
@@ -325,6 +434,10 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             }
             if id == "atlas_longevity_a" || id == "atlas_longevity_b" {
                 return lifespan().calib();
+            }
+            // Age found in a stand or a sample of trees, not a longevity of the species.
+            if conditions_text(e).contains("stand") && !conditions_text(e).contains("free-standing") {
+                return lifespan().nc("âge observé dans un peuplement ou un échantillon, pas la longévité de l'espèce");
             }
             lifespan()
         }
@@ -402,17 +515,29 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
                 .warn("valeur de Virot et al. contestée (Albrecht et al. 2016)")
         }
         "mycorrhiza_type" => {
-            // Expected type read from the entry's own text.
+            // No explicit field in the reference format (value is empty,
+            // unit "category"): the expected type is read from the entry's
+            // text, ignoring negated mentions ("not ectomycorrhiza") and
+            // sources that do not state the type.
             let txt = entry_text(e);
-            let want = if txt.contains("ecto") || txt.contains("ecm") {
-                "Ecto"
-            } else if txt.contains("arbusc") || txt.contains("endomy") || txt.contains("(va)") || txt.contains(" am ") {
-                "Arbusc"
-            } else {
-                return Measured::not_measurable("type mycorhizien non lisible dans l'entrée");
+            if ["type not stated", "not stated by", "non précisé", "pas détaillé", "not detailed"].iter().any(|k| txt.contains(k)) && !txt.contains("inferred") {
+                return Measured::not_measurable("la source ne donne pas le type de mycorhize (seulement l'existence de la symbiose)");
+            }
+            let ecto = affirmed(&txt, &["ecto", "ecm"]);
+            let arb = affirmed(&txt, &["arbusc", "endomy", "(va)", "am "]);
+            let (want, label) = match (ecto, arb) {
+                (true, false) => ("Ecto", "ectomycorhize"),
+                (false, true) => ("Arbusc", "mycorhize arbusculaire"),
+                (true, true) => return Measured::not_measurable("le texte de l'entrée affirme les deux types de mycorhize"),
+                (false, false) => return Measured::not_measurable("type mycorhizien non lisible dans l'entrée"),
             };
             let t = format!("{:?}", g.symbiosis.mycorrhiza);
-            Measured::rule(t.contains(want), format!("type du génome : {t}"), "type mycorhizien", Nature::Param)
+            let m = Measured::rule(t.contains(want), format!("type du génome : {t} ; type attendu lu dans l'entrée : {label}"), "type mycorhizien", Nature::Param);
+            if txt.contains("inferred") || txt.contains("déduit") {
+                m.warn("type déduit par l'auteur de l'entrée (genre fongique), non énoncé par la source")
+            } else {
+                m
+            }
         }
         "root_architecture" => {
             if id == "wpde_rootsystem" {
@@ -442,6 +567,17 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             }
         }
         "frost_tolerance" => {
+            // Qualitative statement. Only a statement about flowers is read
+            // with the flower-frost rule; a statement on seedlings or on
+            // frost in general is not a flowering claim.
+            let txt = entry_text(e) + " " + &e.id;
+            let flowers = ["flower", "fleur", "blossom", "bloom", "floraison", "blüher"].iter().any(|k| txt.contains(k));
+            if !flowers {
+                if ["seedling", "plantule", "jeunes plants"].iter().any(|k| txt.contains(k)) {
+                    return Measured::not_modeled("gel des plantules : pas de régénération simulée (l'énoncé ne porte pas sur les fleurs)");
+                }
+                return Measured::not_measurable("énoncé général sur le gel (feuilles, bourgeons, pousses), sans critère du banc : seul le gel des fleurs est lu, et l'énoncé ne les concerne pas");
+            }
             let v: Vec<f64> = sp
                 .runs
                 .iter()
@@ -562,6 +698,24 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
         | "crown_to_stem_ratio" | "crown_diameter_vs_dbh_linear" => Measured::not_modeled("grandeur ou processus absent du moteur, ou sans protocole par espèce"),
         _ => Measured::not_measurable(format!("observable « {q} » non relié par le banc")),
     }
+}
+
+/// Spruce minus fir mean height at equal age (paired seeds), the quantity of
+/// a yield-table comparison (Utschig 2004). Needs the spruce in the run.
+fn height_gap(sp: &SpeciesCtx, cx: &Ctx, age: u32) -> Measured {
+    let a = age.min(sp.last_age());
+    let Some(spruce) = cx.get("picea_abies").filter(|s| s.id != sp.id) else {
+        return Measured::not_measurable("l'épicéa n'est pas dans le run : écart de hauteur non mesurable");
+    };
+    let v: Vec<f64> = spruce
+        .runs
+        .iter()
+        .zip(sp.runs.iter())
+        .filter(|(s, f)| alive_at(s, a) && alive_at(f, a))
+        .filter_map(|(s, f)| Some(s.years.get(a as usize - 1)?.height_m - f.years.get(a as usize - 1)?.height_m))
+        .collect();
+    Measured::values(v, format!("hauteur de l'épicéa moins hauteur du {} à {a} ans (même graine, arbres isolés)", sp.genome.common_name_fr.to_lowercase()), Nature::Emergent)
+        .warn("tables de production de peuplement (Wiedemann, Assmann & Franz contre Hausser) comparées à deux arbres isolés ; âge de 100 ans choisi par le banc")
 }
 
 /// Cherry on gley clay vs the reference soil (waterlogging intolerance).
@@ -736,4 +890,22 @@ fn vent_or(_cx: &Ctx, _e: &Entry, reason: &str) -> Measured {
 #[cfg(feature = "vent")]
 fn vent_or(cx: &Ctx, e: &Entry, _reason: &str) -> Measured {
     crate::vent::physics_entry(cx, e)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::affirmed;
+
+    #[test]
+    fn negated_mycorrhiza_type_is_not_affirmed() {
+        let t = "arbuscular mycorrhiza (not ectomycorrhiza)";
+        assert!(!affirmed(t, &["ecto", "ecm"]));
+        assert!(affirmed(t, &["arbusc"]));
+        let t = "ectomycorhize : confirme le type ecm, contre l'arbuscule du merisier.";
+        assert!(affirmed(t, &["ecto", "ecm"]));
+        assert!(!affirmed(t, &["arbusc"]));
+        assert!(!affirmed("non-ectomycorrhizal", &["ecto"]));
+        assert!(!affirmed("hector", &["ecto"]));
+        assert!(affirmed("ectomycorrhizal with a large number of fungi", &["ecto"]));
+    }
 }

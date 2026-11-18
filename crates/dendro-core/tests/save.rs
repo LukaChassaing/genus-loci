@@ -188,7 +188,7 @@ fn write_and_read_a_file() {
     file.write(&path).expect("write");
     let back = SaveFile::read(&path).expect("read");
     assert_eq!(back, file);
-    assert_eq!(back.builtin_species_index(), Some(1));
+    assert_eq!(back.builtin_species_index(), Genome::index_of("prunus_avium"));
     assert_eq!(back.replay().expect("replay").state_hash(), s.state_hash());
     let _ = std::fs::remove_dir_all(&dir);
 }

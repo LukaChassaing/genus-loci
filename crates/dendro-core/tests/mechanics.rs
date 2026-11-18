@@ -173,27 +173,25 @@ fn crown_drag_follows_the_vogel_exponent() {
 // ----------------------------------------------------------------------
 
 /// Trees on the reference soil (deep loam), seeds `SEEDS`, at 60 and 150
-/// years: `[species][age][seed]`.
-fn trees() -> &'static Vec<Vec<Vec<Simulation>>> {
-    static T: OnceLock<Vec<Vec<Vec<Simulation>>>> = OnceLock::new();
+/// years: `(species id, [age][seed])`, in registry order. Tests name the
+/// species they check by id (`tree("quercus_robur")`): the registry order
+/// changes whenever a species file is added.
+/// `(species id, typical lifespan in years, [age][seed])`.
+type SpeciesTrees = (String, f32, Vec<Vec<Simulation>>);
+
+fn trees() -> &'static Vec<SpeciesTrees> {
+    static T: OnceLock<Vec<SpeciesTrees>> = OnceLock::new();
     T.get_or_init(|| {
         // Every deciduous species of the registry: the claims below are
         // about crowns that are bare in winter. Evergreens are excluded on
-        // purpose (their winter crown keeps its needles, and the drag of a
-        // monopodial conifer crown is a known artefact of the static model,
-        // docs/sources.md « Écarts connus »).
-        //
-        // Documented exception: the apple (`malus_domestica`). Its very
-        // twiggy crown (~18 000 shoot units at 60 y) has, at the 45-50 m/s
-        // of its critical speeds, a larger bare-twig drag (estimated twig
-        // reconfiguration exponent -0.5) than the reconfigured drag of its
-        // crown in leaf (seed 42, 45 m/s: 9.8 kN against 7.1 kN), so the
-        // claim fails there (median 48.3 m/s leafless against 52.1 in
-        // leaf). A limit of the static drag model, not of the genome
-        // (docs/sources.md, « Écarts connus »).
+        // purpose (their winter crown keeps its needles, and the in-leaf
+        // stem of a monopodial conifer is still too weak, docs/sources.md
+        // « Écarts connus »). No other exception: the apple was excluded
+        // until the bare crown wood was sheltered and capped by the leafy
+        // envelope (mechanics.rs, `CROWN_WOOD_LEAF_CAP`).
         Genome::builtin()
             .into_iter()
-            .filter(|g| !g.leaf.evergreen() && g.id != "malus_domestica")
+            .filter(|g| !g.leaf.evergreen())
             .map(|g| {
                 let mut at60 = Vec::new();
                 let mut at150 = Vec::new();
@@ -204,9 +202,26 @@ fn trees() -> &'static Vec<Vec<Vec<Simulation>>> {
                     s.advance_years(90);
                     at150.push(s);
                 }
-                vec![at60, at150]
+                (g.id.clone(), g.pruning.typical_lifespan_years, vec![at60, at150])
             })
             .collect()
+    })
+}
+
+/// The trees of one species, by id: `[age][seed]`.
+fn tree(id: &str) -> &'static Vec<Vec<Simulation>> {
+    &trees().iter().find(|(i, _, _)| i == id).unwrap_or_else(|| panic!("no deciduous species {id}")).2
+}
+
+/// Every deciduous species, with only the ages (indices into `AGES`) that
+/// fall within its typical lifespan (`pruning.typical_lifespan_years`): a
+/// 150-year hazel (a stem lives 60-90 years) or plum is not a tree the
+/// claims below are about. Decided with the user (2026-11-18) when the
+/// 150-year hazel's limb safety rose from 2.25 to 2.54 at 10 m/s (the wind
+/// moment partly cancelling a limb's self-weight moment).
+fn living_trees() -> impl Iterator<Item = (&'static str, usize, &'static Vec<Simulation>)> {
+    trees().iter().flat_map(|(id, life, by_age)| {
+        by_age.iter().enumerate().filter(move |(a, _)| AGES[*a] as f32 <= *life).map(move |(a, sims)| (id.as_str(), a, sims))
     })
 }
 
@@ -222,20 +237,30 @@ fn in_leaf(u: f32) -> WindLoad {
 
 #[test]
 fn more_wind_means_less_safety() {
-    for (sp, by_age) in trees().iter().enumerate() {
-        for (a, sims) in by_age.iter().enumerate() {
-            let model = sims[0].mechanics_model();
-            let mut last = f32::INFINITY;
-            for u in [0.0, 10.0, 20.0, 30.0, 40.0, 50.0] {
-                let s = model.evaluate(&in_leaf(u));
-                let worst = s.stem_safety.min(s.limb_safety).min(s.anchorage_safety);
-                assert!(worst <= last + 1e-4, "species {sp} age {}: safety rose from {last} to {worst} at {u} m/s", AGES[a]);
-                last = worst;
-                if u > 0.0 {
-                    assert!(s.drag_n > 0.0);
-                }
+    // From 20 m/s on, more wind means less safety, and a 50 m/s gust leaves
+    // the tree less safe than still air. Below 20 m/s a light wind may
+    // relieve a limb: its moment partly cancels the limb's self-weight
+    // moment (150-year hazel: limb safety 2.25 -> 2.54 at 10 m/s; 150-year
+    // pear: 6.4 -> 7.5). Decided with the user (2026-11-18); the test used
+    // to require a monotonic fall from 0 m/s.
+    for (sp, a, sims) in living_trees() {
+        let model = sims[0].mechanics_model();
+        let worst_at = |u: f32| {
+            let s = model.evaluate(&in_leaf(u));
+            if u > 0.0 {
+                assert!(s.drag_n > 0.0);
             }
+            s.stem_safety.min(s.limb_safety).min(s.anchorage_safety)
+        };
+        let calm = worst_at(0.0);
+        let _ = worst_at(10.0);
+        let mut last = f32::INFINITY;
+        for u in [20.0, 30.0, 40.0, 50.0] {
+            let worst = worst_at(u);
+            assert!(worst <= last + 1e-4, "species {sp} age {}: safety rose from {last} to {worst} at {u} m/s", AGES[a]);
+            last = worst;
         }
+        assert!(last < calm, "species {sp} age {}: safety at 50 m/s {last} not below still air {calm}", AGES[a]);
     }
 }
 
@@ -243,8 +268,8 @@ fn more_wind_means_less_safety() {
 fn leafless_crown_withstands_more_wind_than_crown_in_leaf() {
     // Broadleaves catch much more wind in leaf (Vollsinger et al. 2005 for
     // the crown drag; winter storms meet bare crowns).
-    for (sp, by_age) in trees().iter().enumerate() {
-        for (a, sims) in by_age.iter().enumerate() {
+    for (sp, a, sims) in living_trees() {
+        {
             let bare: Vec<f32> = sims.iter().map(|s| s.mechanics_model().critical_speeds(&leafless()).first().map_or(80.0, |f| f.1)).collect();
             let leafy: Vec<f32> = sims.iter().map(|s| s.mechanics_model().critical_speeds(&in_leaf(0.0)).first().map_or(80.0, |f| f.1)).collect();
             let (b, l) = (median(bare.clone()), median(leafy.clone()));
@@ -262,7 +287,7 @@ fn decay_reduces_safety() {
     // (1) Injected decay: hollowing (shell t/R = 0.3) the weakest stem
     // section of a sound 60-year oak lowers its stem safety and its
     // critical stem-breaking speed.
-    let oak = &trees()[0][0][0];
+    let oak = &tree("quercus_robur")[0][0];
     let (segs, site) = oak.mechanics_inputs();
     let t = oak.genome().mechanics.clone();
     let storm = WindLoad { leaf_fraction: Some(0.0), ..WindLoad::new(30.0) };
@@ -325,7 +350,7 @@ fn saturated_soil_lowers_the_uprooting_speed() {
     // Gleyed vs freely draining soil (ForestGALES 2.5): x0.886 on the
     // critical turning moment; turning moment ~ U^2 above the
     // reconfiguration range, so the critical speed drops by ~sqrt(0.886).
-    let oak = &trees()[0][0][0];
+    let oak = &tree("quercus_robur")[0][0];
     let (segs, site) = oak.mechanics_inputs();
     let t = oak.genome().mechanics.clone();
     let wet_site = MechSite { saturated_root_fraction: 1.0, ..site.clone() };
@@ -350,8 +375,8 @@ fn self_weight_safety_is_plausible() {
     // ~3-11 for a green MOR of 55-57 MPa: the >= 2 floor is loose. Every
     // species and age, the 150-year oak included (its limbs were too
     // slender, ~1.6, before the adaptive radial growth of growth.rs).
-    for (sp, by_age) in trees().iter().enumerate() {
-        for (a, sims) in by_age.iter().enumerate() {
+    for (sp, a, sims) in living_trees() {
+        {
             let snaps: Vec<_> = sims.iter().map(|s| s.mechanics_model().evaluate(&in_leaf(0.0))).collect();
             let stem = median(snaps.iter().map(|s| s.stem_safety).collect());
             let limb = median(snaps.iter().map(|s| s.limb_safety).collect());
@@ -416,15 +441,15 @@ fn scaffold_insertions_add_cross_section() {
     // shed branches is gone from the sum), and for the 150-year oak, whose
     // limbs are loaded most, above 1.02 (pure Pressler allocation gives
     // 0.99-1.00). The band is ours, built on the two model limits.
-    for (sp, by_age) in trees().iter().enumerate() {
-        for (a, sims) in by_age.iter().enumerate() {
+    for (sp, a, sims) in living_trees() {
+        {
             let ratios: Vec<f32> = sims.iter().flat_map(|s| scaffold_insertions(s).into_iter().map(|x| x.1)).collect();
             if ratios.is_empty() {
                 continue;
             }
             let m = median(ratios.clone());
             assert!((0.95..=1.25).contains(&m), "species {sp} age {}: median area ratio at limb insertions {m:.3} ({} limbs)", AGES[a], ratios.len());
-            if sp == 0 && AGES[a] == 150 {
+            if sp == "quercus_robur" && AGES[a] == 150 {
                 assert!(m > 1.02, "old oak: median area ratio at limb insertions {m:.3} (pure pipe model)");
             }
         }
@@ -442,7 +467,7 @@ fn old_oak_limbs_bear_crown_like_stress() {
     // range of species means, 5.2-18.9 MPa. The 1.5 factor is ours.
     let mut ratio = Vec::new();
     let mut limb_mpa = Vec::new();
-    for sim in &trees()[0][1] {
+    for sim in &tree("quercus_robur")[1] {
         let snap = sim.mechanics_model().evaluate(&in_leaf(0.0));
         let (segs, _) = sim.mechanics_inputs();
         let limbs: Vec<f32> = scaffold_insertions(sim).into_iter().map(|(i, _)| snap.segment_stress_mpa[i]).collect();
@@ -462,28 +487,28 @@ fn old_oak_limbs_bear_crown_like_stress() {
 
 #[test]
 fn adult_critical_gusts_in_published_range() {
-    // Target: the first failure of a sound adult broadleaf, leafless (the
-    // European winter storms), at a 10 m gust speed of 30-45 m/s (median of
-    // three seeds). Anchors: the static tree assessment of Sinn & Wessolly
-    // (1989) loads trees with a 32 m/s Beaufort-12 wind that a sound tree
-    // must resist; storm data show almost all trunks break above ~42 m/s,
-    // whatever the species and size (Virot et al. 2016, Phys Rev E
-    // 93:023001).
-    // The band around the two anchors is our choice (estimated).
-    // Checked: oak at 60 and 150 years, cherry at 60. The 150-year cherry
-    // (beyond its usual lifespan, a small senescent crown) comes out above
-    // the band (~56-59 m/s): reported in docs/sources.md, not tested.
-    let cases = [(0usize, 0usize), (0, 1), (1, 0)];
+    // A sound adult broadleaf, leafless (the European winter storms), must
+    // not fail below a 10 m gust of 32 m/s: the static tree assessment of
+    // Sinn & Wessolly (1989) loads trees with a Beaufort-12 wind of 32 m/s
+    // that a sound tree must resist (median of three seeds).
+    // Changed with the user (2026-11-18): the former band 30-45 m/s was our
+    // own estimate around 32 m/s and the ~42 m/s of Virot et al. 2016 (Phys
+    // Rev E 93:023001), which Albrecht et al. 2016 dispute; with the
+    // frontal-area drag the 60-year oak and cherry give 47.4 and 45.8 m/s.
+    // Virot's value stays a comparison of the validation bench
+    // (`virot_critical_wind`, data/validation/physics.ron), not a test bound.
+    // Checked: oak at 60 and 150 years, cherry at 60.
+    let cases = [("quercus_robur", 0usize), ("quercus_robur", 1), ("prunus_avium", 0)];
     for (sp, a) in cases {
-        let first: Vec<f32> = trees()[sp][a].iter().map(|s| s.mechanics_model().critical_speeds(&leafless()).first().map_or(80.0, |f| f.1)).collect();
+        let first: Vec<f32> = tree(sp)[a].iter().map(|s| s.mechanics_model().critical_speeds(&leafless()).first().map_or(80.0, |f| f.1)).collect();
         let m = median(first.clone());
-        assert!((30.0..=45.0).contains(&m), "species {sp} age {}: first failure at {m:.1} m/s ({first:?})", AGES[a]);
+        assert!(m >= 32.0, "species {sp} age {}: first failure at {m:.1} m/s ({first:?}), below the 32 m/s of Sinn & Wessolly 1989", AGES[a]);
     }
 }
 
 #[test]
 fn snapshot_is_deterministic_and_reports_modes() {
-    let s = &trees()[1][0][0];
+    let s = &tree("prunus_avium")[0][0];
     let a = s.mechanics_snapshot(&WindLoad::new(35.0));
     let b = s.mechanics_snapshot(&WindLoad::new(35.0));
     assert_eq!(a, b);
@@ -511,7 +536,7 @@ fn snapshot_is_deterministic_and_reports_modes() {
 fn performance_mechanics_old_oak() {
     // Cost budget: one evaluation is O(n); the critical speeds (~80 passes)
     // of a 150-year oak (~24 000 segments) stay well under 0.2 s (release).
-    let s = &trees()[0][1][0];
+    let s = &tree("quercus_robur")[1][0];
     let t0 = std::time::Instant::now();
     let m = s.mechanics_model();
     let _ = m.evaluate(&WindLoad::new(30.0));
@@ -522,3 +547,4 @@ fn performance_mechanics_old_oak() {
     println!("model + 1 evaluation {:.1} ms, critical speeds {:.1} ms ({} segments)", one * 1e3, crit * 1e3, m.segment_count());
     assert!(one < 0.02 && crit < 0.2);
 }
+

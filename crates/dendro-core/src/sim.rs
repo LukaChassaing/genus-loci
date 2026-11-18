@@ -1240,7 +1240,9 @@ impl Simulation {
                 let want = (area / (s_pref * s_pref)).max(n.unit_years as f32).min(60.0);
                 // Small units: one shoot card sized by the shoot itself.
                 let size = if want <= 3.0 {
-                    (n.length + 1.5 * leaf_len).clamp(2.2 * leaf_len, s_pref)
+                    // `max` then `min`, not `clamp`: a small `cluster_size_leaves` (< 2.2)
+                    // puts s_pref below the floor and `clamp` would panic.
+                    (n.length + 1.5 * leaf_len).max(2.2 * leaf_len).min(s_pref)
                 } else {
                     (area / want.round()).sqrt().clamp(0.8 * s_pref, s_max)
                 };

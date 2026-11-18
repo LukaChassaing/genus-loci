@@ -19,8 +19,16 @@
 //!   intercepted rain. Wind: a logarithmic profile over open ground scaled
 //!   by the speed at 10 m; drag on the leafy crown `F = ½ ρ Cd(U) A0 U²`
 //!   on its still-air frontal area `A0`, with reconfiguration
-//!   `Cd ∝ U^B` (Vogel exponent B < 0, so drag ∝ U^(2+B)); in leafless
-//!   parts, cross-flow drag on every woody segment taken as a rigid cylinder.
+//!   `Cd ∝ U^B` (Vogel exponent B < 0, so drag ∝ U^(2+B)). `A0` is the
+//!   silhouette of the leafy tips on the plane normal to the wind, one
+//!   light voxel per cell, and the force is **distributed by frontal
+//!   area**: each cell carries `½ ρ Cd S U(z)²`, shared among the tips of
+//!   that cell (tips behind one another along the wind shelter each
+//!   other), not by the foliage each shoot carries. Leafless crown wood:
+//!   cross-flow drag of rigid cylinders, with the mutual hiding of the
+//!   elements of a cell (random overlap) and, inside the leafy envelope,
+//!   capped by the drag the same cell has in full leaf
+//!   ([`CROWN_WOOD_LEAF_CAP`]). The stem is always fully exposed.
 //! * **Moments.** Forces and moments are summed as vectors from the tips
 //!   to the collar (`M_i = Σ_j (a_j − s_i) × F_j` over the subtree of i,
 //!   computed in O(n) as `Σ a_j × F_j − s_i × Σ F_j`); the bending moment of
@@ -59,7 +67,6 @@ use crate::fmath::DMath;
 use crate::genome::MechanicsTraits;
 use crate::math::Vec3;
 use crate::sim::Simulation;
-use std::collections::HashSet;
 
 // ----------------------------------------------------------------------
 // Constants
@@ -108,6 +115,16 @@ pub const WOOD_DRAG_COEFFICIENT: f32 = 1.2;
 /// Sitka spruce crowns (n = 0.51), whose streamlining is mainly the bending
 /// of branches. Not applied to the stem.
 pub const BARE_WOOD_VOGEL_EXPONENT: f32 = -0.5;
+/// Cap on the drag of the bare crown wood of one envelope cell, as a
+/// fraction of the drag of the same cell in full leaf at the same speed:
+/// a crown out of leaf does not catch more wind than in leaf. The only
+/// measurement found is on three field-grown poplars: drag coefficient of
+/// the defoliated crown 0.553-0.770 x that of the leafy crown at 10 m/s, on
+/// the same (ellipse) envelope area, the ratio increasing with wind speed
+/// (Koizumi et al. 2010, J Wood Sci 56:189-193, author manuscript read).
+/// Above 10 m/s the ratio is not known: 1 (the bound itself, no margin
+/// taken from the 10 m/s measurement) is estimated.
+pub const CROWN_WOOD_LEAF_CAP: f32 = 1.0;
 /// Leaf dry matter content (dry mass / fresh mass), to turn the dry leaf
 /// mass per area of `flux.rs` (LMA) into a fresh mass. Order of magnitude
 /// for tree leaves (0.3-0.45; LDMC as defined by Wilson, Thompson &
@@ -576,18 +593,89 @@ impl MechanicsModel {
         let (sa, ca) = load.azimuth_deg.to_radians().dsin_cos();
         let wind = Vec3::new(ca, 0.0, sa);
         let across = Vec3::new(-sa, 0.0, ca);
-        // Still-air frontal area of the leafy crown: leafy shoot tips
-        // rasterised on the plane normal to the wind, one light voxel per
-        // cell (the resolution at which the simulation knows its crown).
+        // Silhouette of the crown on the plane normal to the wind, one light
+        // voxel per cell (the resolution at which the simulation knows its
+        // crown): a cell belongs to the leafy envelope when a leafy shoot
+        // tip projects into it. Every segment is binned once (leafy shoots
+        // by their tip, crown wood by its midpoint; the stem is not binned)
+        // on a dense grid over their bounding box, sums taken in segment
+        // order (deterministic). O(n + cells).
         let cell = self.site.crown_cell_m.max(0.05);
-        let mut cells: HashSet<(i32, i32)> = HashSet::new();
-        for s in self.segs.iter().filter(|s| s.leaf_share > 0.0) {
-            let u = (s.end.dot(across) / cell).floor() as i32;
-            let w = (s.end.y / cell).floor() as i32;
-            cells.insert((u, w));
+        let binned = |s: &Seg| s.leaf_share > 0.0 || s.role != SegmentRole::Trunk;
+        let key = |s: &Seg| {
+            let p = if s.leaf_share > 0.0 { s.end } else { s.mid };
+            ((p.dot(across) / cell).floor() as i32, (p.y / cell).floor() as i32)
+        };
+        let (mut u0, mut u1, mut w0, mut w1) = (i32::MAX, i32::MIN, i32::MAX, i32::MIN);
+        for s in self.segs.iter().filter(|s| binned(s)) {
+            let (u, w) = key(s);
+            (u0, u1, w0, w1) = (u0.min(u), u1.max(u), w0.min(w), w1.max(w));
         }
-        let full_area = cells.len() as f32 * cell * cell;
+        let nu = if u1 >= u0 { (u1 - u0 + 1) as usize } else { 0 };
+        let nw = if w1 >= w0 { (w1 - w0 + 1) as usize } else { 0 };
+        let cell_of: Vec<usize> = self
+            .segs
+            .iter()
+            .map(|s| {
+                if binned(s) {
+                    let (u, w) = key(s);
+                    (u - u0) as usize * nw + (w - w0) as usize
+                } else {
+                    usize::MAX
+                }
+            })
+            .collect();
+        // Per cell: leaf share of the tips, projected area of the crown wood
+        // (`d L |sin θ|`, m²) and its rigid cross-flow drag `½ ρ Cd d L sin²θ`.
+        let mut leaf_in = vec![0.0f32; nu * nw];
+        let mut wood_area = vec![0.0f32; nu * nw];
+        let mut wood_drag = vec![0.0f32; nu * nw];
+        for (s, &c) in self.segs.iter().zip(&cell_of) {
+            if c == usize::MAX {
+                continue;
+            }
+            if s.leaf_share > 0.0 {
+                leaf_in[c] += s.leaf_share;
+            }
+            if s.role != SegmentRole::Trunk {
+                let cth = s.dir.dot(wind);
+                let sin2 = (1.0 - cth * cth).max(0.0);
+                wood_area[c] += s.d * s.len * sin2.sqrt();
+                wood_drag[c] += 0.5 * AIR_DENSITY * WOOD_DRAG_COEFFICIENT * s.d * s.len * sin2;
+            }
+        }
+        // Still-air frontal area of the leafy crown: the envelope cells.
+        let cell_area = cell * cell;
+        let full_area = leaf_in.iter().filter(|&&l| l > 0.0).count() as f32 * cell_area;
         let crown_area = full_area * f;
+        // Crown wood: its exposure per cell (see `CROWN_WOOD_*` and
+        // docs/sources.md). (1) Mutual hiding of the elements of one cell,
+        // random overlap (Beer-Lambert): projected area a on a cell of area
+        // S hides `S (1 − e^(−a/S))`, i.e. a factor `(1 − e^(−x)) / x`
+        // (estimated: real twigs are clumped, not random, and optical hiding
+        // is not the aerodynamic shelter of wakes).
+        // (2) Inside the leafy envelope, the drag of the bare wood of a cell
+        // is capped by the drag of the same cell in full leaf at the same
+        // speed (`CROWN_WOOD_LEAF_CAP`); the cap is taken at the speed where
+        // the ratio of the two reconfiguration laws is largest, so it holds
+        // at every speed. Wood outside the envelope (limbs below the leaves,
+        // wood in gaps of the crown) is never sheltered by leaves.
+        let rw = |u: f32| (u / RECONF_MIN_MS).dpowf(BARE_WOOD_VOGEL_EXPONENT);
+        let rc = |u: f32| (u / CROWN_CD_REFERENCE_MS).dpowf(self.traits.vogel_exponent);
+        let worst = (rw(RECONF_MIN_MS) / rc(RECONF_MIN_MS)).max(rw(RECONF_MAX_MS) / rc(RECONF_MAX_MS));
+        let leaf_cell_drag = 0.5 * AIR_DENSITY * self.traits.crown_drag_coefficient * cell_area;
+        let wood_factor: Vec<f32> = (0..nu * nw)
+            .map(|c| {
+                let x = wood_area[c] / cell_area;
+                let hide = if x > 1e-6 { (1.0 - (-x).dexp()) / x } else { 1.0 };
+                let drag = wood_drag[c] * hide * worst;
+                if leaf_in[c] > 0.0 && drag > 0.0 {
+                    hide * (CROWN_WOOD_LEAF_CAP * leaf_cell_drag / drag).min(1.0)
+                } else {
+                    hide
+                }
+            })
+            .collect();
         // Fresh leaf mass (kg/m²): the species' LMA (g dry / m²) / LDMC.
         let leaf_kg_m2 = self.site.leaf_lma_g_m2 * 1e-3 / LEAF_DRY_MATTER_CONTENT;
         let leaf_kg = self.site.leaf_area_m2 * f * leaf_kg_m2;
@@ -612,12 +700,25 @@ impl MechanicsModel {
             let c = s.dir.dot(wind);
             let sin2 = (1.0 - c * c).max(0.0);
             // In leaf, the crown drag coefficient (measured on whole crowns)
-            // already includes the branches inside the crown: their own drag
-            // only counts for the leafless share. The stem is always exposed.
-            let exposure = if s.role == SegmentRole::Trunk { 1.0 } else { 1.0 - f };
+            // already includes the branches inside the crown: the wood of an
+            // envelope cell only counts for the leafless share. The stem is
+            // always exposed; crown wood outside the envelope always.
+            let cid = cell_of[i];
+            let exposure = if s.role == SegmentRole::Trunk {
+                1.0
+            } else if leaf_in[cid] > 0.0 {
+                (1.0 - f) * wood_factor[cid]
+            } else {
+                wood_factor[cid]
+            };
             p.wood_k.push(0.5 * AIR_DENSITY * WOOD_DRAG_COEFFICIENT * s.d * s.len * sin2 * exposure);
             p.wood_bends.push(s.role != SegmentRole::Trunk);
-            p.crown_k.push(0.5 * AIR_DENSITY * crown_area * s.leaf_share);
+            // Crown drag by frontal area: each envelope cell carries
+            // `½ ρ Cd(U) S f`, shared among the leafy tips of the cell in
+            // proportion to their foliage (tips behind one another along the
+            // wind shelter each other), at the height of each tip.
+            let ck = if s.leaf_share > 0.0 && cid != usize::MAX { 0.5 * AIR_DENSITY * cell_area * f * s.leaf_share / leaf_in[cid] } else { 0.0 };
+            p.crown_k.push(ck);
             p.leaf_mass.push(leaf_kg * s.leaf_share);
             p.extra.push(load.extra_mass_kg.get(i).copied().unwrap_or(0.0).max(0.0));
             let (km, ke) = (profile(s.mid.y), profile(s.end.y));

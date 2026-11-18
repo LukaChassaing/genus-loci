@@ -154,7 +154,7 @@ fn builtin_species() {
     let g = Genome::prunus_avium();
     assert_eq!(Genome::from_ron(&g.to_ron()).unwrap(), g);
     // Renderer traits.
-    let o = &b[0];
+    let o = &b[Genome::index_of("quercus_robur").unwrap()];
     assert_eq!(g.leaf.lobes, 0);
     assert!(g.leaf.serration > 0.5 && o.leaf.serration == 0.0 && o.leaf.lobes > 0);
     assert!(g.bark.lenticels > 0.5 && o.bark.lenticels == 0.0);

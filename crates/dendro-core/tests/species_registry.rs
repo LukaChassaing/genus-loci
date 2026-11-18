@@ -62,3 +62,42 @@ fn every_species_grows_for_a_few_years() {
         assert!(ok, "data/species/{id}.ron: after 8 years height {height:.2} m, DBH {dbh:.1} cm, or rings / mesh missing");
     }
 }
+
+/// Foliage and wood meshes must build for every species at an age where it
+/// is in leaf (mid-July of year 12). Catches a genome trait that sends the
+/// mesher out of its assumed range (a panicking `clamp`, an empty crown).
+#[test]
+fn every_species_builds_leaf_and_wood_meshes() {
+    let hs: Vec<_> = Genome::builtin()
+        .into_iter()
+        .map(|g| {
+            std::thread::spawn(move || {
+                let id = g.id.clone();
+                let mut s = Simulation::new(g, 7);
+                s.advance_days(365 * 12 + 200);
+                (id, s.leaf_mesh().positions.len(), s.wood_mesh().positions.len())
+            })
+        })
+        .collect();
+    for h in hs {
+        let (id, leaf, wood) = h.join().unwrap_or_else(|_| panic!("a species panicked while building its meshes (data/species/*.ron: check leaf.cluster_size_leaves and other leaf traits)"));
+        assert!(leaf > 0, "data/species/{id}.ron: no foliage mesh in July of year 12");
+        assert!(wood > 0, "data/species/{id}.ron: no wood mesh at year 12");
+    }
+}
+
+/// Any positive `cluster_size_leaves` gives a valid foliage mesh (it used to
+/// panic below ~2.2 leaf lengths).
+#[test]
+fn small_leaf_clusters_do_not_break_the_foliage_mesh() {
+    for size in [0.3_f32, 1.0, 1.5, 2.1] {
+        let mut g = Genome::builtin().into_iter().find(|g| g.id == "quercus_robur").unwrap();
+        g.leaf.cluster_size_leaves = size;
+        let mut s = Simulation::new(g, 7);
+        s.advance_days(365 * 8 + 200);
+        let m = s.leaf_mesh();
+        assert!(!m.positions.is_empty(), "cluster_size_leaves = {size}: empty foliage");
+        assert!(m.positions.iter().flatten().all(|v| v.is_finite()), "cluster_size_leaves = {size}: non-finite vertex");
+        assert!(m.indices.iter().all(|&i| (i as usize) < m.positions.len()), "cluster_size_leaves = {size}: bad index");
+    }
+}
