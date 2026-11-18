@@ -1,0 +1,295 @@
+// European larch, Larix decidua Mill. Started from the Norway spruce pilot
+// (picea_abies.ron) with deciduous needles (guide: "Résineux caduc").
+// Reference values: data/validation/larix_decidua.ron (ids in brackets)
+// and the trait sheet docs/species/larix_decidua.md. Status of each value:
+// "measured" (a published value read by the research agent), "proxy"
+// (another species), "estimated" (general knowledge, no source read),
+// "calibrated" (tuned so the emergent tree matches the references).
+// The only deciduous European conifer [atlas_deciduous]: deciduous: true,
+// leaf_type: Needle, one cohort a year (leaf_longevity_years 1). The
+// short-shoot rosettes of 20-40 needles kept several years on old wood
+// (trait sheet) are approximated by `spur_foliage` (short-shoot foliage on
+// 2-year and older wood) and `tip_bunching` (engine gap: no true
+// brachyblasts). No height-age table or open-grown tree was found. Size
+// targets: 30-45 m [wfr_height] [wen_height] and a 1-1.5 m trunk
+// [atlas_dbh] at the bench's "adult" age (0.6 x 600 = 360 y). The British
+// plantation mean DBHs [fc34_el_yc12_dbh_35] etc. are stand values, not
+// targets. Rennes is outside the species' (montane, continental) niche.
+(
+    species: "Larix decidua",
+    common_name: "European larch",
+    common_name_fr: "Mélèze d'Europe",
+    category: Conifer,
+    architecture: (
+        // Monopodial, straight trunk, light conical crown, tiered branches
+        // (Atlas, trait sheet): strong apical control (calibrated by eye).
+        apical_dominance_young: 0.78,
+        apical_dominance_mature: 0.62,
+        maturity_age_years: 150.0,
+        juvenile_phase_years: 40.0,
+        apical_dominance_branches: 0.58,
+        lateral_competition: 1.6,
+        // Calibrated: strong juvenile growth (trait sheet).
+        vigour_per_light: 6.2,
+        bud_break_threshold: 1.0,
+        internode_length_m: 0.05,
+        max_shoot_length_m: 0.80,
+        lateral_buds_per_shoot: 5,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        whorled: true,
+        lateral_planarity: 0.3,
+        branching_angle_deg: 70.0,
+        phyllotaxis_deg: 137.5,
+        max_order: 8,
+        // Tiered drooping branches with pendent twigs (Atlas, trait sheet;
+        // set-points by eye).
+        gravitropism: 0.9,
+        lateral_gravitropism: 0.35,
+        limb_setpoint_low_deg: 100.0,
+        limb_setpoint_high_deg: 60.0,
+        twig_setpoint_deg: 115.0,
+        crown_spread_ratio: 0.30,
+        phototropism: 0.15,
+        sinuosity_deg: 4.0,
+        leader_loss_probability: 0.03,
+        leader_loss_angle_deg: 15.0,
+        sag_coefficient: 4.0,
+        sag_min_radius_mm: 20.0,
+        sag_max_deg_per_year: 0.6,
+        sag_max_total_deg: 15.0,
+        sag_max_droop_deg: 25.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 2.0,
+        straightening_keep_deg: 5.0,
+        straightening_min_radius_mm: 25.0,
+        // Strict light demander (pioneer) [atlas_shade]: shaded branches die
+        // fast (estimated strengths).
+        shedding_threshold: 0.10,
+        shade_survival_years: 2,
+        shedding_mean_threshold: 0.0,
+        clear_bole_fraction: 0.15,
+        clear_bole_max_m: 4.0,
+        clear_bole_limb_ratio: 0.4,
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.0,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 1.0,
+        epicormic_rate: 0.0,
+        // Calibrated on the 30-45 m adult height [wfr_height] [wen_height]:
+        // ~24 m at 40 y, ~38 m at 150 y, ~43 m at 360 y.
+        hydraulic_path_max_m: 38.0,
+        hydraulic_exponent: 1.5,
+        hydraulic_foliage_exponent: 1.2,
+    ),
+    leaf: (
+        // Soft needles 1.5-4 cm [atlas_needle_length], 2-4 [wen_needle_length].
+        length_cm: 2.8,
+        width_cm: 0.1,
+        lobes: 0,
+        serration: 0.0,
+        // Deciduous [atlas_deciduous]: one cohort per year.
+        deciduous: true,
+        marcescence: 0.0,
+        marcescence_max_age_years: 1.0,
+        leaf_type: Needle,
+        leaf_longevity_years: 1.0,
+        // Not found (trait sheet; light foliage, low LAI expected): a
+        // deciduous-like LMA and a low LAI (estimated).
+        lma_g_m2: 110.0,
+        crown_lai: 3.0,
+        // Rendering: needles in tufts on short shoots along the wood
+        // (spur_foliage), bunched on the long shoots.
+        leaves_per_shoot: 60.0,
+        cluster_size_leaves: 4.0,
+        foliage_density: 1.6,
+        tip_bunching: 0.8,
+        petiole_ratio: 0.0,
+        leaf_droop: 0.5,
+        spur_foliage: 0.8,
+        spur_max_radius_mm: 25.0,
+        spur_min_light: 0.15,
+        colour_spread: 0.3,
+    ),
+    // Calibration by eye: light green needles turning golden yellow in
+    // autumn [atlas_deciduous] (carotenoids, no anthocyanins).
+    pigments: (
+        chlorophyll: 0.9,
+        carotenoids: 1.2,
+        anthocyanins: 0.0,
+        tannins: 0.3,
+        anthocyanin_persistence: 0.0,
+    ),
+    phenology: (
+        // No budburst or fall date found (trait sheet): early budburst
+        // (estimated, before the fir genome's 340), autumn colouring and
+        // fall in October-November (estimated): budburst ~DOY 95, bare
+        // ~DOY 320 at Rennes.
+        chilling_requirement_days: 50.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        gdd_budburst: 200.0,
+        chill_forcing_gdd: 250.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 300.0,
+        senescence_photoperiod_h: 12.0,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 130.0,
+        leaf_fall_days: 20.0,
+    ),
+    wood: (
+        // Basic specific gravity 0.45 (Wood Database [wdb_density] site
+        // field): 450 kg/m3.
+        density_kg_m3: 450.0,
+        // Green MOE: as the spruce genome (proxy); no green value found.
+        elasticity_gpa: 9.2,
+        ring_porous: false,
+        earlywood_share: 0.6,
+        ring_contrast: 0.8,
+        // Calibrated: ~1.55 m at 360 y against 1-1.5 m [atlas_dbh]; 29 cm
+        // at 40 y, as the plantation mean of yield class 12
+        // [fc34_el_yc12_dbh_40] (an open-grown tree is expected thicker:
+        // the trunk grows little in youth here).
+        growth_coefficient: 0.000300,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 10.0,
+        pipe_exponent: 2.0,
+        limb_draw_boost: 1.1,
+        bark_irregularity: 0.02,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        collar_flare: 0.12,
+        root_flare: 0.3,
+        root_flare_height_radii: 1.2,
+        buttress_lobes: 4,
+        // Very durable wood (trait sheet): dead wood persists.
+        snag_years_per_m: 400.0,
+    ),
+    // Thick bark, grey-brown and deeply fissured, reddish in the cracks
+    // (trait sheet: thick bark; colours estimated).
+    bark: (
+        color: (0.40, 0.30, 0.26),
+        young_color: (0.50, 0.42, 0.34),
+        old_darkening: (0.10, 0.08, 0.07),
+        lenticels: 0.0,
+        fissures: 0.75,
+        gloss: 0.03,
+    ),
+    roots: (
+        // Heart root system [wde_root]; no depth found (estimated).
+        taproot_dominance: 0.6,
+        taproot_decline_years: 20.0,
+        max_depth_m: 2.0,
+        lateral_spread: 1.4,
+        lateral_count: 10,
+        lateral_depth_m: 0.3,
+        sinker_tendency: 0.3,
+        branching_probability: 0.35,
+        max_order: 3,
+        annual_extension_m: 0.7,
+        max_penetration_mpa: 3.0,
+        // Intolerant of waterlogging; needs drained soils
+        // [atlas_waterlogging] (estimated strengths).
+        waterlogging_tolerance: 0.2,
+        hypoxia_sensitivity: 0.4,
+        hypoxia_air_porosity: 0.12,
+        drought_deepening: 0.2,
+        hydrotropism: 0.3,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.4,
+        fine_root_per_m: 1200.0,
+        rapid_taper: 1.5,
+    ),
+    tolerances: (
+        // -30 degC in dormancy [atlas_frost] (winter hardiness, not
+        // modelled); new shoots: estimated.
+        frost_c: -3.5,
+        // No drought value read (estimated).
+        drought: 0.35,
+        // Light demanding pioneer [atlas_shade].
+        shade: 0.15,
+    ),
+    reproduction: (
+        // 15-20 y open-grown [wde_first_flowering_open].
+        first_flowering_age_years: 17.0,
+        // Flowers with or just before the needles (trait sheet; date
+        // range March-July with elevation [wfr_cones_period]): estimated
+        // early spring. Erect cones ~2.5 cm [atlas_cone_length]
+        // [wfr_cone_length], ripe 4-6 months after pollination
+        // [wen_cone_cycle]; kept on the tree up to 10 years (Atlas, trait
+        // sheet): persistent cones are an engine gap (cleared every
+        // December 31).
+        flower_display: 0.6,
+        fruit_display: 1.0,
+        bloom_gdd: 180.0,
+        bloom_duration_gdd: 80.0,
+        min_wood_age_years: 2,
+        min_light: 0.4,
+        max_wood_radius_mm: 20.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 2.0,
+        fruit_cluster_cm: 3.0,
+        flower_color: (0.85, 0.35, 0.45),
+        fruit_set: 0.6,
+        flower_frost_c: -3.0,
+        fruit_ripening_days: 150.0,
+        fruit_persistence_days: 90.0,
+        fruit_color_unripe: (0.55, 0.40, 0.40),
+        fruit_color_ripe: (0.50, 0.38, 0.25),
+        fruit_kind: ConeErect,
+        // No interval found: masting estimated (every few years).
+        crop_interval_years: 3.0,
+        off_year_crop: 0.2,
+    ),
+    // 600-800 y [atlas_longevity]; decline estimated.
+    longevity: (
+        decline_onset_years: 400.0,
+        decline_years: 200.0,
+        decline_min_vigour: 0.4,
+    ),
+    // Pinaceae: ectomycorrhizal (guide; trait sheet "estimé").
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // No stump sprouts (trait sheet, estimated); short shoots on old wood
+    // (not sourced): a small epicormic potential.
+    pruning: (
+        epicormic_potential: 0.1,
+        sprout_vigour: 0.5,
+        stump_sprouting: 0.0,
+        root_suckering: 0.0,
+        compensatory_growth: 0.1,
+        woundwood_ratio: 1.2,
+        compartmentalization: 0.45,
+        decay_infection_rate: 0.08,
+        decay_axial_m_per_year: 0.10,
+        decay_radial_mm_per_year: 4.0,
+        pathogen_dormant_risk: 0.1,
+        pathogen_summer_risk: 0.15,
+        pathogen_dieback_years: 3.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.1,
+        // 600 y [wde_longevity]; 600-800 [atlas_longevity].
+        typical_lifespan_years: 600.0,
+    ),
+    mechanics: (
+        // No green values found (trait sheet): the spruce genome's (proxy).
+        green_density_kg_m3: 800.0,
+        green_mor_mpa: 41.0,
+        green_moe_gpa: 9.2,
+        crown_drag_coefficient: 0.2,
+        vogel_exponent: -1.0,
+        // ForestGALES parameterises the species but no coefficient was
+        // extracted (trait sheet): the spruce genome's Sitka value (proxy).
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

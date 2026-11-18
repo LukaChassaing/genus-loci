@@ -1,0 +1,296 @@
+// Maritime pine, Pinus pinaster Aiton. Started from the Scots pine genome
+// of this registry (itself from the spruce pilot). Reference values:
+// data/validation/pinus_pinaster.ron (ids in brackets) and the trait sheet
+// docs/species/pinus_pinaster.md. Status of each value: "measured" (a
+// published value read by the research agent), "proxy" (another species),
+// "estimated" (general knowledge, no source read), "calibrated" (tuned so
+// the emergent tree matches the references).
+// No height-age table and no open-grown tree were found (trait sheet).
+// Size targets: mature height 20-30 m [atlas_height] [wfr_height] and a
+// trunk up to ~1.2 m [wen_dbh], read by the bench at its "adult" age
+// (0.6 x typical_lifespan_years = 180 y). The potential DOMINANT height of
+// Landes stands, 25-30 m at 40 y [fibois_hdom40], is a stand value on the
+// best sites (not a target; an open-grown tree is expected lower).
+// Polycyclic shoots (several flushes a year [wde_polycyclic]) are an engine
+// gap: the single annual flush is given a long maximum length instead.
+(
+    species: "Pinus pinaster",
+    common_name: "Maritime pine",
+    common_name_fr: "Pin maritime",
+    category: Conifer,
+    architecture: (
+        // Ovoid-conical young crown, irregular and open in the adult,
+        // branches leafy at their ends (Atlas, trait sheet): excurrent
+        // youth, falling stem dominance (calibrated by eye).
+        apical_dominance_young: 0.75,
+        apical_dominance_mature: 0.52,
+        maturity_age_years: 70.0,
+        juvenile_phase_years: 20.0,
+        apical_dominance_branches: 0.55,
+        lateral_competition: 1.8,
+        // Calibrated: fast youth (several flushes a year, engine gap).
+        vigour_per_light: 6.4,
+        bud_break_threshold: 1.0,
+        internode_length_m: 0.05,
+        max_shoot_length_m: 0.85,
+        // Several whorls a year in reality (polycyclic): one per year here
+        // (engine gap); count per whorl estimated.
+        lateral_buds_per_shoot: 4,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 2,
+        whorled: true,
+        lateral_planarity: 0.1,
+        branching_angle_deg: 55.0,
+        phyllotaxis_deg: 137.5,
+        max_order: 7,
+        gravitropism: 0.75,
+        lateral_gravitropism: 0.35,
+        limb_setpoint_low_deg: 80.0,
+        limb_setpoint_high_deg: 50.0,
+        twig_setpoint_deg: 60.0,
+        // Open, irregular adult crown (calibrated by eye: W/H ~0.43 at
+        // 40 y, ~0.86 at 180 y; the ratio barely responds to this trait
+        // once the height levels off).
+        crown_spread_ratio: 0.28,
+        phototropism: 0.2,
+        // Leaning, sabre-shaped stems on thin soils [fruk_shade] (trait
+        // sheet): more sinuous than the Scots pine (estimated).
+        sinuosity_deg: 7.0,
+        leader_loss_probability: 0.04,
+        leader_loss_angle_deg: 20.0,
+        sag_coefficient: 4.0,
+        sag_min_radius_mm: 20.0,
+        sag_max_deg_per_year: 0.6,
+        sag_max_total_deg: 15.0,
+        sag_max_droop_deg: 25.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 2.0,
+        straightening_keep_deg: 5.0,
+        straightening_min_radius_mm: 25.0,
+        // Strict light demander, "cannot tolerate shade" [atlas_shade]
+        // [fruk_shade]: fast natural pruning (estimated strengths).
+        shedding_threshold: 0.11,
+        shade_survival_years: 2,
+        shedding_mean_threshold: 0.0,
+        clear_bole_fraction: 0.2,
+        clear_bole_max_m: 5.0,
+        clear_bole_limb_ratio: 0.4,
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.0,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 1.0,
+        epicormic_rate: 0.0,
+        // Calibrated on the 20-30 m mature height [atlas_height]: ~21 m
+        // at 40 y (stand dominant height 25-30 m [fibois_hdom40]), ~27 m
+        // at 180 y.
+        hydraulic_path_max_m: 26.0,
+        hydraulic_exponent: 1.6,
+        hydraulic_foliage_exponent: 1.2,
+    ),
+    leaf: (
+        // Needles in pairs, 10-25 cm, the longest of the European pines
+        // [atlas_needle_length] (10-20 cm [wfr_needle_length]).
+        length_cm: 17.0,
+        width_cm: 0.2,
+        lobes: 0,
+        serration: 0.0,
+        deciduous: false,
+        marcescence: 0.0,
+        marcescence_max_age_years: 1.0,
+        leaf_type: Needle,
+        // 2-3 years [atlas_needle_longevity], 2-4 [wde_needle_longevity].
+        leaf_longevity_years: 2.5,
+        // Not found (trait sheet): the spruce's values (proxy).
+        lma_g_m2: 200.0,
+        crown_lai: 4.0,
+        // Rendering: long needles bunched at the shoot ends. NB: the leaf
+        // mesh needs cluster_size_leaves >= 2.2 (1.5 made it panic: clamp
+        // min > max in Simulation::leaf_mesh).
+        leaves_per_shoot: 50.0,
+        cluster_size_leaves: 2.5,
+        foliage_density: 2.2,
+        tip_bunching: 0.8,
+        petiole_ratio: 0.0,
+        leaf_droop: 0.4,
+        spur_foliage: 0.0,
+        spur_max_radius_mm: 15.0,
+        spur_min_light: 0.1,
+        colour_spread: 0.3,
+    ),
+    // Calibration by eye: bright grey-green needles.
+    pigments: (
+        chlorophyll: 1.1,
+        carotenoids: 0.6,
+        anthocyanins: 0.0,
+        tannins: 0.5,
+        anthocyanin_persistence: 0.0,
+    ),
+    phenology: (
+        // No budburst day found; pollen shed mainly in April
+        // [wde_pollen]: budburst and flowering set early, before the
+        // Scots pine (estimated, calibrated against that genome's 360).
+        chilling_requirement_days: 40.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        gdd_budburst: 300.0,
+        chill_forcing_gdd: 300.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 350.0,
+        senescence_photoperiod_h: 12.0,
+        senescence_temp_base_c: 16.0,
+        senescence_cdd: 150.0,
+        leaf_fall_days: 40.0,
+    ),
+    wood: (
+        // Basic specific gravity 0.39 (Wood Database [wdb_density] site
+        // field): 390 kg/m3.
+        density_kg_m3: 390.0,
+        // Green MOE: as the spruce genome (proxy); no green value found.
+        elasticity_gpa: 9.2,
+        ring_porous: false,
+        earlywood_share: 0.6,
+        ring_contrast: 0.75,
+        // Calibrated: ~0.9 m at 180 y, ~1.1 m at 300 y, against up to
+        // 1.2 m [wen_dbh].
+        growth_coefficient: 0.000520,
+        twig_radius_mm: 3.0,
+        max_ring_width_mm: 12.0,
+        pipe_exponent: 2.0,
+        limb_draw_boost: 1.1,
+        bark_irregularity: 0.03,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        collar_flare: 0.12,
+        root_flare: 0.25,
+        root_flare_height_radii: 1.0,
+        buttress_lobes: 3,
+        snag_years_per_m: 250.0,
+    ),
+    // Thick, deeply fissured red-brown to purplish bark in plates
+    // (pyrophyte, Atlas; colours estimated).
+    bark: (
+        color: (0.36, 0.22, 0.18),
+        young_color: (0.50, 0.38, 0.30),
+        old_darkening: (0.10, 0.07, 0.06),
+        lenticels: 0.0,
+        fissures: 0.9,
+        gloss: 0.03,
+    ),
+    roots: (
+        // Strong deep taproot with developed secondaries [atlas_root]
+        // [wde_root], "first plunging, then spreading" [wfr_root]. No depth
+        // given: estimated as the Scots pine genome (~2.7 m).
+        taproot_dominance: 0.9,
+        taproot_decline_years: 20.0,
+        max_depth_m: 3.0,
+        lateral_spread: 1.2,
+        lateral_count: 8,
+        lateral_depth_m: 0.3,
+        sinker_tendency: 0.2,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // Intolerant of peat and gley (trait sheet; estimated strengths).
+        waterlogging_tolerance: 0.2,
+        hypoxia_sensitivity: 0.4,
+        hypoxia_air_porosity: 0.12,
+        drought_deepening: 0.3,
+        hydrotropism: 0.3,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.5,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.5,
+    ),
+    tolerances: (
+        // Does not stand below -18 degC [fruk_frost] (winter hardiness, not
+        // modelled); new shoots: estimated.
+        frost_c: -3.0,
+        // Survives down to 400 mm of rain [atlas_precip] (estimated
+        // strength, below the Scots pine).
+        drought: 0.6,
+        // Cannot tolerate shade [atlas_shade].
+        shade: 0.1,
+    ),
+    reproduction: (
+        // Cones from 6-8 y after sowing [wfr_first_cones].
+        first_flowering_age_years: 7.0,
+        // Pollen in April [wde_pollen]. Cones 8-22 cm [atlas_cone_length],
+        // ripe 2 years after pollination [atlas_cone_cycle] and often kept
+        // closed for years (serotiny): TWO-YEAR and persistent cones are an
+        // engine gap; one-season cycle here, cones ripening in autumn
+        // (estimated) and dropped by the yearly reset.
+        flower_display: 0.4,
+        fruit_display: 1.0,
+        bloom_gdd: 280.0,
+        bloom_duration_gdd: 90.0,
+        min_wood_age_years: 1,
+        min_light: 0.45,
+        max_wood_radius_mm: 20.0,
+        flower_density: 0.8,
+        flower_cluster_cm: 3.0,
+        fruit_cluster_cm: 14.0,
+        flower_color: (0.65, 0.30, 0.45),
+        fruit_set: 0.6,
+        flower_frost_c: -3.0,
+        fruit_ripening_days: 160.0,
+        fruit_persistence_days: 60.0,
+        fruit_color_unripe: (0.38, 0.42, 0.22),
+        fruit_color_ripe: (0.55, 0.38, 0.22),
+        fruit_kind: ConePendent,
+        // No interval found: regular cone crops (estimated).
+        crop_interval_years: 2.0,
+        off_year_crop: 0.3,
+    ),
+    // 300 y [wde_longevity], 500 [wfr_longevity] (unreliable, trait
+    // sheet); decline estimated.
+    longevity: (
+        decline_onset_years: 200.0,
+        decline_years: 100.0,
+        decline_min_vigour: 0.4,
+    ),
+    // Ectomycorrhizal: stands host Boletus and Lactarius [atlas_mycorrhiza].
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // No stump sprouts (trait sheet, estimated); resinous wounds.
+    pruning: (
+        epicormic_potential: 0.0,
+        sprout_vigour: 0.5,
+        stump_sprouting: 0.0,
+        root_suckering: 0.0,
+        compensatory_growth: 0.1,
+        woundwood_ratio: 1.2,
+        compartmentalization: 0.4,
+        decay_infection_rate: 0.10,
+        decay_axial_m_per_year: 0.12,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.1,
+        pathogen_summer_risk: 0.15,
+        pathogen_dieback_years: 3.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.15,
+        // 300 y [wde_longevity].
+        typical_lifespan_years: 300.0,
+    ),
+    mechanics: (
+        // No green values found (trait sheet): the spruce genome's (proxy).
+        green_density_kg_m3: 800.0,
+        green_mor_mpa: 41.0,
+        green_moe_gpa: 9.2,
+        crown_drag_coefficient: 0.2,
+        vogel_exponent: -1.0,
+        // Not in ForestGALES 2.5 (trait sheet): the spruce genome's Sitka
+        // value (proxy).
+        anchorage_nm_per_kg: 178.1,
+    ),
+)
