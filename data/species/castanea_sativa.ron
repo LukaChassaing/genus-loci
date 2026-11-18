@@ -1,0 +1,350 @@
+// Sweet chestnut, Castanea sativa Mill., grown as a seedling (not grafted, not coppiced).
+// Starting point: quercus_robur.ron (Fagaceae, ectomycorrhizal). References:
+// data/validation/castanea_sativa.ron (42 entries), trait sheet docs/species/castanea_sativa.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: ink disease (Phytophthora cinnamomi, P. cambivora) and chestnut blight
+// (Cryphonectria parasitica) are not simulated [eu_ink, eu_blight]; ring-shake (roulure) cannot be
+// modelled; the spiny burr is drawn as a round fruit (Nut); grafted orchard trees and self-
+// sterility are out of scope; the references give NO height-age or diameter-age value and no
+// budburst date for France, so growth is calibrated only on the usual adult height and diameter.
+(
+    species: "Castanea sativa",
+    common_name: "Sweet chestnut",
+    common_name_fr: "Châtaignier",
+    category: Broadleaf,
+    // Large tree, 30-35 m [atlas_height], 40 m maximum [eu_height], trunk up to 150 cm DBH
+    // [eu_dbh]; stout trunk, deeply fissured spiral bark (docs/species/castanea_sativa.md).
+    // Architectural model not verified; broad crown at maturity.
+    architecture: (
+        // estimated.
+        apical_dominance_young: 0.75,
+        // estimated: broad crown carried by thick limbs.
+        apical_dominance_mature: 0.46,
+        maturity_age_years: 50.0,
+        apical_dominance_branches: 0.52,
+        juvenile_phase_years: 15.0,
+        // estimated.
+        lateral_competition: 2.5,
+        // calibrated (see report).
+        vigour_per_light: 6.0,
+        bud_break_threshold: 1.0,
+        // estimated.
+        internode_length_m: 0.04,
+        // estimated: vigorous shoots on young trees (no value in the references).
+        max_shoot_length_m: 0.8,
+        // estimated.
+        lateral_buds_per_shoot: 4,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // estimated.
+        branching_angle_deg: 50.0,
+        phyllotaxis_deg: 144.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        limb_setpoint_low_deg: 60.0,
+        limb_setpoint_high_deg: 30.0,
+        twig_setpoint_deg: 65.0,
+        // estimated.
+        crown_spread_ratio: 1.1,
+        phototropism: 0.12,
+        sinuosity_deg: 8.0,
+        // estimated.
+        leader_loss_probability: 0.12,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated.
+        shedding_threshold: 0.08,
+        shade_survival_years: 3,
+        shedding_mean_threshold: 0.0,
+        // estimated.
+        clear_bole_fraction: 0.15,
+        clear_bole_max_m: 4.0,
+        clear_bole_limb_ratio: 0.5,
+        // estimated: old trees become hollow and stag-headed (rates as the oak pilot).
+        retrenchment_onset_years: 250.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated.
+        epicormic_rate: 0.03,
+        // calibrated: 30-35 m usual [atlas_height, wpe_height 20-35], 40 m maximum [eu_height].
+        hydraulic_path_max_m: 36.0,
+        // calibrated.
+        hydraulic_exponent: 1.6,
+        hydraulic_foliage_exponent: 1.2,
+    ),
+    // Chestnut leaf: long lanceolate, 15-25 cm, coarse sharp teeth (general knowledge, no source
+    // read).
+    leaf: (
+        // estimated.
+        length_cm: 19.0,
+        // estimated.
+        width_cm: 6.0,
+        // unlobed.
+        lobes: 0,
+        // strongly toothed margin.
+        serration: 0.95,
+        deciduous: true,
+        // none.
+        marcescence: 0.0,
+        marcescence_max_age_years: 30.0,
+        // rendering.
+        leaves_per_shoot: 8.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering.
+        foliage_density: 4.0,
+        // rendering.
+        tip_bunching: 0.35,
+        // rendering.
+        petiole_ratio: 0.08,
+        // rendering.
+        leaf_droop: 0.35,
+        // rendering.
+        spur_foliage: 1.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        colour_spread: 0.55,
+    ),
+    // Calibrated by eye: golden-yellow to brown autumn colour, tannin-rich foliage.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 0.9,
+        // calibrated by eye.
+        anthocyanins: 0.05,
+        // calibrated by eye.
+        tannins: 0.8,
+    ),
+    // Budburst is late and spread from April to June across Europe [eu_budburst doy 91-181]; start
+    // of budburst and flowering in May in Ticino [co_flower_start]. Flowering late June-July in the
+    // north of the range [atlas_flowering doy 172-212, eu_flowering 152-212]; nuts fall September-
+    // October [atlas_nut_fall doy 258-304, eu_nut_ripening 304]. Parameters calibrated on these
+    // ranges (no French date available).
+    phenology: (
+        // estimated.
+        chilling_requirement_days: 50.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // calibrated: late budburst, inside the wide range [eu_budburst 91-181].
+        gdd_budburst: 340.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // estimated: leaves colour late October (no reference date).
+        senescence_photoperiod_h: 11.8,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        leaf_fall_days: 21.0,
+    ),
+    // Density: dry wood 590 kg/m3 (12 %) [wdb_density], 630 kg/m3 (15 %) [wpd_density]; tannins ~13
+    // % [wpf_tannin] make the heartwood durable.
+    wood: (
+        // measured, between [wdb_density 590] and [wpd_density 630] (dry wood).
+        density_kg_m3: 600.0,
+        // estimated: Q. robur 9.0 scaled by density.
+        elasticity_gpa: 8.5,
+        // ring-porous (general knowledge).
+        ring_porous: true,
+        // estimated.
+        earlywood_share: 0.35,
+        // rendering.
+        ring_contrast: 0.9,
+        // estimated: durable, tannin-rich heartwood [wpf_tannin].
+        snag_years_per_m: 400.0,
+        // calibrated (see report): no age-resolved DBH reference; targets the usual adult size.
+        growth_coefficient: 0.00030,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering: twisted fluting.
+        bark_irregularity: 0.10,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        root_flare: 0.7,
+        root_flare_height_radii: 2.5,
+        // rendering.
+        buttress_lobes: 5,
+    ),
+    // Rendering: deeply fissured, spiralling grey-brown ridges [docs/species/castanea_sativa.md].
+    bark: (
+        // calibrated by eye.
+        color: (0.38, 0.32, 0.27),
+        // calibrated by eye.
+        young_color: (0.45, 0.33, 0.22),
+        // calibrated by eye.
+        old_darkening: (0.08, 0.06, 0.05),
+        // calibrated by eye.
+        lenticels: 0.05,
+        // calibrated by eye.
+        fissures: 0.95,
+        // calibrated by eye.
+        gloss: 0.0,
+    ),
+    // No rooting depth in the references (docs/species/castanea_sativa.md); acid to neutral soils,
+    // no compaction [Atlas]. Values estimated.
+    roots: (
+        // estimated.
+        taproot_dominance: 0.7,
+        taproot_decline_years: 12.0,
+        // estimated.
+        max_depth_m: 3.5,
+        // estimated.
+        lateral_spread: 1.4,
+        lateral_count: 8,
+        lateral_depth_m: 0.45,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.32/5]; < 0.3 triggers the bench rule "growth on gley
+        // clay".
+        waterlogging_tolerance: 0.26,
+        // estimated.
+        hypoxia_sensitivity: 1.0,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated: sensitive to late frost [atlas frost].
+        frost_c: -2.0,
+        // measured [niinemets_drought 3.46/5]; the Atlas contradicts it ("strong sensitivity to
+        // summer drought"), divergent sources.
+        drought: 0.69,
+        // measured [niinemets_shade 3.15/5]: regenerates in half shade, needs light from the pole
+        // stage.
+        shade: 0.63,
+    ),
+    // Male catkins first, androgynous catkins at shoot tips; first flowering 20-30 years
+    // [wpd_flower_age], first fruiting from seed 25-35 years [wpe_fruit_age 25, wpd_fruit_age].
+    reproduction: (
+        // measured [wpe_fruit_age 25, wpd_flower_age 20-30, wpd_fruit_age 25-35].
+        first_flowering_age_years: 28.0,
+        // creamy-yellow catkins are conspicuous in summer; display level chosen by eye.
+        flower_display: 0.8,
+        // spiny burrs drawn as round fruits (Nut); approximation.
+        fruit_display: 0.6,
+        // calibrated on [atlas_flowering doy 172-212, eu_flowering 152-212]: flowering in late
+        // June-July.
+        bloom_gdd: 900.0,
+        // estimated: long flowering.
+        bloom_duration_gdd: 250.0,
+        // flowers on the current-year shoots.
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        // rendering.
+        flower_density: 2.0,
+        // rendering: long catkins.
+        flower_cluster_cm: 12.0,
+        // rendering.
+        fruit_cluster_cm: 5.0,
+        // rendering.
+        flower_color: (0.90, 0.88, 0.62),
+        fruit_set: 0.3,
+        // estimated.
+        flower_frost_c: -1.5,
+        // calibrated on nut fall in September-October [atlas_nut_fall doy 258-304, eu_nut_ripening
+        // 304].
+        fruit_ripening_days: 95.0,
+        // estimated.
+        fruit_persistence_days: 30.0,
+        // rendering.
+        fruit_color_unripe: (0.42, 0.55, 0.20),
+        // rendering.
+        fruit_color_ripe: (0.45, 0.30, 0.12),
+        // chestnut in its burr (approximation: round fruit).
+        fruit_kind: Nut,
+        // estimated: no mast interval in the references; chestnut crops almost yearly.
+        crop_interval_years: 1.0,
+        // default.
+        off_year_crop: 0.15,
+    ),
+    // 500-600 years [wpe_longevity, wpd_longevity], up to 1000 in cultivation [atlas_longevity];
+    // rarely over 200 in central Europe (docs/species/castanea_sativa.md). No programmed decline.
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // Very vigorous resprouter: coppice is about 80 % of the chestnut forests [atlas_resprout],
+    // cycles of 15-30 years [wpd_coppice]. Durable heartwood. Calibrations chosen for these
+    // qualitative rankings.
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.8,
+        // estimated: stronger than the oak pilot (2.2).
+        sprout_vigour: 2.8,
+        // estimated from [atlas_resprout] ("very vigorous").
+        stump_sprouting: 0.95,
+        // estimated.
+        root_suckering: 0.1,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [wpe_longevity, wpd_longevity 500-600]; central Europe rarely above 200
+        // (divergent). The bench simulates 400 years at most.
+        typical_lifespan_years: 500.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (600/640); no green-wood table for this species was read. Chestnut
+        // density as in the genome.
+        green_density_kg_m3: 962.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 53.4,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 8.1,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

@@ -1,0 +1,383 @@
+// European beech, Fagus sylvatica L.
+// Starting point: quercus_robur.ron. References: data/validation/fagus_sylvatica.ron (53 entries),
+// trait sheet docs/species/fagus_sylvatica.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine for this species: photoperiod control of budburst (budburst here is a
+// Cannell & Smith chilling-forcing model only); beech bark sunscald, red heart rot, drought dieback
+// 2018-20 (no pathogen or heat-damage model); beechnuts in cupules (a Nut is drawn as a round
+// fruit, and left undrawn here).
+(
+    species: "Fagus sylvatica",
+    common_name: "European beech",
+    common_name_fr: "Hêtre commun",
+    category: Broadleaf,
+    // Excurrent, monopodial in youth, long straight bole in a stand; open-grown the crown is broad
+    // with a short bole (docs/species/fagus_sylvatica.md; crown width of old solitary trees 20-30 m
+    // [wpd_crown]). Hallé-Oldeman model not verified.
+    architecture: (
+        // estimated: strong leader in youth (monopodial beech; same as the oak pilot).
+        apical_dominance_young: 0.75,
+        // estimated: open-grown beech keeps a more persistent leader than oak (0.42) but carries a
+        // broad dome of heavy limbs [wpd_crown].
+        apical_dominance_mature: 0.50,
+        // estimated.
+        maturity_age_years: 60.0,
+        apical_dominance_branches: 0.52,
+        // estimated, as oak.
+        juvenile_phase_years: 15.0,
+        // calibrated by eye: fewer, heavier scaffold limbs than a stand tree but less extreme than
+        // oak (3.0).
+        lateral_competition: 2.2,
+        vigour_per_light: 5.7,
+        bud_break_threshold: 1.0,
+        // estimated: beech internodes are short (typical value, no source checked).
+        internode_length_m: 0.03,
+        // calibrated: annual leader growth 40-70 cm/yr in 30-50-year-old beeches [wpf_young_growth]
+        // (stand trees).
+        max_shoot_length_m: 0.45,
+        // estimated.
+        lateral_buds_per_shoot: 3,
+        // estimated.
+        lateral_buds_per_metamer: 0.5,
+        // estimated.
+        bud_lifetime_years: 4,
+        // estimated.
+        branching_angle_deg: 45.0,
+        // estimated (general botanical knowledge): beech leaves are distichous (2-ranked), 1/2
+        // phyllotaxis.
+        phyllotaxis_deg: 180.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        // calibrated by eye: lower limbs of open-grown beech sweep out then up.
+        limb_setpoint_low_deg: 65.0,
+        // calibrated by eye.
+        limb_setpoint_high_deg: 32.0,
+        // calibrated by eye.
+        twig_setpoint_deg: 70.0,
+        // calibrated: open-grown beech crowns are about as wide as tall; crown width of 20-30 m for
+        // old solitary trees [wpd_crown] is reached only after a century or two.
+        crown_spread_ratio: 1.0,
+        phototropism: 0.12,
+        // estimated: beech stems are straight, smooth.
+        sinuosity_deg: 5.0,
+        // estimated: far fewer elbowed relays than oak (0.25).
+        leader_loss_probability: 0.06,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated: shade-tolerant, inner crown keeps leaves [niinemets_shade 4.56/5,
+        // atlas_shade].
+        shedding_threshold: 0.06,
+        // estimated.
+        shade_survival_years: 5,
+        shedding_mean_threshold: 0.0,
+        // estimated: open-grown bole short; in a stand clear to 15-20 m
+        // (docs/species/fagus_sylvatica.md).
+        clear_bole_fraction: 0.2,
+        // estimated.
+        clear_bole_max_m: 5.0,
+        clear_bole_limb_ratio: 0.5,
+        // no crown retrenchment modelled for beech (veteran-oak mechanism).
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // beech has very few epicormic shoots (stump_sprouting is "quasi nul" [wpf_stump]).
+        epicormic_rate: 0.0,
+        // calibrated so that open-grown height stays within 25-40 m [wpe_height, wpf_height,
+        // atlas_height_usual]; records 45-50 m are stand trees [atlas_height_record,
+        // wpd_height_peak].
+        hydraulic_path_max_m: 40.0,
+        // calibrated (as oak).
+        hydraulic_exponent: 1.8,
+        // calibrated (as oak).
+        hydraulic_foliage_exponent: 1.2,
+        // estimated: plagiotropic, fan-like side twigs of beech (ADDING_A_SPECIES.md lists Fagus).
+        // Calibrated by eye.
+        lateral_planarity: 0.35,
+    ),
+    // Beech leaf: elliptic, 5-10 cm long, entire to slightly wavy margin, ~7 pairs of veins, short
+    // petiole (general knowledge, no source read). Marcescence: leaves kept on young trees and the
+    // sheltered lower crown [wpf_marcescence], qualitative only.
+    leaf: (
+        // estimated.
+        length_cm: 8.0,
+        // estimated.
+        width_cm: 5.0,
+        // entire margin.
+        lobes: 0,
+        // estimated: slightly wavy margin.
+        serration: 0.1,
+        deciduous: true,
+        // estimated: frequent on young trees and the lower crown [wpf_marcescence] (qualitative;
+        // the fraction is a guess).
+        marcescence: 0.6,
+        // estimated: marcescence fades with age; the age is a guess.
+        marcescence_max_age_years: 25.0,
+        // estimated (rendering).
+        leaves_per_shoot: 8.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering: dense shade crown.
+        foliage_density: 4.5,
+        // rendering: leaves spread along the twig in two ranks, not in tufts.
+        tip_bunching: 0.3,
+        // rendering.
+        petiole_ratio: 0.1,
+        // rendering.
+        leaf_droop: 0.3,
+        // rendering: no brachyblast tufts like oak.
+        spur_foliage: 1.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        // rendering.
+        colour_spread: 0.4,
+    ),
+    // Calibrated by eye (no spectral measurement): beech turns yellow then copper-orange-brown.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 0.8,
+        // calibrated by eye.
+        anthocyanins: 0.25,
+        // calibrated by eye: bronze-brown late colour.
+        tannins: 0.7,
+    ),
+    // Budburst: dominant beeches doy 112, understorey 107, RENECOFOR 1997-2013 [ren_budburst_dom,
+    // ren_budburst_under]; 115-125 in lowland France [wpf_budburst]. Beech budburst is also under
+    // photoperiod control (not modelled); the chilling-forcing parameters are calibrated, not
+    // measured.
+    phenology: (
+        // estimated: beech has a larger chilling requirement than oak (general knowledge);
+        // calibrated together with gdd_budburst.
+        chilling_requirement_days: 60.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // calibrated on [ren_budburst_dom, wpf_budburst].
+        gdd_budburst: 308.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // calibrated on [ren_yellow_dom 294, ren_yellow_under 298] (end of yellowing).
+        senescence_photoperiod_h: 12.3,
+        senescence_temp_base_c: 17.0,
+        // calibrated on [ren_yellow_dom 294, ren_yellow_under 298] (end of yellowing): earlier
+        // colouring than the oak pilot (190).
+        senescence_cdd: 100.0,
+        // estimated.
+        leaf_fall_days: 25.0,
+    ),
+    // Density: dry wood [wdb_density 710, eu_density 700, wpe_density 720] (12 % moisture, basal
+    // density not found; the pilots use the same convention).
+    wood: (
+        // measured [wdb_density] (dry wood, 12 %).
+        density_kg_m3: 710.0,
+        // estimated: Q. robur 9.0 scaled by the dry MOE ratio beech/sessile oak (14.31/13.3,
+        // [wdb_moe, wpf_moe12 of quercus_petraea]).
+        elasticity_gpa: 9.7,
+        // diffuse-porous wood.
+        ring_porous: false,
+        // estimated (rendering).
+        earlywood_share: 0.5,
+        // rendering: faint rings.
+        ring_contrast: 0.25,
+        // estimated: non-durable wood, dead limbs rot fast.
+        snag_years_per_m: 120.0,
+        // calibrated (see report); starting value from Q. robur.
+        growth_coefficient: 0.00038,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+        // rendering.
+        collar_flare: 0.15,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // smooth bark.
+        bark_irregularity: 0.02,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        // rendering: pronounced surface buttressing in old beeches.
+        root_flare: 0.55,
+        root_flare_height_radii: 2.5,
+        // rendering.
+        buttress_lobes: 6,
+    ),
+    // Rendering: smooth silver-grey bark, thin, no fissures.
+    bark: (
+        // calibrated by eye.
+        color: (0.58, 0.56, 0.52),
+        // calibrated by eye.
+        young_color: (0.42, 0.36, 0.26),
+        // calibrated by eye.
+        old_darkening: (0.03, 0.03, 0.03),
+        // calibrated by eye.
+        lenticels: 0.1,
+        // calibrated by eye.
+        fissures: 0.0,
+        // calibrated by eye.
+        gloss: 0.15,
+    ),
+    // Heart-shaped, shallow to intermediate system, multidirectional roots, often fused [wpf_roots,
+    // atlas_root_shallow]; drought-susceptible, shallow-rooted [fr_rooting].
+    roots: (
+        // estimated: weak taproot, heart system.
+        taproot_dominance: 0.35,
+        // estimated.
+        taproot_decline_years: 8.0,
+        // estimated: shallow to intermediate [atlas_root_shallow], no depth in the references.
+        max_depth_m: 2.0,
+        // estimated (x crown radius).
+        lateral_spread: 1.3,
+        lateral_count: 8,
+        // estimated: shallow laterals.
+        lateral_depth_m: 0.3,
+        // estimated: heart system with oblique sinkers.
+        sinker_tendency: 0.35,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.02/5, atlas_waterlogging intolerant], scale x/5; < 0.3
+        // triggers the bench rule "growth on gley clay".
+        waterlogging_tolerance: 0.2,
+        // estimated: intolerant of waterlogged soil [fr_waterlogging].
+        hypoxia_sensitivity: 1.0,
+        // estimated: little deepening.
+        drought_deepening: 0.3,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Tolerances on the 0-1 scale = Niinemets & Valladares rating / 5 (bench convention for the
+    // "0-5 scale" entries).
+    tolerances: (
+        // estimated: sensitive to late spring frost [atlas_frost]; the lethal temperature is not
+        // given.
+        frost_c: -2.0,
+        // measured [niinemets_drought 2.40/5].
+        drought: 0.48,
+        // measured [niinemets_shade 4.56/5]; most shade-tolerant broadleaf [atlas_shade].
+        shade: 0.9,
+    ),
+    // Mast years every 5-8 years [atlas_mast_interval, eu_mast]; first fruiting 40-50 years in the
+    // open [atlas_first_fruiting, wpf_flower_open, wpp_fruit], 60-80 in a dense stand
+    // [wpf_flower_dense] (not the target of an isolated tree).
+    reproduction: (
+        // measured [atlas_first_fruiting, wpf_flower_open, wpp_fruit]: 40-50 years in the open.
+        first_flowering_age_years: 45.0,
+        // inconspicuous wind-pollinated flowers, not drawn.
+        flower_display: 0.0,
+        // beechnuts in 4-valved cupules cannot be drawn (Nut is a round fruit); not drawn.
+        fruit_display: 0.0,
+        // calibrated: flowers open with the leaves (mean bloom day close to budburst, as oak).
+        bloom_gdd: 310.0,
+        // estimated.
+        bloom_duration_gdd: 120.0,
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        fruit_cluster_cm: 3.0,
+        flower_color: (0.65, 0.62, 0.30),
+        fruit_set: 0.3,
+        // estimated: late frost damages flowers [atlas_frost].
+        flower_frost_c: -2.0,
+        // estimated: nuts fall in September-October.
+        fruit_ripening_days: 150.0,
+        // estimated.
+        fruit_persistence_days: 30.0,
+        fruit_color_unripe: (0.35, 0.45, 0.15),
+        fruit_color_ripe: (0.45, 0.32, 0.15),
+        // beechnut.
+        fruit_kind: Nut,
+        // measured [atlas_mast_interval, eu_mast]: 5-8 years, middle value.
+        crop_interval_years: 6.5,
+        // estimated: very little seed between mast years.
+        off_year_crop: 0.05,
+    ),
+    // 150-300 years typical [atlas_longevity, eu_longevity]; 546-year record [wpd_age_record]. No
+    // programmed decline.
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    // Ectomycorrhizal, essential [wpf_mycorrhiza]. Calibrations as the oak pilot (flux view only).
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // Beech rarely resprouts from the stump, almost never in lowland [wpf_stump]; wound response
+    // poor; red heart rot from ~100 years, Ganoderma and Meripilus
+    // (docs/species/fagus_sylvatica.md). Values are calibrations chosen for these qualitative
+    // rankings.
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.15,
+        // estimated.
+        sprout_vigour: 0.8,
+        // estimated from [wpf_stump] ("rare, almost never in colline stage").
+        stump_sprouting: 0.05,
+        // none reported.
+        root_suckering: 0.0,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        // estimated: weak compartmentalisation of beech (general knowledge).
+        compartmentalization: 0.45,
+        // estimated: heart rot above ~100 years [Atlas, EUFORGEN via
+        // docs/species/fagus_sylvatica.md].
+        decay_infection_rate: 0.07,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [eu_longevity 250+, atlas_longevity 150-300]; the bench takes the simulated
+        // duration and the adult age from it.
+        typical_lifespan_years: 250.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (710/640); no green-wood table for this species was read. Beech
+        // density from [wdb_density].
+        green_density_kg_m3: 1138.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 63.2,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 9.5,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

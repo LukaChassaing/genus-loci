@@ -1,0 +1,379 @@
+// European ash, Fraxinus excelsior L.
+// Starting point: quercus_robur.ron (ring-porous, light-demanding), adjusted to a faster, taller,
+// less spreading tree. References: data/validation/fraxinus_excelsior.ron (41 entries), trait sheet
+// docs/species/fraxinus_excelsior.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: (1) compound pinnate leaf (20-35 cm, 7-13 leaflets) cannot be drawn: a
+// single long entire blade stands for it; (2) opposite branching: the engine has one bud per
+// metamer, a 90 degree divergence angle approximates the decussate pattern; (3) ASH DIEBACK
+// (chalarose, Hymenoscyphus fraxineus; mortality above 90 % in several countries [atlas_dieback])
+// is NOT simulated: the engine has no crown pathogen, so these trees live as if the disease did not
+// exist; (4) black heartwood after 70-80 years [wpd_heartwood] is not drawn; (5) no mean budburst
+// or leaf fall date is available in the references (the sheet says so): both are estimated and left
+// uncalibrated.
+(
+    species: "Fraxinus excelsior",
+    common_name: "European ash",
+    common_name_fr: "Frêne commun",
+    category: Broadleaf,
+    // Tall tree with an open ovoid crown and ascending branches; large black terminal buds;
+    // frequent forking after frost or browsing (Atlas, docs/species/fraxinus_excelsior.md). Height
+    // 30 m at 100 years [wpd_100y], 10 m at 20 years [wpf_juvenile], leader up to 1.5 m/yr between
+    // 2 and 15 years [wpd_shoot], ring width up to 9 mm [wpd_ring].
+    architecture: (
+        // estimated: strong, fast leader in youth.
+        apical_dominance_young: 0.8,
+        // estimated: ascending limbs, open ovoid crown; less decurrent than oak (0.42).
+        apical_dominance_mature: 0.5,
+        // estimated.
+        maturity_age_years: 40.0,
+        apical_dominance_branches: 0.52,
+        // estimated.
+        juvenile_phase_years: 12.0,
+        // estimated.
+        lateral_competition: 2.0,
+        // calibrated (first lever of height): 10 m at 20 years [wpf_juvenile], 30 m at 100 years
+        // [wpd_100y].
+        vigour_per_light: 5.5,
+        bud_break_threshold: 1.0,
+        // estimated: long internodes on vigorous shoots.
+        internode_length_m: 0.05,
+        // calibrated: leader growth up to 1.5 m/yr at 2-15 years in full light [wpd_shoot].
+        max_shoot_length_m: 0.75,
+        // estimated: opposite buds.
+        lateral_buds_per_shoot: 4,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // estimated: ascending branches.
+        branching_angle_deg: 45.0,
+        // approximation of the opposite decussate arrangement (one bud per metamer in the engine):
+        // successive nodes turn by 90 degrees.
+        phyllotaxis_deg: 90.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        // calibrated by eye.
+        limb_setpoint_low_deg: 55.0,
+        // calibrated by eye.
+        limb_setpoint_high_deg: 30.0,
+        // calibrated by eye: upturned twig tips.
+        twig_setpoint_deg: 60.0,
+        // estimated: ovoid, less wide than oak.
+        crown_spread_ratio: 0.8,
+        phototropism: 0.12,
+        sinuosity_deg: 8.0,
+        // estimated: forking after frost damage (docs/species/fraxinus_excelsior.md).
+        leader_loss_probability: 0.12,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated: light-demanding adult.
+        shedding_threshold: 0.10,
+        // estimated.
+        shade_survival_years: 3,
+        shedding_mean_threshold: 0.0,
+        // estimated.
+        clear_bole_fraction: 0.25,
+        // estimated.
+        clear_bole_max_m: 6.0,
+        clear_bole_limb_ratio: 0.5,
+        // not modelled.
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated.
+        epicormic_rate: 0.01,
+        // calibrated: 30 m at 100 years, 20-35 m usual, up to 45 m [wpd_100y, atlas_height_usual,
+        // atlas_height_record, wpp_tallest 45.2].
+        hydraulic_path_max_m: 36.0,
+        // calibrated: fast juvenile growth then a plateau.
+        hydraulic_exponent: 1.5,
+        // calibrated.
+        hydraulic_foliage_exponent: 1.0,
+    ),
+    // Compound pinnate leaf of 20-35 cm with opposite insertion
+    // (docs/species/fraxinus_excelsior.md): the engine cannot draw leaflets. A single narrow
+    // elongated blade of the right overall size stands for it (length 24, width 8): ENGINE GAP.
+    leaf: (
+        // proxy for the whole compound leaf (20-35 cm, docs/species/fraxinus_excelsior.md); an
+        // approximation of the overall extent, not of the leaflets.
+        length_cm: 24.0,
+        // estimated overall width of the compound leaf.
+        width_cm: 8.0,
+        // no compound-leaf texture in the engine.
+        lobes: 0,
+        // estimated.
+        serration: 0.3,
+        deciduous: true,
+        // none.
+        marcescence: 0.0,
+        marcescence_max_age_years: 30.0,
+        // rendering: few large leaves, stout twigs.
+        leaves_per_shoot: 5.0,
+        // rendering.
+        cluster_size_leaves: 2.5,
+        // rendering: light, open foliage.
+        foliage_density: 3.0,
+        // rendering.
+        tip_bunching: 0.4,
+        // rendering.
+        petiole_ratio: 0.15,
+        // rendering.
+        leaf_droop: 0.4,
+        // rendering: no spur shoots.
+        spur_foliage: 0.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        colour_spread: 0.55,
+    ),
+    // Calibrated by eye: ash leaves yellow-green and drop early with little colour.
+    pigments: (
+        // calibrated by eye.
+        chlorophyll: 0.9,
+        // calibrated by eye.
+        carotenoids: 0.7,
+        // calibrated by eye.
+        anthocyanins: 0.05,
+        // calibrated by eye.
+        tannins: 0.1,
+    ),
+    // Flowers open before the leaves, which unfold late [atlas_flowering_order]; budburst advances
+    // 0.78 d/yr at Fontainebleau [vitasse_trend]. No mean date of budburst or leaf fall is given by
+    // any reference (docs/species/fraxinus_excelsior.md): the values below are ESTIMATED from
+    // general knowledge (ash is among the last broadleaves to leaf out and sheds green leaves
+    // early) and are not validated.
+    phenology: (
+        // estimated.
+        chilling_requirement_days: 55.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // estimated: late budburst (after oak) [atlas_flowering_order: leaves unfold late]. No date
+        // to calibrate on.
+        gdd_budburst: 340.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // estimated: early, lightly coloured leaf drop. No date to calibrate on.
+        senescence_photoperiod_h: 12.6,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        // estimated: leaves drop quickly.
+        leaf_fall_days: 14.0,
+    ),
+    // Density: dry wood 680 kg/m3 (12 %) [wdb_density], 710 kg/m3 [wpe_density]; ring-porous wood,
+    // rings up to 9 mm [wpd_ring].
+    wood: (
+        // measured, between [wdb_density 680] and [wpe_density 710] (dry wood).
+        density_kg_m3: 690.0,
+        // estimated: Q. robur 9.0 scaled by density.
+        elasticity_gpa: 9.5,
+        // ring-porous (general knowledge).
+        ring_porous: true,
+        // estimated.
+        earlywood_share: 0.35,
+        // rendering.
+        ring_contrast: 0.8,
+        // estimated: moderately durable.
+        snag_years_per_m: 150.0,
+        // calibrated on [wpd_100y_dbh 30-40 cm at 100 years, Germany average]; see report.
+        growth_coefficient: 0.00030,
+        twig_radius_mm: 2.5,
+        // measured [wpd_ring]: up to 9 mm in favourable conditions.
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering.
+        bark_irregularity: 0.04,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        root_flare: 0.7,
+        root_flare_height_radii: 2.5,
+        buttress_lobes: 5,
+    ),
+    // Rendering: grey, smooth when young, then a network of shallow interlacing ridges.
+    bark: (
+        // calibrated by eye.
+        color: (0.50, 0.47, 0.42),
+        // calibrated by eye.
+        young_color: (0.50, 0.48, 0.30),
+        // calibrated by eye.
+        old_darkening: (0.05, 0.05, 0.05),
+        // calibrated by eye.
+        lenticels: 0.1,
+        // calibrated by eye.
+        fissures: 0.55,
+        // calibrated by eye.
+        gloss: 0.05,
+    ),
+    // 90-year-old ash: 3.5 m root spread, 1.4 m depth [wpd_root_spread, wpd_roots] (qualitative
+    // source, primary not traced).
+    roots: (
+        // estimated.
+        taproot_dominance: 0.6,
+        // estimated.
+        taproot_decline_years: 10.0,
+        // estimated: 1.4 m observed at 90 years [wpd_roots], genetic maximum unknown.
+        max_depth_m: 2.5,
+        // calibrated toward [wpd_root_spread 3.5 m at 90 years].
+        lateral_spread: 1.0,
+        lateral_count: 8,
+        lateral_depth_m: 0.45,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 2.7/5]; seasonal flooding tolerated [Atlas].
+        waterlogging_tolerance: 0.54,
+        // estimated.
+        hypoxia_sensitivity: 0.2,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated: late frost damages new shoots (forking, docs/species/fraxinus_excelsior.md).
+        frost_c: -2.0,
+        // measured [niinemets_drought 2.5/5].
+        drought: 0.5,
+        // measured [niinemets_shade 2.66/5]: light-demanding adult.
+        shade: 0.53,
+        // estimated: juveniles tolerate shade (docs/species/fraxinus_excelsior.md); the value is a
+        // guess.
+        shade_juvenile: Some(0.75),
+        // estimated.
+        shade_juvenile_years: 10.0,
+        // estimated.
+        shade_mature_years: 30.0,
+    ),
+    // First fruiting 20-30 years for an isolated tree [wpd_fruit_open, atlas_fruit_age], 30-35 in a
+    // group [wpd_fruit_group], 30-40 in Poland [wpp_fruit]; masting every 2-5 years [atlas_mast].
+    reproduction: (
+        // measured [atlas_fruit_age, wpd_fruit_open]: 20-30 years for an isolated tree.
+        first_flowering_age_years: 25.0,
+        // estimated: small dark purple flower tufts before the leaves; the display level is chosen
+        // by eye.
+        flower_display: 0.4,
+        // bunches of samaras (winged keys).
+        fruit_display: 0.8,
+        // estimated: flowers open before the leaves [atlas_flowering_order]. No date to calibrate
+        // on.
+        bloom_gdd: 110.0,
+        // estimated.
+        bloom_duration_gdd: 100.0,
+        // estimated.
+        min_wood_age_years: 1,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        // rendering.
+        fruit_cluster_cm: 10.0,
+        // rendering.
+        flower_color: (0.48, 0.20, 0.30),
+        fruit_set: 0.3,
+        // estimated.
+        flower_frost_c: -2.0,
+        // estimated: samaras ripen in autumn and hang on into winter (the yearly cycle clears them
+        // on 31 December).
+        fruit_ripening_days: 140.0,
+        // estimated.
+        fruit_persistence_days: 120.0,
+        // rendering.
+        fruit_color_unripe: (0.55, 0.65, 0.25),
+        // rendering.
+        fruit_color_ripe: (0.62, 0.50, 0.28),
+        // samara.
+        fruit_kind: Samara,
+        // measured [atlas_mast]: heavier crops every 2-5 years (middle value).
+        crop_interval_years: 3.0,
+        // estimated.
+        off_year_crop: 0.3,
+    ),
+    // 150-200 years [wpf_longevity], 250-300 [wpd_longevity], 250 [wpe_longevity]. No programmed
+    // decline (and no chalara dieback, see header).
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    // Arbuscular mycorrhizal (Wang & Qiu 2006, ADDING_A_SPECIES.md); the reference file has no ash
+    // mycorrhiza entry. Calibrations are estimates (flux view only).
+    symbiosis: (
+        // Wang & Qiu 2006 (as cited in ADDING_A_SPECIES.md, not read).
+        mycorrhiza: Arbuscular,
+        // estimated: lower cost than ectomycorrhizal trees.
+        carbon_cost: 0.08,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        // estimated.
+        hyphal_reach_m: 0.1,
+    ),
+    // Coppices and pollards well (10-year coppice cycle [wpe_coppice]). Calibrations chosen for
+    // these qualitative rankings.
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.4,
+        // estimated.
+        sprout_vigour: 1.8,
+        // estimated from [wpe_coppice].
+        stump_sprouting: 0.8,
+        root_suckering: 0.0,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured, middle of [wpf_longevity 150-200, wpd_longevity 250-300, wpe_longevity 250];
+        // the bench takes the simulated duration and the adult age from it.
+        typical_lifespan_years: 200.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (690/640); no green-wood table for this species was read. Ash density
+        // as in the genome.
+        green_density_kg_m3: 1106.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 61.5,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 9.3,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

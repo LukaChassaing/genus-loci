@@ -1,0 +1,361 @@
+// Small-leaved lime, Tilia cordata Mill.
+// Starting point: quercus_robur.ron, with the sprouting traits of coppice trees (lime is the most
+// proven coppice species, hollow veterans renewed by shoots). References:
+// data/validation/tilia_cordata.ron (53 entries; main source Radoglou et al. 2009, a review read in
+// full that treats T. cordata, T. platyphyllos and T. tomentosa), trait sheet
+// docs/species/tilia_cordata.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: the unique bract-winged nutlet cluster is approximated by a Nut; basal
+// and trunk shoots of old limes ("reiteration") work only through epicormic traits; the thousand-
+// year coppice stools and 16 m diameter stool rings [atlas_coppice_stool] are a multi-stem life
+// form that is not simulated (one trunk); the wood density is that of Tilia x europaea
+// [wdb_density], not T. cordata alone.
+(
+    species: "Tilia cordata",
+    common_name: "Small-leaved lime",
+    common_name_fr: "Tilleul à petites feuilles",
+    category: Broadleaf,
+    // Large tree, hemispherical crown of 5-12 m in a stand, up to 20 m open-grown [ra_crown,
+    // ra_crown_open]; clear bole 2-4 m isolated or 10-15 m in a stand; height 30-40 m
+    // [atlas_height, ra_height], 42 m at Bialowieza [ra_bialowieza]; 10 m at 20 years (natural) or
+    // 7 m (urban) [ra_h20_nat, ra_h20_urban], 40 m or 20 m at 100 years [ra_h100_nat,
+    // ra_h100_urban]. Height increments 12 to 26 cm/yr in a primary forest [ra_biel_incr_*] (unit
+    // not confirmed): shaded understorey, not an open tree.
+    architecture: (
+        // estimated.
+        apical_dominance_young: 0.72,
+        // estimated: dense hemispherical crown on several limbs.
+        apical_dominance_mature: 0.44,
+        // estimated.
+        maturity_age_years: 50.0,
+        apical_dominance_branches: 0.52,
+        juvenile_phase_years: 15.0,
+        // estimated.
+        lateral_competition: 2.0,
+        vigour_per_light: 5.7,
+        bud_break_threshold: 1.0,
+        // estimated.
+        internode_length_m: 0.04,
+        // calibrated: 23-26 cm/yr in a forest [ra_biel_incr_8, _13] and 10 m at 20 years
+        // [ra_h20_nat] for a stand tree; an open tree is allowed more.
+        max_shoot_length_m: 0.6,
+        // estimated.
+        lateral_buds_per_shoot: 3,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // estimated.
+        branching_angle_deg: 50.0,
+        // estimated (general botanical knowledge): distichous leaves.
+        phyllotaxis_deg: 180.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        limb_setpoint_low_deg: 60.0,
+        limb_setpoint_high_deg: 30.0,
+        twig_setpoint_deg: 65.0,
+        // calibrated: hemispherical crown, up to 20 m wide when isolated [ra_crown_open].
+        crown_spread_ratio: 0.65,
+        phototropism: 0.12,
+        // estimated.
+        sinuosity_deg: 9.0,
+        // estimated.
+        leader_loss_probability: 0.12,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated: shade-tolerant [niinemets_shade 4.18/5].
+        shedding_threshold: 0.07,
+        // estimated.
+        shade_survival_years: 4,
+        shedding_mean_threshold: 0.0,
+        // estimated: clear bole of 2-4 m for an isolated tree (docs/species/tilia_cordata.md).
+        clear_bole_fraction: 0.12,
+        // measured: 2-4 m isolated (docs/species/tilia_cordata.md).
+        clear_bole_max_m: 3.5,
+        clear_bole_limb_ratio: 0.5,
+        // estimated: old limes become hollow and renew from within (rates as the oak pilot).
+        retrenchment_onset_years: 250.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated: trunk and basal sprouts are typical of lime.
+        epicormic_rate: 0.06,
+        // calibrated: 30-40 m [atlas_height], 42 m record [ra_bialowieza].
+        hydraulic_path_max_m: 36.0,
+        // calibrated.
+        hydraulic_exponent: 1.6,
+        hydraulic_foliage_exponent: 1.2,
+        // estimated: zigzag, plagiotropic twigs.
+        lateral_planarity: 0.25,
+    ),
+    // Small-leaved lime: asymmetric heart-shaped leaf, 3-8 cm, finely serrate, long petiole
+    // (general knowledge, no source read).
+    leaf: (
+        // estimated.
+        length_cm: 6.0,
+        // estimated.
+        width_cm: 6.0,
+        // unlobed.
+        lobes: 0,
+        // finely serrate.
+        serration: 0.5,
+        deciduous: true,
+        // none.
+        marcescence: 0.0,
+        marcescence_max_age_years: 30.0,
+        // rendering.
+        leaves_per_shoot: 9.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering: dense, heavy shade.
+        foliage_density: 4.5,
+        // rendering.
+        tip_bunching: 0.2,
+        // rendering.
+        petiole_ratio: 0.4,
+        // rendering.
+        leaf_droop: 0.4,
+        // rendering.
+        spur_foliage: 0.5,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        colour_spread: 0.55,
+    ),
+    // Calibrated by eye: pure yellow autumn colour.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 1.0,
+        // calibrated by eye.
+        anthocyanins: 0.05,
+        // calibrated by eye.
+        tannins: 0.2,
+    ),
+    // Weakly hit by frost thanks to late budburst and early bud formation [Atlas, WP en]; flowering
+    // June-July [atlas_flowering doy 152-212]. No budburst or leaf fall date in the references
+    // (docs/species/tilia_cordata.md): budburst and senescence ESTIMATED (late budburst), not
+    // validated.
+    phenology: (
+        // estimated.
+        chilling_requirement_days: 50.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // estimated: late budburst (Atlas, via docs/species/tilia_cordata.md: late budburst, bud
+        // set early); no date to calibrate on.
+        gdd_budburst: 330.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // estimated; no date to calibrate on.
+        senescence_photoperiod_h: 12.1,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        leaf_fall_days: 21.0,
+    ),
+    // Density: 535 kg/m3 dry (12 %) for Tilia x europaea, not T. cordata alone [wdb_density,
+    // proxy].
+    wood: (
+        // proxy: Tilia x europaea [wdb_density] (dry wood).
+        density_kg_m3: 535.0,
+        // estimated: Q. robur 9.0 scaled by density.
+        elasticity_gpa: 7.5,
+        // diffuse-porous wood.
+        ring_porous: false,
+        // estimated (rendering).
+        earlywood_share: 0.5,
+        // rendering.
+        ring_contrast: 0.15,
+        // estimated: soft, perishable wood.
+        snag_years_per_m: 100.0,
+        // calibrated (see report) on [ra_dbh_50 15 cm, ra_dbh_75 25 cm, ra_dbh_400 85 cm]
+        // (stand/urban trees: an open tree is expected above these).
+        growth_coefficient: 0.00024,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering.
+        bark_irregularity: 0.08,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        // rendering: irregular buttresses on old trees (docs/species/tilia_cordata.md).
+        root_flare: 0.7,
+        root_flare_height_radii: 2.5,
+        // rendering.
+        buttress_lobes: 6,
+    ),
+    // Rendering: grey-brown, finely fissured into long shallow ridges.
+    bark: (
+        // calibrated by eye.
+        color: (0.40, 0.36, 0.32),
+        // calibrated by eye.
+        young_color: (0.45, 0.36, 0.28),
+        // calibrated by eye.
+        old_darkening: (0.06, 0.05, 0.04),
+        // calibrated by eye.
+        lenticels: 0.1,
+        // calibrated by eye.
+        fissures: 0.6,
+        // calibrated by eye.
+        gloss: 0.0,
+    ),
+    // Soil depth above 0.6 m is optimal (docs/species/tilia_cordata.md); suckers up to 5 m from the
+    // stem [ra_sucker]. No other rooting data.
+    roots: (
+        // estimated.
+        taproot_dominance: 0.5,
+        // estimated.
+        taproot_decline_years: 12.0,
+        // estimated.
+        max_depth_m: 3.0,
+        // estimated.
+        lateral_spread: 1.4,
+        lateral_count: 8,
+        lateral_depth_m: 0.45,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.83/5].
+        waterlogging_tolerance: 0.37,
+        // estimated.
+        hypoxia_sensitivity: 0.3,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated: little affected by frost [Atlas]; -34 degC record is for the wood [wpe_frost].
+        frost_c: -3.0,
+        // measured [niinemets_drought 2.75/5].
+        drought: 0.55,
+        // measured [niinemets_shade 4.18/5].
+        shade: 0.84,
+    ),
+    // First flowering 25-30 years in a stand [ra_flower_age], 30-40 [atlas_seed_age], 10-20 for
+    // trees from sprouts [ra_flower_sprout]; good crop every 2-3 years [atlas_mast]; flowering in
+    // June-July [atlas_flowering].
+    reproduction: (
+        // measured: overlap of [ra_flower_age 25-30, atlas_seed_age 30-40], seedling tree (not a
+        // sprout).
+        first_flowering_age_years: 30.0,
+        // fragrant pale yellow cymes under a pale bract; display chosen by eye.
+        flower_display: 0.6,
+        // small nutlets with a bract; approximation (Nut, drawn as round fruit).
+        fruit_display: 0.3,
+        // calibrated on [atlas_flowering doy 152-212]: flowering in June-July, long after budburst.
+        bloom_gdd: 950.0,
+        // estimated.
+        bloom_duration_gdd: 200.0,
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        // rendering.
+        flower_cluster_cm: 7.0,
+        // rendering.
+        fruit_cluster_cm: 4.0,
+        // rendering.
+        flower_color: (0.88, 0.86, 0.50),
+        fruit_set: 0.3,
+        flower_frost_c: -2.5,
+        // estimated: nutlets ripen in September-October.
+        fruit_ripening_days: 80.0,
+        // estimated.
+        fruit_persistence_days: 70.0,
+        // rendering.
+        fruit_color_unripe: (0.55, 0.65, 0.30),
+        // rendering.
+        fruit_color_ripe: (0.58, 0.50, 0.32),
+        // bract-winged nutlet (approximation).
+        fruit_kind: Nut,
+        // measured [atlas_mast]: good crop every 2-3 years.
+        crop_interval_years: 2.5,
+        // estimated.
+        off_year_crop: 0.3,
+    ),
+    // Over 1000 years even when coppiced [atlas_longevity], 500 years as a tree [wpf_longevity]. No
+    // programmed decline.
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // The best-proven coppice species: strong sprouting after cutting, no decline of sprouting with
+    // age even beyond 200 years, suckers up to 5 m [ra_sprout, ra_sucker, atlas_resprout].
+    // Calibrations chosen for these qualitative rankings.
+    pruning: (
+        // estimated from [ra_sprout].
+        epicormic_potential: 0.95,
+        // estimated: the strongest of the broadleaves of this set.
+        sprout_vigour: 3.0,
+        // estimated from [ra_sprout] (no decline with age).
+        stump_sprouting: 1.0,
+        // estimated from [ra_sucker] (suckers to 5 m).
+        root_suckering: 0.3,
+        // estimated.
+        compensatory_growth: 0.5,
+        woundwood_ratio: 2.2,
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [wpf_longevity 500]; coppiced individuals exceed 1000 years [atlas_longevity].
+        // The bench simulates 400 years at most.
+        typical_lifespan_years: 500.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (535/640); no green-wood table for this species was read. Lime density
+        // from [wdb_density] (Tilia x europaea).
+        green_density_kg_m3: 858.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 47.6,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 7.2,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)
