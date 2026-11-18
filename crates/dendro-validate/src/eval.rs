@@ -10,20 +10,48 @@ use crate::verdict::{median, Measured, Nature};
 use dendro_core::Genome;
 
 pub struct SpeciesCtx {
+    /// Registry id (`data/species/<id>.ron`, `data/validation/<id>.ron`).
+    pub id: String,
     pub genome: Genome,
     pub runs: Vec<TreeRun>,
     /// Same seeds on the gley clay preset (waterlogging rule), 30 years.
     pub gley: Vec<TreeRun>,
     /// Reference age for "mature" sizes given without an age (bench choice).
     pub mature_age: u32,
+    /// Age of the July transpiration read for `transpiration_l_day` without
+    /// an age (bench choice).
+    pub transp_age: u32,
+    /// Age of the critical gust read for `critical_wind_ms` (bench choice).
+    pub crit_age: u32,
 }
 
 pub struct Ctx {
-    pub oak: SpeciesCtx,
-    pub cherry: SpeciesCtx,
+    /// Every species simulated in this run (registry order).
+    pub species: Vec<SpeciesCtx>,
     pub climate: Vec<ClimateStats>,
     #[cfg(feature = "vent")]
     pub vent: crate::vent::Extra,
+}
+
+impl Ctx {
+    pub fn get(&self, id: &str) -> Option<&SpeciesCtx> {
+        self.species.iter().find(|s| s.id == id)
+    }
+    /// The oak: reference species of `physics.ron` (that file is only
+    /// evaluated when the oak is part of the run).
+    pub fn oak(&self) -> &SpeciesCtx {
+        self.get("quercus_robur").expect("physics.ron needs the oak in the run")
+    }
+    /// The cherry, when simulated (secondary values of a few physics rows).
+    pub fn cherry(&self) -> Option<&SpeciesCtx> {
+        self.get("prunus_avium")
+    }
+}
+
+/// Lower-case text of an entry (conditions, quote, note): qualitative
+/// entries carry their claim there.
+fn entry_text(e: &Entry) -> String {
+    [e.conditions.extra.as_deref(), e.quote.as_deref(), e.note.as_deref()].into_iter().flatten().collect::<Vec<_>>().join(" ").to_lowercase()
 }
 
 /// Years of a run while the tree is standing (all of them on main).
@@ -97,9 +125,23 @@ fn age_of(e: &Entry) -> Option<u32> {
 
 const STAND: &str = "peuplement (le moteur simule un arbre isolé)";
 
-/// Measurement for an entry of a species file.
-pub fn species_entry(sp: &SpeciesCtx, other: &SpeciesCtx, e: &Entry) -> Measured {
-    let oak = sp.genome.species.starts_with("Quercus");
+/// Measurement for an entry of a species file (`cx`: the other species of
+/// the run, for the few rules that compare with the oak).
+///
+/// Fruit-tree files tag each entry `FRANC/plein vent`, `VERGER greffé
+/// <porte-greffe>` or `MIXTE` at the start of `conditions.extra`: the engine
+/// grows an own-rooted seedling tree (no grafting, no rootstock), so the
+/// grafted-orchard entries are not comparable.
+pub fn species_entry(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
+    let m = species_entry_raw(sp, cx, e);
+    let grafted = e.conditions.extra.as_deref().is_some_and(|x| x.trim_start().to_lowercase().starts_with("verger greffé"));
+    if grafted && m.comparable() {
+        return m.nc("verger greffé sur porte-greffe : le moteur simule un arbre franc de semis, sans greffe ni taille");
+    }
+    m
+}
+
+fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
     let mat = sp.mature_age;
     let id = e.id.as_str();
     let q = e.quantity.as_str();
@@ -300,11 +342,12 @@ pub fn species_entry(sp: &SpeciesCtx, other: &SpeciesCtx, e: &Entry) -> Measured
         "lai" => Measured::values(sp.at(mat, |a| a.lai_crown), "surface foliaire / projection du houppier (constante LAI_FULL)", Nature::Constant).nc("peuplement dépérissant"),
         "transpiration_mm_day" => Measured::values(sp.at(100, |a| a.july_transp_l_day / (std::f64::consts::PI * (a.crown_width_m / 2.0).powi(2))), "transpiration de juillet par m² de projection du houppier (mm/j), 100 ans", Nature::Emergent).nc("peuplement dépérissant"),
         "transpiration_l_day" => {
-            if oak {
-                Measured::values(sp.at(100, |a| a.july_transp_l_day), "transpiration moyenne de juillet (L/j), 100 ans (DBH ~80 cm), moyenne de 5 ans", Nature::Emergent)
-                    .nc("chênes de plantation (houppiers plus petits qu'un arbre isolé)")
-            } else {
-                Measured::values(sp.at(30, |a| a.july_transp_l_day), "transpiration moyenne de juillet (L/j), 30 ans", Nature::Emergent).nc("verger de cultivar greffé, hémisphère sud")
+            let a = age.unwrap_or(sp.transp_age);
+            let m = Measured::values(sp.at(a, |r| r.july_transp_l_day), format!("transpiration moyenne de juillet (L/j), {a} ans, moyenne de 5 ans"), Nature::Emergent);
+            match id {
+                "quick_tree_water_use" => m.nc("chênes de plantation (houppiers plus petits qu'un arbre isolé)"),
+                "heatpulse_transp" => m.nc("verger de cultivar greffé, hémisphère sud"),
+                _ => m,
             }
         }
         "transpiration_l_day_per_m2_canopy" => Measured::values(
@@ -328,7 +371,9 @@ pub fn species_entry(sp: &SpeciesCtx, other: &SpeciesCtx, e: &Entry) -> Measured
             if e.unit.starts_with("Ellenberg") {
                 return Measured::one(p, "paramètre shade du génome (0-1)", Nature::Param).nc("indice d'Ellenberg (lumière), pas une tolérance");
             }
-            if q == "waterlogging_tolerance" && !oak {
+            // Species the genome declares intolerant of waterlogging: the
+            // growth on gley clay must show it (bench rule).
+            if q == "waterlogging_tolerance" && g.roots.waterlogging_tolerance < 0.3 {
                 return waterlogging_rule(sp);
             }
             if id == "pryor_shade_young" {
@@ -346,29 +391,55 @@ pub fn species_entry(sp: &SpeciesCtx, other: &SpeciesCtx, e: &Entry) -> Measured
         "green_density_kg_m3" => Measured::one(g.mechanics.green_density_kg_m3 as f64, "densité verte du génome (mécanique)", Nature::Param),
         "mor_mpa" => Measured::one(g.mechanics.green_mor_mpa as f64, "MOR du bois vert (génome)", Nature::Param).nc("bois sec (≈ 12 %) ou de structure contre bois vert du moteur"),
         "moe_gpa" => Measured::one(g.mechanics.green_moe_gpa as f64, "MOE du bois vert (génome)", Nature::Param).nc("bois sec (≈ 12 %) ou de structure contre bois vert du moteur"),
+        "critical_wind_ms" if g.leaf.evergreen() => {
+            // An evergreen meets winter storms with most of its foliage.
+            let a = sp.crit_age;
+            Measured::values(sp.at(a, |r| r.first_crit_leafy.unwrap_or(f64::NAN)), format!("première rafale critique, houppier en feuilles (persistant), {a} ans"), Nature::Emergent)
+        }
         "critical_wind_ms" => {
-            let a = if oak { 100 } else { 60 };
+            let a = sp.crit_age;
             Measured::values(sp.at(a, |r| r.first_crit_leafless.unwrap_or(f64::NAN)), format!("première rafale critique, houppier défeuillé, {a} ans"), Nature::Emergent)
                 .warn("valeur de Virot et al. contestée (Albrecht et al. 2016)")
         }
         "mycorrhiza_type" => {
-            let want_ecto = oak;
+            // Expected type read from the entry's own text.
+            let txt = entry_text(e);
+            let want = if txt.contains("ecto") || txt.contains("ecm") {
+                "Ecto"
+            } else if txt.contains("arbusc") || txt.contains("endomy") || txt.contains("(va)") || txt.contains(" am ") {
+                "Arbusc"
+            } else {
+                return Measured::not_measurable("type mycorhizien non lisible dans l'entrée");
+            };
             let t = format!("{:?}", g.symbiosis.mycorrhiza);
-            let pass = if want_ecto { t.contains("Ecto") } else { t.contains("Arbusc") };
-            Measured::rule(pass, format!("type du génome : {t}"), "type mycorhizien", Nature::Param)
+            Measured::rule(t.contains(want), format!("type du génome : {t}"), "type mycorhizien", Nature::Param)
         }
         "root_architecture" => {
             if id == "wpde_rootsystem" {
                 return Measured::not_measurable("« kräftig und weitläufig » : pas de critère opérationnel");
             }
+            let txt = entry_text(e);
+            let shallow = ["shallow", "flach", "superficiel", "traçant"].iter().any(|k| txt.contains(k));
+            let Some(oak) = cx.get("quercus_robur").filter(|o| shallow && o.id != sp.id) else {
+                return Measured::not_measurable("architecture racinaire qualitative : pas de critère du banc (seul « superficiel » est comparé au chêne)");
+            };
             let c = median(&sp.year(60, |y| y.root_depth_m));
-            let o = median(&other.year(60, |y| y.root_depth_m));
-            Measured::rule(c < o, format!("profondeur à 60 ans : merisier {c:.2} m, chêne {o:.2} m (critère du banc : enracinement moins profond que le chêne)"), "enracinement superficiel relatif", Nature::Emergent)
+            let o = median(&oak.year(60, |y| y.root_depth_m));
+            let name = sp.genome.common_name_fr.to_lowercase();
+            Measured::rule(c < o, format!("profondeur à 60 ans : {name} {c:.2} m, chêne {o:.2} m (critère du banc : enracinement moins profond que le chêne)"), "enracinement superficiel relatif", Nature::Emergent)
         }
         "ring_width_trend" => {
             let a = median(&sp.ring_mean(4, 6));
             let b = median(&sp.ring_mean(12, 20));
             Measured::rule(a > b, format!("cerne à 1,3 m, âge cambial 4-6 : {a:.2} mm, 12-20 : {b:.2} mm (critère du banc : déclin)"), "déclin du cerne après 4-5 ans", Nature::Emergent)
+        }
+        "frost_tolerance" if e.unit == "degC" => {
+            let txt = entry_text(e) + " " + &e.id;
+            if ["blossom", "flower", "fleur", "bloom", "floraison"].iter().any(|k| txt.contains(k)) {
+                Measured::one(g.reproduction.flower_frost_c as f64, "paramètre reproduction.flower_frost_c (gel des fleurs ouvertes)", Nature::Param)
+            } else {
+                Measured::not_modeled("endurcissement au froid du bois en hiver non modélisé")
+            }
         }
         "frost_tolerance" => {
             let v: Vec<f64> = sp
@@ -417,6 +488,78 @@ pub fn species_entry(sp: &SpeciesCtx, other: &SpeciesCtx, e: &Entry) -> Measured
         | "max_occluded_branch_diameter_mm_4y" | "pruning_max_branch_diameter_mm" => {
             Measured::not_measurable("modélisé (taille, plaies, rejets) mais le banc n'a pas encore de protocole d'élagage pour cette entrée")
         }
+        // --- Observables introduced with the 20 new species files ---
+        "needle_longevity_years" => {
+            if g.leaf.evergreen() {
+                Measured::one(g.leaf.leaf_longevity_years as f64, "paramètre leaf.leaf_longevity_years (durée de vie moyenne d'une cohorte)", Nature::Param)
+            } else {
+                Measured::not_modeled("génome caduc : une seule cohorte de feuilles par an")
+            }
+        }
+        "leaf_length_cm" | "needle_length_cm" => Measured::one(g.leaf.length_cm as f64, "paramètre leaf.length_cm (texture du feuillage)", Nature::Param),
+        "height_increment_cm_yr" | "height_increment_m_yr" => {
+            let k = if q.ends_with("cm_yr") { 100.0 } else { 1.0 };
+            let unit = if k > 1.0 { "cm/an" } else { "m/an" };
+            let v: Vec<f64> = sp.runs.iter().map(|r| living(r).windows(2).map(|w| (w[1].height_m - w[0].height_m) * k).fold(0.0, f64::max)).collect();
+            Measured::values(v, format!("accroissement annuel maximal de la hauteur ({unit}) sur la vie simulée"), Nature::Emergent)
+        }
+        "basic_density_kg_m3" => Measured::one(g.wood.density_kg_m3 as f64, "densité basale du génome (wood.density_kg_m3)", Nature::Param),
+        "oven_dry_density_kg_m3" => Measured::one(g.wood.density_kg_m3 as f64, "densité basale du génome", Nature::Param).nc("densité anhydre contre densité basale"),
+        "chilling_requirement_days" => Measured::one(g.phenology.chilling_requirement_days as f64, "paramètre phenology.chilling_requirement_days (jours ≤ 5 °C, Cannell & Smith)", Nature::Param),
+        "fruit_mass_g" | "nut_mass_g" => {
+            if g.reproduction.fruit_mass_g > 0.0 {
+                Measured::one(g.reproduction.fruit_mass_g as f64, "paramètre reproduction.fruit_mass_g (informatif, sans coût carboné)", Nature::Param)
+            } else {
+                Measured::not_modeled("masse du fruit non renseignée dans le génome")
+            }
+        }
+        "root_fraction_top_10cm" | "root_fraction_top_30cm" | "root_fraction_top_40cm" => {
+            let (f, d): (fn(&AgeRec) -> f64, u32) = match q {
+                "root_fraction_top_10cm" => (|r| r.root_frac_10, 10),
+                "root_fraction_top_30cm" => (|r| r.root_frac_30, 30),
+                _ => (|r| r.root_frac_40, 40),
+            };
+            let a = mat.min(sp.last_age());
+            Measured::values(sp.at(a, f), format!("fraction de la longueur racinaire au-dessus de {d} cm, {a} ans"), Nature::Emergent).warn("longueur de racines (moteur) contre biomasse (source)")
+        }
+        "clear_bole_height_m" => {
+            let a = age.unwrap_or(mat).min(sp.last_age());
+            Measured::values(sp.at(a, |r| r.clear_bole_m), format!("hauteur du fût sans grosse branche, {a} ans"), Nature::Emergent)
+        }
+        "cone_length_cm" | "fruit_diameter_cm" | "nut_size_cm" | "catkin_length_cm" | "flower_diameter_cm" | "flowers_per_cluster" => {
+            Measured::not_modeled("taille des organes reproducteurs non simulée (seule une carte d'affichage, reproduction.*_cluster_cm)")
+        }
+        "frost_kill_10pct_c" | "frost_kill_90pct_c" | "frost_hardiness_c" => Measured::not_modeled("endurcissement au froid hivernal non modélisé (seul le gel des jeunes feuilles et des fleurs l'est)"),
+        "cone_cycle_years" | "aril_maturity_years" => Measured::not_modeled("cycle de fructification sur une seule saison : pas de cône de deux ans"),
+        "fruit_yield_t_per_tree" | "biennial_bearing_ratio" | "yield_comparison" | "fruiting_peak_age_years" | "productive_lifespan_years" | "fruit_set" => {
+            Measured::not_modeled("pas de rendement en fruits (affichage seulement, sans coût carboné)")
+        }
+        "rootstock_vigour" | "size_vs_seedling_pct" => Measured::not_modeled("pas de porte-greffe : l'arbre simulé est franc de pied (semis)"),
+        "rain_mm_yr" | "rain_mm_month" | "rain_mm_day_record" | "rain_days_ge_1mm" | "rain_days_ge_5mm" | "rain_days_ge_10mm" | "temp_mean_c" | "temp_min_mean_c"
+        | "temp_max_mean_c" | "summer_temp_mean_c" | "record_low_c" | "record_high_c" | "diurnal_range_c" | "hot_days_tx_ge_30" | "hot_days_tx_ge_25"
+        | "frost_days" | "frost_days_tx_le_0" | "frost_days_tn_le_m5" | "frost_days_tn_le_m10" | "sunshine_h_yr" | "global_radiation_mj_m2_yr" | "etp_mm_yr"
+        | "snow_days" | "wind_mean_ms" | "gust_record_ms" | "gust_days_ge_16ms" | "gust_days_ge_28ms" => {
+            Measured::not_measurable("climat d'une station de l'aire de l'espèce : le banc simule le climat de Rennes")
+        }
+        "damping_ratio" | "f0_vs_d_over_h2" | "f0_winter_gain_pct" | "f0_debranched_vs_intact" | "anchorage_moment_knm" | "tilt_at_critical_moment_deg"
+        | "drag_coefficient" | "anchorage_moment_gain_deep_roots_pct" | "thigmomorphogenesis_effect" | "bending_dose_response" | "stem_vs_anchorage_strengthening"
+        | "radial_growth_mechanical_control" | "failure_mode" | "leaf_on_damage_effect" | "pruning_crown_mass_threshold_pct" | "leonardo_rule" => {
+            Measured::not_modeled("mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron)")
+        }
+        "storm_damage_predictors" | "storm_damaged_forest_fraction" | "storm_damage_plot_fraction" | "storm_damage_return_time_years" | "uprooted_share_of_damaged_pct"
+        | "windthrown_volume_m3" | "forest_destroyed_fraction" | "wind_tolerance" | "wind_exposure_tolerance" | "salt_wind_tolerance" => {
+            Measured::not_modeled("dégâts de tempête à l'échelle du peuplement ou du paysage")
+        }
+        "site_index" | "height_mai_culmination_years" | "height_cai_culmination_years" | "dbh_mai_culmination_years" | "dbh_cai_culmination_years" | "cai_peak_age_years"
+        | "exploitability_age_years" | "coppice_rotation_years" | "stems_per_stool" | "height_growth_end_years" => {
+            Measured::not_modeled("grandeur de peuplement ou de gestion : le moteur simule un arbre isolé")
+        }
+        "flowering_date_shift_days" | "flowering_date_sd_days" | "budburst_trend_days_per_yr" | "flowering_elevation_gradient_d_per_100m" | "budburst_rmse_d"
+        | "budburst_model_form" | "chill_portions" => Measured::not_measurable("tendance, gradient ou statistique de modèle : pas de protocole du banc"),
+        "seed_dormancy_years" | "stratification_days" | "seed_dispersal_m" | "sex_system" | "ploidy" | "clonal_age_years" | "allelopathy_juglone" | "tannin_content_pct"
+        | "pathogen_ink_disease" | "pathogen_blight" | "ash_dieback_mortality_fraction" | "heartwood_onset_years" | "bark_thickness_cm" | "sinker_root_onset_years"
+        | "litter_g_m2_yr" | "photosynthesis_optimum_c" | "wound_closure" | "marcescence" | "root_shoot_ratio" | "root_beta" | "rew_stress_threshold"
+        | "crown_to_stem_ratio" | "crown_diameter_vs_dbh_linear" => Measured::not_modeled("grandeur ou processus absent du moteur, ou sans protocole par espèce"),
         _ => Measured::not_measurable(format!("observable « {q} » non relié par le banc")),
     }
 }
@@ -438,7 +581,7 @@ fn waterlogging_rule(sp: &SpeciesCtx) -> Measured {
 pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
     let c = &cx.climate;
     let cl = |f: fn(&ClimateStats) -> f64, what: &str| Measured::values(c.iter().map(f).collect(), what.to_string(), Nature::Emergent);
-    let oak = &cx.oak;
+    let oak = cx.oak();
     let id = e.id.as_str();
     match id {
         "rennes_temp_mean_annual" => cl(|s| s.t_mean, "température moyenne annuelle").calib(),
@@ -495,7 +638,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
         "leonardo_rule_eloy" => {
             let v = oak.at(100, |r| r.area_ratio);
             let m = median(&v);
-            let ch = median(&cx.cherry.at(60, |r| r.area_ratio));
+            let ch = cx.cherry().map_or(f64::NAN, |c| median(&c.at(60, |r| r.area_ratio)));
             Measured::rule(
                 (0.8..=1.2).contains(&m),
                 format!("Σ sections filles / section mère aux fourches (rayon ≥ 1 cm) : chêne 100 ans {m:.3}, merisier 60 ans {ch:.3} (critère de travail 0,8-1,2, non publié)"),
@@ -535,7 +678,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
                 "root_frac_top30" => (|r| r.root_frac_30, 30),
                 _ => (|r| r.root_frac_40, 40),
             };
-            let ch = median(&cx.cherry.at(60, f));
+            let ch = cx.cherry().map_or(f64::NAN, |c| median(&c.at(60, f)));
             Measured::values(oak.at(100, f), format!("fraction de la longueur racinaire au-dessus de {d} cm, chêne 100 ans (merisier 60 ans : {ch:.2})"), Nature::Emergent)
                 .warn("longueur de racines (moteur) contre biomasse (Jackson)")
         }
@@ -548,7 +691,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
         "hemery_linear_range" => {
             let r2: Vec<f64> = oak.runs.iter().map(|r| r2_crown_dbh(&r.years)).collect();
             let m = median(&r2);
-            let ch = median(&cx.cherry.runs.iter().map(|r| r2_crown_dbh(&r.years)).collect::<Vec<_>>());
+            let ch = cx.cherry().map_or(f64::NAN, |c| median(&c.runs.iter().map(|r| r2_crown_dbh(&r.years)).collect::<Vec<_>>()));
             Measured::rule(m > 0.8, format!("r² de la largeur de houppier sur le DBH entre 20 et 50 cm : chêne {m:.3}, merisier {ch:.3} (publié : r² > 0,8)"), "houppier linéaire en DBH", Nature::Emergent)
         }
         "hemery_walnut_crown" | "hemery_walnut_z_ratio" => {

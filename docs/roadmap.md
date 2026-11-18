@@ -19,7 +19,7 @@ Date : 2026-11-16. Document vivant : à relire à chaque jalon terminé. Pas de 
 | Domaine | Ce qui existe | Maturité |
 |---|---|---|
 | Cœur de simulation | `dendro-core` (~9 000 lignes) : climat ancré sur la fiche Météo-France de Rennes (températures Tx/Tn par un générateur de type WGEN calé sur les normales et les jours de gel mensuels ; pluie encore stylisée), sol en couches avec bilan hydrique type BILJOU, phénologie chilling-forcing, croissance par bourgeons et compétition pour la lumière (Palubicki 2009), loi de Pressler / modèle du tuyau, cernes (initial/final, poreux ou non), racines stylisées, reproduction, longévité, taille. Déterministe (`rng.rs` : `advance_days(365) == 365 × advance_days(1)`). | Solide pour un POC, documenté et sourcé. |
-| Espèces et sols | 2 espèces (*Quercus robur*, *Prunus avium*), 4 sols. **Compilés dans le binaire** (`include_str!` dans `genome.rs` et `soil.rs`). | Génome riche (13 groupes de traits) mais testé sur deux feuillus seulement. |
+| Espèces et sols | **Registre d'espèces** : tout fichier `data/species/*.ron` est découvert et embarqué à la compilation (`build.rs`), groupé par catégorie dans les menus, utilisé par les sauvegardes (nom latin), le banc et `state_hash`. 4 espèces (chêne, merisier, pommier, épicéa) ; références de 20 essences dans `data/validation/` ; guide `docs/species/ADDING_A_SPECIES.md`. 4 sols, compilés aussi. | Génome générique éprouvé par un résineux persistant et un fruitier : cohortes d'aiguilles, verticilles, plagiotropie, masting/alternance, LMA/LAI par espèce. Reste : rafales critiques des résineux invalides (artefact de répartition de la traînée), pas de greffe, planches dessinées pour 2 espèces. |
 | Taille | Coupes, plaies, compartimentation et pourriture, chronologie rejouable (`LogEvent`), annulation, arbre témoin « fantôme », mesures objectives. | Le plus abouti côté jeu. |
 | Flux | Xylème, minéraux, phloème, O₂/CO₂, vapeur, mycorhizes en unités réelles, tracés lumineux. `flux.rs` est **sans état et sans rétroaction** sur la croissance. | Bonne vitrine pédagogique, c'est une lecture, pas un modèle. |
 | Rendu et interface | Godot 4.7 Forward+, bloc de sol en iceberg, vue des cernes, planches d'herbier générées par code, menus (titre, installation, options, pause), fonds peints optionnels. « Laboratoire » et « Commandes » sont déjà au menu, désactivés (« à venir ») ; l'entrée « Commandes » est à retirer (voir §3, mode mis de côté). | Belle base, jamais éprouvée en vraie partie. |
@@ -126,9 +126,11 @@ Ordre proposé et trait mis à l'épreuve :
 | 3 | *Betula pendula* | Pionnière à vie courte, croissance très rapide, graines légères. |
 | 4 | *Fraxinus excelsior* | Feuilles composées, débourrement tardif, bois à zone poreuse, chalarose (prépare M5). |
 | 5 | *Salix alba* / *Populus nigra* | Sols engorgés, têtards, rejets abondants : stress de la taille. |
-| 6 | *Pinus sylvestris* | Premier conifère : sempervirence réelle (aujourd'hui un stub à date fixe dans `phenology.rs`), verticilles, aiguilles, bois sans vaisseaux, résine. |
+| 6 | *Pinus sylvestris* | ~~Premier conifère~~ : fait avec *Picea abies* (cohortes d'aiguilles, verticilles, plagiotropie, cônes, masting). Reste pour les pins : cônes sur deux saisons, aiguilles en faisceaux longues (approximées par `tip_bunching`), résine. |
 | 7 | *Corylus avellana* | Premier arbuste : touffe de tiges, recépage naturel. |
 | 8 | Une herbacée vivace (*Digitalis purpurea* ou une graminée) | Pas de croissance secondaire ni de cernes : le génome doit rendre ces blocs optionnels. |
+
+**Fait (registre).** Les espèces sont découvertes à la compilation (`build.rs`) : ajouter une espèce = ajouter un fichier RON (`docs/species/ADDING_A_SPECIES.md`). Deux pilotes : épicéa (résineux persistant) et pommier (fruitier franc de pied), testés sur 5 graines (`tests/pilots.rs`). Prochaines étapes : génomes des 18 essences dont les références sont prêtes, répartition de la traînée par surface frontale (résineux), textures de folioles (frêne, noyer), fruits secs (noix, glands), planches d'herbier génériques.
 
 **Critères de sortie.** Chaque espèce : un RON, une entrée sourcée dans `docs/sources.md`, une planche d'herbier, un test de forme (hauteur et diamètre dans les plages de l'Atlas européen) ; **zéro** `if species ==` dans le code (vérifié par grep en CI).
 

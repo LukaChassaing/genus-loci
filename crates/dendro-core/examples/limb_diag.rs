@@ -22,10 +22,10 @@ fn main() {
     while let Some(a) = args.next() {
         match a.as_str() {
             "--species" => {
-                genome = match args.next().as_deref() {
-                    Some("cherry") => Genome::prunus_avium(),
-                    _ => Genome::quercus_robur(),
-                }
+                // Registry id or latin name (`picea_abies`); oak / cherry kept as aliases.
+                let id = args.next().unwrap_or_default();
+                let id = match id.as_str() { "oak" => "quercus_robur", "cherry" => "prunus_avium", o => o };
+                genome = Genome::find(id).unwrap_or_else(|| panic!("unknown species {id}"));
             }
             "--genome" => genome = Genome::from_ron(&std::fs::read_to_string(args.next().unwrap()).unwrap()).unwrap(),
             "--seed" => seed = args.next().unwrap().parse().unwrap(),

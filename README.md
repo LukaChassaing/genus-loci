@@ -6,7 +6,7 @@ Un arbre pousse jour après jour à partir de ses gènes (un génome de traits m
 
 ## Ce que fait le prototype
 
-- **Deux espèces** : le chêne pédonculé (*Quercus robur*) et le merisier (*Prunus avium*). Chaque espèce est un fichier RON de traits (`data/species/`), sans branche de code par espèce.
+- **Un registre d'espèces** : chaque espèce est un fichier RON de traits (`data/species/<nom_latin>.ron`), découvert et embarqué à la compilation, sans branche de code par espèce ; le menu « Espèce » les groupe en feuillus, fruitiers et résineux. Aujourd'hui : chêne pédonculé (*Quercus robur*) et merisier (*Prunus avium*), et deux pilotes du registre, le pommier (*Malus domestica*, arbre franc de plein vent) et l'épicéa commun (*Picea abies*, résineux persistant : cohortes d'aiguilles, verticilles, cônes, masting). Ajouter une espèce : [`docs/species/ADDING_A_SPECIES.md`](docs/species/ADDING_A_SPECIES.md).
 - **Quatre sols** (`data/soils/`) : limon profond (sol brun), mince sur calcaire (rendzine), argile engorgée (gley), sable sec (podzol). Le sol est en couches, avec un bilan hydrique ; l'asphyxie des racines est modélisée.
 - **Climat et météo** : climat stylisé (ancré sur les normales de Rennes), météo journalière, sécheresse forcée à volonté.
 - **Phénologie** : débourrement, floraison, fructification, couleurs d'automne, chute des feuilles ; croissance par bourgeons en compétition pour la lumière ; cernes annuels ; longévité.
@@ -15,7 +15,7 @@ Un arbre pousse jour après jour à partir de ses gènes (un génome de traits m
 - **Taille** (« Taille », touche T) : coupes à la souris, plaies, compartimentation et pourriture, chronologie rejouable, annulation, sauts dans le temps, opérations en un clic (élaguer, éclaircir, réduire, têtard), et **arbre témoin** : la silhouette fantôme de l'arbre jamais taillé (même graine), avec un tableau de comparaison (hauteur, diamètre, feuillage, réserves, vigueur, carie, espérance de vie).
 - **Mécanique** (« Mécanique », touche M) : tenue de l'arbre sous son poids et une rafale constante (curseur 0 à 50 m/s, avec km/h et Beaufort) : facteur de sécurité, point faible, mode de ruine attendu (rupture du tronc, d'une charpentière, déracinement) et vitesse critique de chaque mode ; le bois est coloré du vert (sûr) au rouge (rompt). Lecture statique sans rétroaction : rien ne casse encore. Valeurs et écarts : `docs/sources.md`, « Mécanique statique ».
 - **Vue des cernes** (« Cernes ») : coupe du tronc à 1,3 m, survol et zoom à la molette.
-- **Planches d'herbier** (menu « Planches ») : une planche botanique par espèce, entièrement dessinée par le code.
+- **Planches d'herbier** (menu « Planches ») : planches botaniques du chêne et du merisier, entièrement dessinées par le code (les autres espèces ont une fiche générique).
 - **Menus** : écran titre, préparation de l'Arboretum (espèce, sol, âge de départ, graine), options, pause. « Laboratoire » est au menu mais désactivé (« à venir »).
 
 ## Commandes
@@ -68,7 +68,7 @@ Elles court-circuitent l'écran titre (le jeu démarre directement sur la simula
 |---|---|
 | `DENDRO_SHOT=/chemin/absolu.png` | Avance rapide, enregistre une capture, quitte |
 | `DENDRO_YEARS`, `DENDRO_DOY` | Années à simuler, jour de l'année de la capture (200 = mi-juillet) |
-| `DENDRO_SPECIES`, `DENDRO_SOIL`, `DENDRO_SEED` | Espèce (0 chêne, 1 merisier), sol, graine |
+| `DENDRO_SPECIES`, `DENDRO_SOIL`, `DENDRO_SEED` | Espèce (identifiant du registre, ex. `picea_abies`, ou nom latin ; un indice marche encore mais change quand on ajoute une espèce), sol, graine |
 | `DENDRO_SIZE=1280x720` | Taille de la fenêtre |
 | `DENDRO_CAM`, `DENDRO_CAMDIST`, `DENDRO_YAW`, `DENDRO_PITCH` | Caméra : préréglages `leaves`, `flowers`, `trunk`, `low`, `wide`, `roots` ; angles en degrés |
 | `DENDRO_XRAY`, `DENDRO_SOIL_OPACITY`, `DENDRO_GUIDES` | Sol transparent, opacité du sol, repères |
@@ -99,7 +99,7 @@ DENDRO_FLUX=1 DENDRO_SIZE=1280x720 godot --path godot
 | `crates/dendro-core` | Cœur de simulation en Rust pur et déterministe (génome, climat, sol, phénologie, croissance, racines, flux, mécanique, taille, cernes, maillages). Aucune dépendance à Godot. Exemples dans `examples/`, tests dans `tests/`. |
 | `crates/dendro-godot` | Liaison Godot (gdext) : expose la classe `TreeSim`. |
 | `godot/` | Projet Godot 4.7 : scène 3D, interface, menus, vue des cernes, planches (`scripts/`). Texte de l'interface en français, code et commentaires en anglais. |
-| `data/species/`, `data/soils/` | Génomes d'espèces et profils de sol (RON), compilés dans le binaire. |
+| `data/species/`, `data/soils/` | Génomes d'espèces (un fichier par espèce, découverts par `crates/dendro-core/build.rs`) et profils de sol (RON), compilés dans le binaire. Fiches de traits : `docs/species/`. |
 | `godot/art/` | Fonds peints facultatifs (voir `godot/art/LISEZMOI.md`) ; sans eux, un fond procédural est dessiné. |
 | `docs/` | [`roadmap.md`](docs/roadmap.md) (feuille de route et état détaillé), [`sources.md`](docs/sources.md) (sources scientifiques et écarts connus), [`build.md`](docs/build.md), analyses préparatoires, prompts d'images. |
 

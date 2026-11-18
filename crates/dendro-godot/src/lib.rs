@@ -74,6 +74,27 @@ impl TreeSim {
     fn get_species_common_names(&self) -> PackedStringArray {
         Backend::species_common_names().iter().map(|n| GString::from(n.as_str())).collect()
     }
+    /// Registry ids of the built-in species (`data/species/<id>.ron`), in index order.
+    #[func]
+    fn get_species_ids(&self) -> PackedStringArray {
+        Backend::species_ids().iter().map(|n| GString::from(n.as_str())).collect()
+    }
+    /// French menu group of each species (« Feuillus », « Fruitiers », « Résineux »), in index order.
+    #[func]
+    fn get_species_categories(&self) -> PackedStringArray {
+        Backend::species_categories().iter().map(|n| GString::from(n.as_str())).collect()
+    }
+    /// Index of a species given by registry id or latin binomial, -1 if unknown. Indices shift when a
+    /// species file is added: persist ids, not indices.
+    #[func]
+    fn find_species(&self, id_or_latin: GString) -> i32 {
+        dendro_core::Genome::index_of(&id_or_latin.to_string()).map_or(-1, |i| i as i32)
+    }
+    /// Index of the species shown when nothing is chosen (the oak).
+    #[func]
+    fn get_default_species(&self) -> i32 {
+        dendro_core::Genome::default_index() as i32
+    }
     #[func]
     fn get_bedrock_depth_m(&self) -> f64 {
         self.backend.bedrock_depth_m() as f64
@@ -248,6 +269,31 @@ impl TreeSim {
         Vector4::new(a[0], a[1], a[2], a[3])
     }
     /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous oak).
+    /// Leaf form of the species: 0 broad leaf, 1 needle, 2 scale (foliage texture).
+    #[func]
+    fn get_leaf_type(&self) -> i32 {
+        self.backend.leaf_type()
+    }
+    /// Foliage card size in leaf (needle) lengths.
+    #[func]
+    fn get_leaf_cluster_size(&self) -> f32 {
+        self.backend.leaf_cluster_size()
+    }
+    /// The species keeps green foliage over winter (several leaf cohorts).
+    #[func]
+    fn get_evergreen(&self) -> bool {
+        self.backend.evergreen()
+    }
+    /// Fruit kind: 0 fleshy, 1 nut, 2 samara, 3 pendent cone, 4 erect cone, 5 aril (fruit texture).
+    #[func]
+    fn get_fruit_kind(&self) -> i32 {
+        self.backend.fruit_kind()
+    }
+    /// Size of one fruit card (cm): large fleshy fruits (apple, pear) get a single-fruit texture.
+    #[func]
+    fn get_fruit_cluster_cm(&self) -> f32 {
+        self.backend.fruit_cluster_cm()
+    }
     #[func]
     fn get_ring_contrast(&self) -> f32 {
         self.backend.ring_contrast()

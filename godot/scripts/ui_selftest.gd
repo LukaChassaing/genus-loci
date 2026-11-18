@@ -39,35 +39,53 @@ static func run(host: Node, check: Callable) -> void:
 	check.call("title: back to menu", title.page == "menu")
 	title.queue_free()
 
-	# Arboretum setup: 2 species, 4 soils, 4 start ages, seed parsing, launch signal.
+	# Arboretum setup: every registry species (grouped menu), 4 soils, 4 start ages, seed parsing, launch signal.
+	var reg: TreeSim = TreeSim.new()
+	var n_sp: int = reg.get_species_ids().size()
+	var cherry_i: int = reg.find_species("prunus_avium")
 	var setup: ArboretumSetup = ArboretumSetup.new()
 	host.add_child(setup)
 	await tree.process_frame
-	check.call("setup: lists 2 species", setup.species_seg.buttons.size() == 2, str(setup.species_seg.buttons.size()))
-	check.call("setup: species named from the core", setup.species_seg.buttons[1].text == "Merisier", setup.species_seg.buttons[1].text)
+	var n_items: int = 0
+	var n_sep: int = 0
+	for k: int in setup.species_menu.item_count:
+		if setup.species_menu.is_item_separator(k):
+			n_sep += 1
+		else:
+			n_items += 1
+	check.call("setup: lists every registry species", n_items == n_sp and n_sp >= 4, "%d items, %d species" % [n_items, n_sp])
+	check.call("setup: grouped by category (headers)", n_sep >= 2 and n_sep <= 3, "%d headers" % n_sep)
+	check.call("setup: default species is the oak", setup.species == reg.find_species("quercus_robur"))
+	var ci: int = setup.species_menu.get_item_index(cherry_i)
+	check.call("setup: species named from the core", setup.species_menu.get_item_text(ci) == "Merisier", setup.species_menu.get_item_text(ci))
 	check.call("setup: lists 4 soils", setup.soil_seg.buttons.size() == 4, str(setup.soil_seg.buttons.size()))
 	check.call("setup: 4 start ages", setup.age_seg.buttons.size() == 4)
 	check.call("setup: empty seed = random (-1)", setup.chosen_seed() == -1)
 	var got: Array = []
 	setup.launched.connect(func(sp: int, so: int, sd: int, yr: int) -> void: got.append([sp, so, sd, yr]))
-	setup.species_seg.buttons[1].pressed.emit()
+	setup.species_menu.select(ci)
+	setup.species_menu.item_selected.emit(ci)
 	setup.soil_seg.buttons[2].pressed.emit()
 	setup.age_seg.buttons[3].pressed.emit()
 	setup.seed_edit.text = "4242"
 	setup.plant_button.pressed.emit()
-	check.call("setup: launch carries the choice", got.size() == 1 and got[0] == [1, 2, 4242, 100], str(got))
+	check.call("setup: launch carries the choice", got.size() == 1 and got[0] == [cherry_i, 2, 4242, 100], str(got))
 	setup.queue_free()
 
-	# Plates: both species build and lay out.
-	for i: int in 2:
+	# Plates: the two hand-drawn plates build and lay out; other species get a generic card, no plate.
+	for p: int in PlateView.PLATE_IDS.size():
+		var i: int = reg.find_species(PlateView.PLATE_IDS[p])
 		var pv: PlateView = PlateView.new()
 		host.add_child(pv)
 		pv.size = Vector2(1280, 720)
 		pv.set_species(i)
 		await tree.process_frame
 		await tree.process_frame
-		check.call("plate %d builds and is laid out" % i, pv.species == i and pv._s > 0.3 and PlateView.species_data(i)["latin"] != "", "scale %.2f" % pv._s)
+		check.call("plate %d builds and is laid out" % p, pv.species == p and pv._s > 0.3 and PlateView.species_data(i)["latin"] != "", "scale %.2f" % pv._s)
 		pv.queue_free()
+	var spruce_i: int = reg.find_species("picea_abies")
+	check.call("plate: a species without plate gets a generic card", spruce_i < 0 or (not PlateView.has_plate(spruce_i)
+		and PlateView.species_data(spruce_i)["latin"] == "Picea abies"))
 	check.call("plate leaf data: oak lobed, cherry serrate", _leaf_ok())
 
 	# Settings round-trip (temporary file, the real settings are untouched).
@@ -220,10 +238,10 @@ static func run(host: Node, check: Callable) -> void:
 
 static func _leaf_ok() -> bool:
 	var ts: TreeSim = TreeSim.new()
-	ts.set_species(0)
+	ts.set_species(ts.find_species("quercus_robur"))
 	ts.reset(1)
 	var oak: bool = ts.get_leaf_lobes() > 0
-	ts.set_species(1)
+	ts.set_species(ts.find_species("prunus_avium"))
 	ts.reset(1)
 	var cherry: bool = ts.get_leaf_lobes() == 0 and ts.get_leaf_serration() > 0.0
 	return oak and cherry
@@ -237,7 +255,8 @@ static func _save_load_checks(tree: SceneTree, check: Callable) -> void:
 	for f: String in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir.path_join(f))
 	var a: TreeSim = TreeSim.new()
-	a.set_species(1)
+	var cherry_i: int = a.find_species("prunus_avium")
+	a.set_species(cherry_i)
 	a.set_soil(2)
 	a.reset(4321)
 	a.advance_days(365.0 * 7.0 + 140.0)
@@ -270,7 +289,7 @@ static func _save_load_checks(tree: SceneTree, check: Callable) -> void:
 		"%d polls, %d ms" % [polls, Time.get_ticks_msec() - t0])
 	check.call("load: same state hash as the saved tree", b.get_state_hash() == a.get_state_hash() and bool(info.get("match", false)),
 		"%s vs %s" % [b.get_state_hash(), a.get_state_hash()])
-	check.call("load: species, soil, seed, day, drought restored", b.get_species() == 1 and b.get_soil() == 2 and b.get_seed() == 4321
+	check.call("load: species, soil, seed, day, drought restored", b.get_species() == cherry_i and b.get_soil() == 2 and b.get_seed() == 4321
 		and b.get_days_elapsed() == a.get_days_elapsed() and b.get_drought() == a.get_drought() and b.get_prune_cut_count() == a.get_prune_cut_count())
 	check.call("load: the history has cuts, undo works on the loaded tree", cuts > 0 and b.prune_undo(), "%d cuts" % cuts)
 	var list: Array = TreeSim.list_saves(dir)

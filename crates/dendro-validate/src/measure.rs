@@ -85,12 +85,16 @@ pub struct TreeRun {
     pub vent: crate::vent::RunDyn,
 }
 
-pub fn sample_ages(species: &str) -> Vec<u32> {
-    if species.starts_with("Quercus") {
+/// Ages at which the detailed record (mechanics, transpiration...) is
+/// taken, for a run of `years` years: long runs (> 150 years) use the long
+/// list, others the short one, cut at `years`.
+pub fn sample_ages(years: u32) -> Vec<u32> {
+    let all = if years > 150 {
         vec![5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 130, 144, 150, 200, 250, 300, 350, 400]
     } else {
         vec![5, 10, 15, 20, 25, 30, 40, 50, 56, 59, 60, 70, 75, 80, 100, 120, 150]
-    }
+    };
+    all.into_iter().filter(|&a| a <= years).collect()
 }
 
 pub const DBH_THRESHOLDS: [u32; 5] = [25, 30, 40, 50, 60];
@@ -171,7 +175,7 @@ pub fn run_tree_on(genome: &Genome, seed: u64, years: u32, soil: SoilProfile, de
     let mut sim = Simulation::with_site(genome.clone(), seed, ClimateParams::default(), soil);
     #[cfg(feature = "vent")]
     crate::vent::configure(&mut sim);
-    let ages = if detailed { sample_ages(&genome.species) } else { Vec::new() };
+    let ages = if detailed { sample_ages(years) } else { Vec::new() };
     let mut run = TreeRun { seed, ..Default::default() };
     let mut prev_dbh = 0.0f64;
     let mut july_acc: BTreeMap<u32, (f64, u32)> = BTreeMap::new();

@@ -862,14 +862,17 @@ impl Simulation {
             let n = &mut self.shoots.nodes[idx];
             let cut = n.length - plan.cut_len.min(n.length);
             let mut l2 = 0.0;
-            if n.leafy {
-                l2 = 0.5 * face + 0.5 * face * (n.length / unit_len.max(1e-3)).min(1.0);
+            // Foliage on the cut unit (an evergreen's older needles too).
+            let lw = n.leaf_w();
+            if lw > 0.0 {
+                l2 = (0.5 * face + 0.5 * face * (n.length / unit_len.max(1e-3)).min(1.0)) * lw;
             }
             let w2 = n.area * cut;
             n.length = plan.cut_len.min(n.length).max(0.002);
             n.grow_from = n.grow_from.min(n.length);
             n.path_end -= cut;
             n.leafy = false;
+            n.old_leaf = 0.0;
             n.term_bud = false;
             n.lat_buds = 0;
             n.cut_end = true;
@@ -1049,6 +1052,7 @@ impl Simulation {
                 if !n.is_snag() && n.order > 0 && n.radius() < 0.08 && n.leaf_n > 0.0 && rng::unit(rng::hash(seed, S_PRUNE, n.id as u64, (year as u64) << 8 | 3)) < p {
                     n.snag_since = year;
                     n.leafy = false;
+                    n.old_leaf = 0.0;
                     n.term_bud = false;
                     n.lat_buds = 0;
                 }
@@ -1060,6 +1064,7 @@ impl Simulation {
                         n.snag_since = year;
                     }
                     n.leafy = false;
+                    n.old_leaf = 0.0;
                     n.term_bud = false;
                     n.lat_buds = 0;
                 }
@@ -1167,6 +1172,7 @@ impl Simulation {
                     nd.snag_since = year;
                 }
                 nd.leafy = false;
+                nd.old_leaf = 0.0;
                 nd.term_bud = false;
                 nd.lat_buds = 0;
                 nd.sprout = 0.0;
@@ -1298,8 +1304,9 @@ impl Simulation {
             let nd = &nodes[j];
             let len = if j == plan.idx && !plan.at_base { nd.length - plan.cut_len } else { nd.length };
             wood += nd.area * len.max(0.0);
-            if nd.leafy {
-                leaf += (0.5 + 0.5 * (nd.length / unit_len.max(1e-3)).min(1.0)) * face;
+            let lw = nd.leaf_w();
+            if lw > 0.0 {
+                leaf += (0.5 + 0.5 * (nd.length / unit_len.max(1e-3)).min(1.0)) * face * lw;
             }
             if j == plan.idx {
                 fol += nd.foliage;
@@ -1561,7 +1568,7 @@ impl Simulation {
 
     /// Is the tree alive (some foliage or a bud on living wood)?
     pub fn is_alive(&self) -> bool {
-        !self.prune.dead && self.shoots.nodes.iter().any(|n| !n.is_snag() && (n.leafy || n.term_bud || n.lat_buds > 0))
+        !self.prune.dead && self.shoots.nodes.iter().any(|n| !n.is_snag() && (n.leafy || n.old_leaf > 0.0 || n.term_bud || n.lat_buds > 0))
     }
 
     /// Estimated total lifespan (years). Heuristic: the species' typical

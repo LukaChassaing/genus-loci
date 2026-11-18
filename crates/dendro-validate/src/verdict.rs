@@ -131,6 +131,10 @@ impl Measured {
         self.not_comparable = Some(reason.into());
         self
     }
+    /// A verdict would be given (not forced, not already non comparable).
+    pub fn comparable(&self) -> bool {
+        self.forced.is_none() && self.not_comparable.is_none()
+    }
     pub fn calib(mut self) -> Self {
         self.calibration = true;
         self

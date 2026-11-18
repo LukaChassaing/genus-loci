@@ -96,7 +96,7 @@ func _ready() -> void:
 		sim.set_soil(int(soil_env))
 	var species_env: String = OS.get_environment("DENDRO_SPECIES")
 	if species_env != "":
-		sim.set_species(int(species_env))
+		sim.set_species(_species_from_env(species_env))
 	# Arboretum choice from the title screen (the DENDRO_* variables above take precedence).
 	var cfg: Dictionary = Game.take_pending()
 	var start_days: float = 0.0
@@ -132,7 +132,7 @@ func _ready() -> void:
 	hud.set_soil_names(sim.get_soil_names())
 	hud.select_soil(sim.get_soil())
 	hud.soil_selected.connect(_on_soil_selected)
-	hud.set_species_names(sim.get_species_common_names(), sim.get_species_names())
+	hud.set_species_names(sim.get_species_common_names(), sim.get_species_names(), sim.get_species_categories())
 	hud.select_species(sim.get_species())
 	hud.species_selected.connect(_on_species_selected)
 	_apply_species_look()
@@ -177,6 +177,18 @@ func _ready() -> void:
 		_run_bench(float(OS.get_environment("DENDRO_BENCH")), shot)
 	elif shot != "":
 		_screenshot_and_quit(shot)
+
+
+## DENDRO_SPECIES: a registry id or latin name (`picea_abies`, « Picea abies »), or an index (indices shift when
+## a species file is added: prefer ids).
+func _species_from_env(v: String) -> int:
+	if v.is_valid_int():
+		return int(v)
+	var i: int = sim.find_species(v)
+	if i < 0:
+		push_warning("DENDRO_SPECIES: unknown species %s" % v)
+		return sim.get_default_species()
+	return i
 
 
 ## A saved tree replaced the seedling (SaveFlow, once the replay is done): the refresh of a new seed,
@@ -231,13 +243,24 @@ func _apply_species_look() -> void:
 	var lobes: int = sim.get_leaf_lobes()
 	var serr: float = sim.get_leaf_serration()
 	var arr: Vector4 = sim.get_leaf_arrangement()  # leaves per shoot, tip bunching, petiole ratio, droop
-	var key: String = "%d|%.2f|%.2f|%.2f|%.3f|%.3f|%s" % [lobes, serr, fis, lent, sim.get_leaf_length_m(),
-		sim.get_leaf_width_m(), arr]
+	var leaf_type: int = sim.get_leaf_type()  # 0 broad, 1 needle, 2 scale
+	var fruit_kind: int = sim.get_fruit_kind()
+	if fruit_kind == 0 and sim.get_fruit_cluster_cm() >= 5.0:
+		fruit_kind = 100  # large fleshy fruit (apple, pear): one fruit per card
+	var key: String = "%d|%.2f|%.2f|%.2f|%.3f|%.3f|%s|%d|%.1f" % [lobes, serr, fis, lent, sim.get_leaf_length_m(),
+		sim.get_leaf_width_m(), arr, leaf_type, sim.get_leaf_cluster_size()]
 	if not _tex_cache.has(key):
 		var t0: int = Time.get_ticks_msec()
 		var oak_leaf_look: bool = lobes > 0 and arr.is_equal_approx(Vector4(7.0, 0.75, 0.06, 0.15))
-		if oak_leaf_look and absf(fis - 0.85) < 0.01 and lent < 0.01:
+		if oak_leaf_look and absf(fis - 0.85) < 0.01 and lent < 0.01 and leaf_type == 0:
 			_tex_cache[key] = {"leaf": _oak_leaf, "bark": _oak_bark}  # the startup oak textures
+		elif leaf_type != 0:
+			# Conifers: needle sprays (needle length = 1 / card size in needle lengths; tufts from tip bunching,
+			# needle angle from droop).
+			_tex_cache[key] = {
+			"leaf": ProcTextures.make_needle_cluster_texture(1.0 / maxf(sim.get_leaf_cluster_size(), 1.5), arr.y, arr.w),
+			"bark": ProcTextures.make_bark_textures(fis, lent),
+			}
 		else:
 			_tex_cache[key] = {
 			"leaf": ProcTextures.make_leaf_cluster_texture(lobes, serr, sim.get_leaf_length_m(), sim.get_leaf_width_m(),
@@ -247,6 +270,7 @@ func _apply_species_look() -> void:
 		print("[dendro] species textures generated in %d ms" % (Time.get_ticks_msec() - t0))
 	var entry: Dictionary = _tex_cache[key]
 	leaf_mat.set_shader_parameter("leaf_tex", entry["leaf"])
+	_apply_fruit_look(fruit_kind)
 	var bt: Array[ImageTexture] = entry["bark"]
 	bark_mat.albedo_texture = bt[0]
 	bark_mat.normal_texture = bt[1]
@@ -254,6 +278,27 @@ func _apply_species_look() -> void:
 	ProcTextures.set_bark_look(bark_mat, sim.get_bark_gloss(), fis)
 	hud.select_species(sim.get_species())
 	hud.set_bark_color(sim.get_bark_color())
+
+
+## Fruit (and, for conifers, strobilus) texture of the species' fruit kind; generated once per kind.
+var _fruit_tex: Dictionary = {}
+func _apply_fruit_look(kind: int) -> void:
+	if _fruit_tex.is_empty():
+		_fruit_tex[-1] = [ProcTextures.make_flower_texture(), ProcTextures.make_fruit_texture()]
+	if not _fruit_tex.has(kind):
+		match kind:
+			3, 4:  # cones: the female strobili (the "flowers") are small cones too
+				var cone: ImageTexture = ProcTextures.make_cone_texture(0.32 if kind == 3 else 0.42)
+				_fruit_tex[kind] = [cone, cone]
+			2:
+				_fruit_tex[kind] = [_fruit_tex[-1][0], ProcTextures.make_samara_texture()]
+			100:
+				_fruit_tex[kind] = [_fruit_tex[-1][0], ProcTextures.make_fruit_texture(true)]
+			_:
+				_fruit_tex[kind] = _fruit_tex[-1]
+	var pair: Array = _fruit_tex[kind]
+	flower_mat.set_shader_parameter("flower_tex", pair[0])
+	flower_mat.set_shader_parameter("fruit_tex", pair[1])
 
 
 func _apply_seed(new_seed: int) -> void:
@@ -498,7 +543,10 @@ func _update_foliage_season(delta: float) -> void:
 
 
 ## 1 when the leaves on the tree are autumn or dead winter leaves (colouring, leaf fall, dormancy), else 0.
+## Evergreens: never (their winter crown is green; only the cast cohort yellows).
 func _autumn_look() -> float:
+	if sim.get_evergreen():
+		return 0.0
 	var phase: int = sim.get_phase()
 	return 1.0 if phase == 4 or phase == 5 or phase == 0 else 0.0
 
@@ -754,7 +802,7 @@ func _update_view_state(delta: float) -> void:
 
 	# Falling leaves.
 	var h: float = tree_h
-	leaf_fall.emitting = phase == 5 and crown_r > 1.5
+	leaf_fall.emitting = phase == 5 and crown_r > 1.5 and not sim.get_evergreen()
 	leaf_fall.position = Vector3(0.0, 0.72 * h, 0.0)
 	leaf_fall.lifetime = clampf(0.72 * h / 1.0, 3.0, 25.0)
 	(leaf_fall.process_material as ParticleProcessMaterial).emission_box_extents = Vector3(crown_r * 0.85, 0.15 * h + 0.2, crown_r * 0.85)
@@ -814,7 +862,7 @@ func _simulate() -> void:
 # ---------------------------------------------------------------------------------------------
 # Debug / verification hooks (env vars, never used in normal play)
 #   DENDRO_SHOT=path.png  fast-forward and save a screenshot, then quit
-#   DENDRO_SPECIES=1      species index (0 oak, 1 wild cherry)
+#   DENDRO_SPECIES=picea_abies  species: registry id (data/species/<id>.ron) or latin name; an index still works
 #   DENDRO_YEARS=60       years to fast-forward (default 40)
 #   DENDRO_DOY=300        day of year to stop at (default 200 = mid-July)
 #   DENDRO_CAM=leaves|flowers|trunk|low|roots|wide|default   camera preset (wide = whole block; roots = root view through the wedge;
@@ -1368,9 +1416,14 @@ func _run_selftest() -> void:
 	var lens_r: Array[float] = []
 	var species0: int = sim.get_species()
 	var combos: Array[Vector2i] = []
-	for sp: int in [0, 1]:
+	for sp: int in [sim.find_species("quercus_robur"), sim.find_species("prunus_avium")]:
 		for yrs: int in [1, 5, 20, 40, 100, 200, 300]:
 			combos.append(Vector2i(sp, yrs))
+	# The pilot conifer and fruit tree too (a tall narrow cone, a low broad crown).
+	for sp_id: String in ["picea_abies", "malus_domestica"]:
+		if sim.find_species(sp_id) >= 0:
+			for yrs: int in [20, 100]:
+				combos.append(Vector2i(sim.find_species(sp_id), yrs))
 	for combo: Vector2i in combos:
 		var years: int = combo.y
 		sim.set_species(combo.x)
@@ -1422,7 +1475,7 @@ func _run_selftest() -> void:
 			"%.3f vs %.3f" % [root_mat.get_shader_parameter("clip_radius") as float, soil.radius])
 		_check("root clip depth equals plug depth", is_equal_approx(root_mat.get_shader_parameter("clip_depth") as float, soil.depth))
 	sim.set_species(species0)
-	_check("soil body scales with the roots (1 y clod -> 200 y lens)", lens_r.size() == 14 and lens_r[5] > 4.0 * lens_r[0] and lens_r[4] > lens_r[3],
+	_check("soil body scales with the roots (1 y clod -> 200 y lens)", lens_r.size() >= 14 and lens_r[5] > 4.0 * lens_r[0] and lens_r[4] > lens_r[3],
 		str(lens_r))
 	# Eases toward a new envelope, rebuilding only when it moved noticeably (no per-frame rebuild).
 	var builds0: int = soil.rebuild_count
@@ -1634,11 +1687,51 @@ func _run_selftest() -> void:
 	_apply_seed(seed_value)
 	_check("soil choice: back to deep loam", sim.get_bedrock_depth_m() < 0.0 and sim.get_age_years() < 0.1)
 
-	# 11. Species: selector populated, cherry blooms (flower mesh), oak never does.
-	_check("species selector has 2 entries", hud.species_option.item_count == 2, str(hud.species_option.item_count))
-	_check("species selector shows French common names", hud.species_option.get_item_text(1) == "Merisier", hud.species_option.get_item_text(1))
-	hud.species_selected.emit(1)  # same path as the OptionButton
-	_check("species switch: cherry simulated", sim.get_species() == 1 and sim.get_age_years() < 0.1 and sim.get_leaf_lobes() == 0)
+	# 11. Species: selector populated (every registry species, grouped by category), every species loads and
+	# grows, cherry blooms (flower mesh), oak never does, the evergreen spruce stays green in winter.
+	var oak_i: int = sim.find_species("quercus_robur")
+	var cherry_i: int = sim.find_species("prunus_avium")
+	var n_sp: int = sim.get_species_ids().size()
+	var n_items: int = 0
+	var n_headers: int = 0
+	for k: int in hud.species_option.item_count:
+		if hud.species_option.is_item_separator(k):
+			n_headers += 1
+		else:
+			n_items += 1
+	_check("species selector lists every registry species", n_items == n_sp and n_sp >= 4, "%d items, %d species" % [n_items, n_sp])
+	var cats: PackedStringArray = sim.get_species_categories()
+	var distinct: Dictionary = {}
+	for c: String in cats:
+		distinct[c] = true
+	_check("species selector grouped under category headers", n_headers == distinct.size(), "%d headers, %d categories" % [n_headers, distinct.size()])
+	_check("species selector shows French common names",
+		hud.species_option.get_item_text(hud.species_option.get_item_index(cherry_i)) == "Merisier")
+	var ids: PackedStringArray = sim.get_species_ids()
+	var bad: Array[String] = []
+	for i: int in n_sp:
+		sim.set_species(i)
+		_apply_seed(3)
+		_advance_days_direct(6.0 * 365.0 + 190.0)
+		_rebuild_meshes(true)
+		var lm: ArrayMesh = leaf_mi.mesh as ArrayMesh
+		if sim.get_species() != i or sim.get_height_m() <= 0.3 or wood_mi.mesh == null or lm == null or lm.get_surface_count() == 0:
+			bad.append("%s (%.2f m)" % [ids[i], sim.get_height_m()])
+	_check("every species loads, grows 6 years and builds its meshes", bad.is_empty(), str(bad))
+	var spruce_i: int = sim.find_species("picea_abies")
+	if spruce_i >= 0:
+		sim.set_species(spruce_i)
+		_apply_seed(3)
+		_advance_days_direct(15.0 * 365.0 + 15.0)  # mid-January
+		_rebuild_meshes(true)
+		var wl: ArrayMesh = leaf_mi.mesh as ArrayMesh
+		var c: Color = sim.get_leaf_color()
+		_check("spruce: evergreen, needles in winter, green", sim.get_evergreen() and sim.get_leaf_type() == 1 and wl != null
+			and wl.get_surface_count() > 0 and c.g > c.r and sim.get_leaf_density() > 0.6, "density %.2f, colour %s" % [sim.get_leaf_density(), c])
+		_check("spruce: needle texture, cone fruit", leaf_mat.get_shader_parameter("leaf_tex") != _oak_leaf and sim.get_fruit_kind() == 3)
+		_check("spruce: no autumn look in winter", _autumn_look() == 0.0)
+	hud.species_selected.emit(cherry_i)  # same path as the OptionButton
+	_check("species switch: cherry simulated", sim.get_species() == cherry_i and sim.get_age_years() < 0.1 and sim.get_leaf_lobes() == 0)
 	_check("cherry bark look: lenticels, no fissures", sim.get_bark_lenticels() > 0.5 and sim.get_bark_fissures() < 0.5 and bark_mat.roughness < 0.7,
 		"rough %.2f" % bark_mat.roughness)
 	_advance_days_direct(12.0 * 365.0)
@@ -1657,8 +1750,8 @@ func _run_selftest() -> void:
 	_update_view_state(1.0)
 	_check("flower mesh instance shows the blossoms", flower_mi.mesh != null and flower_mi.mesh.get_surface_count() > 0
 		and (flower_mat.get_shader_parameter("flower_keep") as float) > 0.0)
-	hud.species_selected.emit(0)
-	_check("species switch back: oak simulated", sim.get_species() == 0 and sim.get_leaf_lobes() > 0)
+	hud.species_selected.emit(oak_i)
+	_check("species switch back: oak simulated", sim.get_species() == oak_i and sim.get_leaf_lobes() > 0)
 	_advance_days_direct(12.0 * 365.0 + 102.0)
 	var oak_fl: ArrayMesh = sim.build_flower_mesh()
 	_check("oak: flower mesh empty", oak_fl.get_surface_count() == 0 or (oak_fl.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 0)

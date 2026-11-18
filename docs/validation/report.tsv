@@ -300,6 +300,147 @@ prunus_avium	albrecht_ring	ring_width_mm	conforme	4.494962577025095	0.900	-0.001
 prunus_avium	pryor_ring_veneer	ring_width_mm	non comparable	4.494962577025095	1.000	1.9966
 prunus_avium	nocetti_ring_decline	ring_width_trend	hors plage		1.000	
 prunus_avium	heatpulse_transp	transpiration_l_day	non comparable	57.47844515769712	1.000	12.3982
+malus_domestica	euforgen_sylvestris_height	height_m	limite	10.32383918762207	0.900	0.0324
+malus_domestica	euforgen_sylvestris_dbh	dbh_cm	conforme	27.289613723754883	0.900	-0.1974
+malus_domestica	euforgen_sylvestris_longevity	longevity_years	conforme	90	0.900	0.0000
+malus_domestica	euforgen_light_demand	shade_tolerance	non mesurable		0.900	
+malus_domestica	de_wiki_freestanding_height	height_m	limite	7.327739238739014	0.240	-0.3628
+malus_domestica	de_wiki_max_height	height_m	conforme	10.32383918762207	0.240	-0.4838
+malus_domestica	de_wiki_dbh_record	dbh_cm	conforme	58.08284378051758	0.240	-0.2256
+malus_domestica	fr_wiki_height_range	height_m	conforme	7.327739238739014	0.240	-0.1379
+malus_domestica	it_wiki_height_range	height_m	conforme	7.327739238739014	0.240	0.1273
+malus_domestica	en_wiki_height_cultivated	height_m	non comparable	7.327739238739014	0.240	1.2547
+malus_domestica	en_wiki_height_wild	height_m	conforme	10.32383918762207	0.240	-0.3117
+malus_domestica	de_wiki_longevity	longevity_years	indicatif	90	0.240	-0.1000
+malus_domestica	arche_noah_longevity	longevity_years	conforme	90	0.600	0.0000
+malus_domestica	arche_noah_peak_bearing	fruiting_peak_age_years	non modélisé		0.600	
+malus_domestica	fr_wiki_hightige_prod_life	productive_lifespan_years	non modélisé		0.240	
+malus_domestica	fr_wiki_m9_replace	productive_lifespan_years	non modélisé		0.240	
+malus_domestica	de_wiki_seedling_rootstock_first_fruit	age_first_flowering_years	conforme	10	0.240	0.1111
+malus_domestica	cider_uk_standard_first_fruit	age_first_flowering_years	non comparable	10	0.600	0.0000
+malus_domestica	cider_uk_standard_century	productive_lifespan_years	non modélisé		0.600	
+malus_domestica	cider_uk_bush_first_fruit	age_first_flowering_years	non comparable	10	0.600	1.8571
+malus_domestica	rhs_m27_height	height_m	non comparable	7.327739238739014	0.800	3.8852
+malus_domestica	rhs_m27_first_fruit	age_first_flowering_years	non comparable	10	0.800	4.0000
+malus_domestica	rhs_m9_height	height_m	non comparable	7.327739238739014	0.800	2.4894
+malus_domestica	rhs_m9_first_fruit	age_first_flowering_years	non comparable	10	0.800	3.0000
+malus_domestica	rhs_m9_spread	crown_width_m	non comparable	7.268383502960205	0.800	1.6920
+malus_domestica	rhs_m26_height	height_m	non comparable	7.327739238739014	0.800	1.7140
+malus_domestica	rhs_m26_first_fruit	age_first_flowering_years	non comparable	10	0.800	3.0000
+malus_domestica	rhs_m26_spread	crown_width_m	non comparable	7.268383502960205	0.800	1.0190
+malus_domestica	rhs_mm106_height	height_m	non comparable	7.327739238739014	0.800	1.0936
+malus_domestica	rhs_mm106_first_fruit	age_first_flowering_years	non comparable	10	0.800	1.8571
+malus_domestica	rhs_mm106_spread	crown_width_m	non comparable	7.268383502960205	0.800	0.8171
+malus_domestica	rhs_mm111_height	height_m	non comparable	7.327739238739014	0.800	0.7242
+malus_domestica	rhs_mm111_first_fruit	age_first_flowering_years	non comparable	10	0.800	1.2222
+malus_domestica	rhs_mm111_spread	crown_width_m	non comparable	7.268383502960205	0.800	0.6152
+malus_domestica	rhs_m25_height	height_m	non comparable	7.327739238739014	0.800	0.6284
+malus_domestica	rhs_m25_first_fruit	age_first_flowering_years	non comparable	10	0.800	0.8182
+malus_domestica	rhs_m25_spread	crown_width_m	non comparable	7.268383502960205	0.800	0.2114
+malus_domestica	ars_size_seedling	size_vs_seedling_pct	non modélisé		0.800	
+malus_domestica	ars_size_mm111	size_vs_seedling_pct	non modélisé		0.800	
+malus_domestica	ars_size_mm106	size_vs_seedling_pct	non modélisé		0.800	
+malus_domestica	ars_size_m9	size_vs_seedling_pct	non modélisé		0.800	
+malus_domestica	ars_seedling_bearing	age_first_flowering_years	indicatif	10	0.800	
+malus_domestica	fr_wiki_paradis_seedling_first_fruit	age_first_flowering_years	hors plage	10	0.240	1.8571
+malus_domestica	vieux_vergers_yield	fruit_yield_t_per_tree	non modélisé		0.600	
+malus_domestica	arche_noah_yield_mean	fruit_yield_t_per_tree	non modélisé		0.600	
+malus_domestica	arche_noah_yield_max	fruit_yield_t_per_tree	non modélisé		0.600	
+malus_domestica	en_wiki_yield_mature	fruit_yield_t_per_tree	non modélisé		0.240	
+malus_domestica	en_wiki_yield_dwarf	fruit_yield_t_per_tree	non modélisé		0.240	
+malus_domestica	cider_uk_biennial_ratio	biennial_bearing_ratio	non modélisé		0.600	
+malus_domestica	psu_apple_silver_tip_10	frost_kill_10pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_silver_tip_90	frost_kill_90pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_green_tip_10	frost_kill_10pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_green_tip_90	frost_kill_90pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_tight_cluster_10	frost_kill_10pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_tight_cluster_90	frost_kill_90pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_full_bloom_10	frost_kill_10pct_c	non modélisé		0.600	
+malus_domestica	psu_apple_full_bloom_90	frost_kill_90pct_c	non modélisé		0.600	
+malus_domestica	en_wiki_blossom_frost	frost_tolerance	indicatif	-2.200000047683716	0.240	-0.1000
+malus_domestica	en_wiki_wood_frost	frost_tolerance	non modélisé		0.240	
+malus_domestica	it_wiki_cold_tolerance	frost_tolerance	non modélisé		0.240	
+malus_domestica	fr_wiki_chill_hours	chilling_hours	non modélisé		0.240	
+malus_domestica	fr_wiki_chill_hours_cultivars	chilling_hours	non modélisé		0.240	
+malus_domestica	fr_wiki_chill_portions	chill_portions	non mesurable		0.240	
+malus_domestica	en_wiki_pollination_group_A	flowering_doy	non comparable	131.31205673758865	0.240	0.0763
+malus_domestica	en_wiki_pollination_group_C	flowering_doy	non comparable	131.31205673758865	0.240	0.0140
+malus_domestica	en_wiki_pollination_group_H	flowering_doy	non comparable	131.31205673758865	0.240	-0.1006
+malus_domestica	de_wiki_bloom_may	flowering_doy	conforme	131.31205673758865	0.240	-0.0345
+malus_domestica	legave_angers_shift	flowering_date_shift_days	non mesurable		1.000	
+malus_domestica	legave_angers_sd	flowering_date_sd_days	non mesurable		1.000	
+malus_domestica	legave_gembloux_shift	flowering_date_shift_days	non mesurable		1.000	
+malus_domestica	legave_gembloux_sd	flowering_date_sd_days	non mesurable		1.000	
+malus_domestica	wdb_apple_density12	dry_density_kg_m3	non comparable	610	0.600	-0.2651
+malus_domestica	wdb_apple_density_basic	basic_density_kg_m3	indicatif	610	0.600	0.0000
+malus_domestica	wdb_apple_mor	mor_mpa	non comparable	53	0.600	-0.3998
+malus_domestica	wdb_apple_moe	moe_gpa	non comparable	7.400000095367432	0.600	-0.1553
+malus_domestica	wdb_apple_size	height_m	conforme	7.327739238739014	0.600	0.1273
+malus_domestica	en_wiki_fruit_diameter	fruit_diameter_cm	non modélisé		0.240	
+malus_domestica	it_wiki_fruit_diameter	fruit_diameter_cm	non modélisé		0.240	
+malus_domestica	wiki_flowers_per_cluster	flowers_per_cluster	non modélisé		0.240	
+malus_domestica	absence_root_depth_apple	root_depth_m	entrée d'absence		0.300	
+malus_domestica	absence_mycorrhiza_apple	mycorrhiza_type	entrée d'absence		0.300	
+malus_domestica	absence_cider_standard_brittany_yield	fruit_yield_t_per_tree	entrée d'absence		0.300	
+malus_domestica	absence_chilling_rennes	chilling_hours	entrée d'absence		0.300	
+picea_abies	atlas_height_max	height_m	hors plage	39.123653411865234	0.900	-0.2887
+picea_abies	atlas_dbh_max	dbh_cm	hors plage	165.93936157226563	0.900	0.1063
+picea_abies	atlas_longevity_normal	longevity_years	conforme	250	0.900	0.0000
+picea_abies	atlas_clonal_age	clonal_age_years	non modélisé		0.900	
+picea_abies	atlas_first_flowering	age_first_flowering_years	conforme	29	0.900	0.1600
+picea_abies	atlas_first_flowering_dense	age_first_flowering_years	conforme	29	0.900	-0.2750
+picea_abies	atlas_needle_length	needle_length_cm	conforme	1.7999999523162842	0.900	0.0286
+picea_abies	atlas_cone_length	cone_length_cm	non modélisé		0.900	
+picea_abies	atlas_shade	shade_tolerance	non mesurable		0.900	
+picea_abies	atlas_drought	drought_tolerance	non mesurable		0.900	
+picea_abies	atlas_waterlogging	waterlogging_tolerance	non mesurable		0.900	
+picea_abies	atlas_root_arch	root_architecture	conforme		0.900	
+picea_abies	atlas_mycorrhiza	mycorrhiza_type	conforme		0.900	
+picea_abies	wfr_height	height_m	conforme	39.123653411865234	0.240	0.0433
+picea_abies	wfr_dbh	dbh_cm	hors plage	165.93936157226563	0.240	0.1063
+picea_abies	wfr_longevity	longevity_years	indicatif	250	0.240	-0.5000
+picea_abies	wfr_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0000
+picea_abies	wfr_cone_maturity	fruit_maturity_doy	conforme	264.8664596273292	0.240	-0.0333
+picea_abies	wen_height_record	height_m	conforme	43.333187103271484	0.240	-0.3090
+picea_abies	wen_leader_growth	height_increment_m_yr	conforme	0.6983191967010498	0.240	-0.3017
+picea_abies	wen_oldest_ring_dated	longevity_years	limite	250	0.240	-0.5301
+picea_abies	wde_height_typ	height_m	limite	39.123653411865234	0.240	-0.2329
+picea_abies	wde_longevity	longevity_years	limite	250	0.240	-0.5833
+picea_abies	wde_first_flowering	age_first_flowering_years	limite	29	0.240	-0.1714
+picea_abies	wde_flowering	flowering_doy	conforme	136.41925465838509	0.240	-0.0966
+picea_abies	wde_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0909
+picea_abies	wde_sinker	sinker_root_onset_years	non modélisé		0.240	
+picea_abies	wde_frost	frost_hardiness_c	non modélisé		0.240	
+picea_abies	wsv_first_cones	age_first_flowering_years	limite	29	0.240	-0.1714
+picea_abies	wdeholz_green	green_density_kg_m3	conforme	800	0.240	0.0000
+picea_abies	wdeholz_dry12	dry_density_kg_m3	non comparable	395	0.240	-0.1596
+picea_abies	wdeholz_bending	mor_mpa	non comparable	41	0.240	-0.4875
+picea_abies	fr_coning	age_first_flowering_years	indicatif	29	0.400	-0.2750
+picea_abies	fr_rotation	rotation_years	non modélisé		0.400	
+picea_abies	utschig_h100_ass	height_m	indicatif	36.455142974853516	0.800	0.0722
+picea_abies	utschig_vol100	stand_volume_m3_ha	non modélisé		0.800	
+picea_abies	utschig_incr	mai_m3_ha_yr	non modélisé		0.800	
+picea_abies	utschig_cai_peak	cai_peak_age_years	non modélisé		0.800	
+picea_abies	wde_mai_germany	mai_m3_ha_yr	non modélisé		0.240	
+picea_abies	kall_depth	root_depth_m	non mesurable		1.000	
+picea_abies	kall_spread	root_spread_m	hors plage	17.977418899536133	1.000	0.7799
+picea_abies	kall_crb30	root_fraction_top_30cm	indicatif	0.872496485710144	1.000	0.0906
+picea_abies	kall_frb10	root_fraction_top_10cm	indicatif	0.38048070669174194	1.000	-0.4565
+picea_abies	kall_h16	height_m	indicatif	10.148748397827148	1.000	1.2553
+picea_abies	kall_h54	height_m	indicatif	27.838804244995117	1.000	0.2318
+picea_abies	schutz_return	storm_damage_return_time_years	non modélisé		0.500	
+picea_abies	zub_uproot	uprooted_share_of_damaged_pct	non modélisé		1.000	
+picea_abies	hale_cws	critical_wind_ms	hors plage	11.72021484375	1.000	-0.6093
+picea_abies	andreozzi_sitka	anchorage_moment_knm	non modélisé		0.600	
+picea_abies	andreozzi_tilt	tilt_at_critical_moment_deg	non modélisé		0.600	
+picea_abies	moore_damping	damping_ratio	non modélisé		0.450	
+picea_abies	sla85_lma	lma_g_m2	conforme	200.00350478769457	0.500	0.0000
+picea_abies	fc34_ns_yc20_dbh_40	dbh_cm	indicatif	36.20845031738281	0.800	0.4483
+picea_abies	fc34_ns_yc20_dbh_50	dbh_cm	indicatif	44.05784606933594	0.800	0.2958
+picea_abies	fc34_ns_yc20_dbh_60	dbh_cm	indicatif	51.94994354248047	0.800	0.2369
+picea_abies	fc34_ns_yc14_dbh_50	dbh_cm	indicatif	44.05784606933594	0.800	0.9156
+picea_abies	fc34_ns_maxmai_age	rotation_years	non modélisé		0.800	
+picea_abies	fc34_ns_maxmai_dbh	dbh_cm	hors plage	105.24476623535156	0.800	1.8065
 physics	rennes_temp_mean_annual	temp_mean_c	indicatif	12.432086338386348	1.000	0.0026
 physics	rennes_temp_mean_jan	temp_mean_c	indicatif	6.311021106666134	1.000	0.0179
 physics	rennes_temp_mean_jul	temp_mean_c	indicatif	19.273652413698933	1.000	0.0038

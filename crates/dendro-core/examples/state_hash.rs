@@ -1,6 +1,6 @@
 //! Cross-platform determinism probe (roadmap M0).
 //!
-//! Grows oak and cherry for N years (default 100) with a fixed seed and prints
+//! Grows every registry species (oak and cherry first) for N years (default 100) with a fixed seed and prints
 //! one FNV-1a 64-bit hash per tree over the bit patterns of the public output
 //! (tree stats, rings, wood/leaf/root/fine-root meshes). CI runs it on Linux and
 //! Windows and fails if the lines differ. No golden value is stored: the
@@ -94,6 +94,13 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
+    // Oak and cherry first (their lines are the historical ones), then every
+    // other registry species.
     run("quercus_robur", Genome::quercus_robur(), seed, years);
     run("prunus_avium", Genome::prunus_avium(), seed, years);
+    for g in Genome::builtin() {
+        if g.id != "quercus_robur" && g.id != "prunus_avium" {
+            run(&g.id.clone(), g, seed, years);
+        }
+    }
 }

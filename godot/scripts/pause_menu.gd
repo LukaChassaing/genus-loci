@@ -91,6 +91,9 @@ func _show_menu() -> void:
 		b.custom_minimum_size = Vector2(0, 44)
 		b.name = "Pause_" + (e[1] as String)
 		b.pressed.connect(_on_entry.bind(e[1] as String))
+		if e[1] == "plate" and not PlateView.has_plate(species):
+			b.disabled = true
+			b.tooltip_text = "Planche pas encore dessinée pour cette espèce"
 		_menu_box.add_child(b)
 		buttons.append(b)
 	UiStyle.focus_later(buttons[0])

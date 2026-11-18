@@ -159,18 +159,18 @@ struct MechCache {
 
 impl Backend {
     pub fn new(seed: u64) -> Self {
-        Self::with_site(seed, 0, 0)
+        Self::with_site(seed, 0, Genome::default_index())
     }
 
-    /// `soil` indexes `SoilProfile::presets()`, `species` indexes `Genome::builtin()`;
-    /// out-of-range values fall back to the first entry.
+    /// `soil` indexes `SoilProfile::presets()`, `species` indexes `Genome::registry()`;
+    /// out-of-range values fall back to the first soil and the default species (the oak).
     pub fn with_site(seed: u64, soil: usize, species: usize) -> Self {
         let mut presets = SoilProfile::presets();
         let soil = if soil < presets.len() { soil } else { 0 };
         let profile = presets.swap_remove(soil);
-        let mut genomes = Genome::builtin();
-        let species = if species < genomes.len() { species } else { 0 };
-        let genome = genomes.swap_remove(species);
+        let genomes = Genome::registry();
+        let species = if species < genomes.len() { species } else { Genome::default_index() };
+        let genome = genomes[species].clone();
         let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
         let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default(), mech: None };
         b.timeline_reset();
@@ -201,12 +201,22 @@ impl Backend {
 
     /// Scientific names of the built-in species, in index order.
     pub fn species_names() -> Vec<String> {
-        Genome::builtin().into_iter().map(|g| g.species).collect()
+        Genome::registry().iter().map(|g| g.species.clone()).collect()
     }
 
     /// French common names of the built-in species, in index order.
     pub fn species_common_names() -> Vec<String> {
-        Genome::builtin().into_iter().map(|g| g.common_name_fr).collect()
+        Genome::registry().iter().map(|g| g.common_name_fr.clone()).collect()
+    }
+
+    /// Registry ids (`data/species/<id>.ron`) of the built-in species, in index order.
+    pub fn species_ids() -> Vec<String> {
+        Genome::registry().iter().map(|g| g.id.clone()).collect()
+    }
+
+    /// French menu group of each built-in species (« Feuillus », « Fruitiers », « Résineux »), in index order.
+    pub fn species_categories() -> Vec<String> {
+        Genome::registry().iter().map(|g| g.category.label_fr().to_string()).collect()
     }
 
     pub fn soil_names() -> Vec<String> {
@@ -420,6 +430,42 @@ impl Backend {
     pub fn leaf_arrangement(&self) -> [f32; 4] {
         let l = &self.sim.genome().leaf;
         [l.leaves_per_shoot, l.tip_bunching, l.petiole_ratio, l.leaf_droop]
+    }
+
+    /// Leaf form for the foliage texture: 0 broad leaf, 1 needle, 2 scale.
+    pub fn leaf_type(&self) -> i32 {
+        match self.sim.genome().leaf.leaf_type {
+            dendro_core::LeafType::Broad => 0,
+            dendro_core::LeafType::Needle => 1,
+            dendro_core::LeafType::Scale => 2,
+        }
+    }
+
+    /// Foliage card size in leaf lengths (`LeafTraits::cluster_size_leaves`).
+    pub fn leaf_cluster_size(&self) -> f32 {
+        self.sim.genome().leaf.cluster_size_leaves
+    }
+
+    /// The species keeps green foliage over winter.
+    pub fn evergreen(&self) -> bool {
+        self.sim.evergreen()
+    }
+
+    /// Fruit kind for the fruit texture: 0 fleshy, 1 nut, 2 samara, 3 pendent cone, 4 erect cone, 5 aril.
+    pub fn fruit_kind(&self) -> i32 {
+        match self.sim.genome().reproduction.fruit_kind {
+            dendro_core::FruitKind::Fleshy => 0,
+            dendro_core::FruitKind::Nut => 1,
+            dendro_core::FruitKind::Samara => 2,
+            dendro_core::FruitKind::ConePendent => 3,
+            dendro_core::FruitKind::ConeErect => 4,
+            dendro_core::FruitKind::Aril => 5,
+        }
+    }
+
+    /// Size of one fruit card (cm), `ReproductionTraits::fruit_cluster_cm`.
+    pub fn fruit_cluster_cm(&self) -> f32 {
+        self.sim.genome().reproduction.fruit_cluster_cm
     }
 
     /// Earlywood / latewood contrast 0..1 for the ring view (1 = ring-porous).

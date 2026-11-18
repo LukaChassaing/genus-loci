@@ -108,12 +108,11 @@ const RM_SAPWOOD: f32 = 25.0;
 /// Depth of the living, conducting sapwood band (m). Calibration: oak
 /// keeps its reserves in the outer sapwood rings (Barbaroux & Bréda 2002).
 const SAPWOOD_DEPTH: f32 = 0.04;
-/// Leaf mass per area (g dry m-2 leaf) and leaf area index of a full crown.
-/// Poorter et al. 2009, "Causes and consequences of variation in leaf mass
-/// per area (LMA): a meta-analysis", New Phytol 182:565-588 (deciduous
-/// trees ~50-100 g m-2); LAI 4 is a calibration for an open-grown crown.
-pub(crate) const LMA: f32 = 75.0;
-pub(crate) const LAI_FULL: f32 = 4.0;
+// Leaf mass per area and crown LAI are species traits (`LeafTraits::
+// lma_g_m2`, `crown_lai`; defaults 75 g/m2 and 4, the former constants:
+// Poorter et al. 2009, "Causes and consequences of variation in leaf mass
+// per area (LMA): a meta-analysis", New Phytol 182:565-588, deciduous trees
+// ~50-100 g m-2; LAI 4 is a calibration for an open-grown crown).
 /// Days over which the year's leaves and shoots are built (budburst to full
 /// expansion), calibration.
 const FLUSH_DAYS: f32 = 35.0;
@@ -556,7 +555,7 @@ impl Simulation {
         let g = self.genome();
         let w = self.weather();
         let phase = v.phen.phase;
-        let leaf = v.phen.leaf_area();
+        let leaf = v.phen.leaf_area(g.leaf.retained_share());
         let doy = (self.day_of_year() + 364) % 365; // the day just simulated
         let cr = self.crown_radius_m().max(0.05);
         let area = std::f32::consts::PI * cr * cr;
@@ -613,7 +612,7 @@ impl Simulation {
         let rm = s.resp_leaf_gc + s.resp_wood_gc + s.resp_root_gc;
 
         // --- allocation of the day's assimilates (phloem sinks) ---
-        let leaf_c_full = LMA * LAI_FULL * area * C_FRAC;
+        let leaf_c_full = g.leaf.lma_g_m2 * g.leaf.crown_lai * area * C_FRAC;
         let mut avail = s.gpp_gc - rm;
         if avail < 0.0 {
             // Respiration exceeding photosynthesis is paid from local reserves.
@@ -800,7 +799,8 @@ impl Simulation {
             s.nutrient_xylem_g[k] = s.nutrient_uptake_g[k] - kept;
             if matches!(phase, Phase::Colouring | Phase::LeafFall) {
                 s.nutrient_resorb_g[k] =
-                    LMA * LAI_FULL * area * NUT_LEAF[k] * 1e-3 * RESORPTION[k] / AUTUMN_DAYS;
+                    g.leaf.lma_g_m2 * g.leaf.crown_lai * area * NUT_LEAF[k] * 1e-3 * RESORPTION[k] / AUTUMN_DAYS
+                        * (1.0 - g.leaf.retained_share());
             }
         }
         if demand[0] > 0.0 {
@@ -930,7 +930,7 @@ impl Simulation {
         let mut down = vec![0.0f32; n];
         let mut s_end = vec![0.0f32; n];
         for (i, nd) in nodes.iter().enumerate() {
-            if nd.leafy && !nd.is_snag() {
+            if nd.leaf_w() > 0.0 {
                 down[i] = nd.light.max(0.05);
             }
             let s0 = if i == 0 {
@@ -946,7 +946,7 @@ impl Simulation {
         }
         let total = down[0].max(1e-6);
         let leafy: Vec<(usize, f32)> = (0..n)
-            .filter(|&i| nodes[i].leafy && !nodes[i].is_snag())
+            .filter(|&i| nodes[i].leaf_w() > 0.0)
             .map(|i| (i, down[i]))
             .collect();
         let mut tips = sample(&leafy, budget.shoot_paths, seed, S_FLUX, |i| {
@@ -1135,7 +1135,7 @@ impl Simulation {
             });
         }
         let bark: Vec<(usize, f32)> = (0..n)
-            .filter(|&i| !nodes[i].is_snag() && !nodes[i].leafy)
+            .filter(|&i| !nodes[i].is_snag() && nodes[i].leaf_w() <= 0.0)
             .map(|i| (i, nodes[i].radius() * nodes[i].length))
             .collect();
         let bmax = bark.iter().map(|b| b.1).fold(0.0, f32::max).max(1e-9);

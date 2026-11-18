@@ -71,7 +71,7 @@ pub enum SaveFileOrError {
 
 /// French common name of a built-in species, or the given name.
 pub fn common_name(species: &str) -> String {
-    Genome::builtin().into_iter().find(|g| g.species == species).map_or_else(|| species.to_string(), |g| g.common_name_fr)
+    Genome::find(species).map_or_else(|| species.to_string(), |g| g.common_name_fr)
 }
 
 impl Backend {

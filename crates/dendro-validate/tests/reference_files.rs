@@ -12,15 +12,37 @@ fn dir() -> PathBuf {
 
 #[test]
 fn reference_files_load_and_are_consistent() {
+    // Every `data/validation/*.ron` (one per species, plus physics.ron):
+    // the subject is the file stem, the structure passes `data::check`.
+    let mut names: Vec<String> = std::fs::read_dir(dir())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "ron"))
+        .map(|p| p.file_stem().unwrap().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert!(names.iter().any(|n| n == "physics") && names.iter().any(|n| n == "quercus_robur"), "{names:?}");
     let mut total = 0;
-    for (name, subject) in [("quercus_robur", "quercus_robur"), ("prunus_avium", "prunus_avium"), ("physics", "physics")] {
-        let f = data::load(&dir().join(format!("{name}.ron"))).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(f.subject, subject);
-        assert!(!f.entries.is_empty(), "{name}: no entry");
-        let errs = data::check(&f);
-        assert!(errs.is_empty(), "{name}:\n{}", errs.join("\n"));
+    let mut problems = Vec::new();
+    for name in &names {
+        let f = match data::load(&dir().join(format!("{name}.ron"))) {
+            Ok(f) => f,
+            Err(e) => {
+                problems.push(e);
+                continue;
+            }
+        };
+        if f.subject != *name {
+            problems.push(format!("{name}: subject {:?} differs from the file name", f.subject));
+        }
+        if f.entries.is_empty() {
+            problems.push(format!("{name}: no entry"));
+        }
+        problems.extend(data::check(&f).into_iter().map(|e| format!("{name}: {e}")));
         total += f.entries.len();
     }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
     assert!(total >= 393, "{total} entries");
 }
 

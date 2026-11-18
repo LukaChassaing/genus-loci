@@ -12,6 +12,8 @@
     species: "Prunus avium",
     common_name: "Wild cherry",
     common_name_fr: "Merisier",
+    // Menu group (no effect on growth).
+    category: Broadleaf,
     architecture: (
         // Apical control of the stem (calibrated): strong in the conical
         // sapling (single leader, regular tiers), then easing from ~18 y so

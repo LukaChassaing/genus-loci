@@ -9,6 +9,10 @@ use crate::fmath::DMath;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+// Species registry: `SPECIES_FILES`, every `data/species/*.ron` embedded at
+// compile time by build.rs (sorted by file name; id = file stem).
+include!(concat!(env!("OUT_DIR"), "/species_registry.rs"));
+
 /// RON source of the built-in pedunculate oak genome
 /// (`data/species/quercus_robur.ron`).
 pub const QUERCUS_ROBUR_RON: &str = include_str!("../../../data/species/quercus_robur.ron");
@@ -16,9 +20,36 @@ pub const QUERCUS_ROBUR_RON: &str = include_str!("../../../data/species/quercus_
 /// (`data/species/prunus_avium.ron`).
 pub const PRUNUS_AVIUM_RON: &str = include_str!("../../../data/species/prunus_avium.ron");
 
+/// Group of a species in the menus (no effect on the simulation).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum SpeciesCategory {
+    /// Forest broadleaf (« feuillu »).
+    #[default]
+    Broadleaf,
+    /// Fruit tree (« fruitier »).
+    FruitTree,
+    /// Conifer (« résineux »).
+    Conifer,
+}
+
+impl SpeciesCategory {
+    /// French plural label for the menus.
+    pub fn label_fr(self) -> &'static str {
+        match self {
+            SpeciesCategory::Broadleaf => "Feuillus",
+            SpeciesCategory::FruitTree => "Fruitiers",
+            SpeciesCategory::Conifer => "Résineux",
+        }
+    }
+}
+
 /// Complete trait set of a species.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Genome {
+    /// Registry id: the file stem of `data/species/<id>.ron` (set when the
+    /// registry loads the file; empty for a genome parsed from elsewhere).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     /// Latin binomial.
     pub species: String,
     /// English common name.
@@ -26,6 +57,9 @@ pub struct Genome {
     /// French common name (front-end labels).
     #[serde(default)]
     pub common_name_fr: String,
+    /// Menu group (feuillu / fruitier / résineux). No effect on growth.
+    #[serde(default)]
+    pub category: SpeciesCategory,
     pub architecture: Architecture,
     pub leaf: LeafTraits,
     pub pigments: Pigments,
@@ -220,6 +254,22 @@ pub struct Architecture {
     /// size limit (fast-growing pioneers).
     #[serde(default = "foliage_exponent_default")]
     pub hydraulic_foliage_exponent: f32,
+    /// Whorled branching: the lateral buds of an annual shoot are spread
+    /// evenly around it (360 deg / n, with a random rotation per shoot)
+    /// instead of following `phyllotaxis_deg`. The shoot model already
+    /// starts all laterals at the tip of the annual shoot, so this gives the
+    /// regular annual whorls (verticilles) of Pinus, Picea, Abies
+    /// (Hallé, Oldeman & Tomlinson 1978: rhythmic growth of the trunk in
+    /// the models of Rauh and Massart). false = phyllotaxis (default).
+    #[serde(default)]
+    pub whorled: bool,
+    /// Plagiotropy of branch laterals (0..1): the laterals of an axis of
+    /// order >= 1 are turned towards the horizontal plane of that axis, so
+    /// branches spread as flat sprays (Massart's and Troll's models:
+    /// Picea, Abies, Fagus, Carpinus; Hallé et al. 1978). 0 = laterals all
+    /// around the axis (default), 1 = all in the plane.
+    #[serde(default)]
+    pub lateral_planarity: f32,
 }
 
 fn afp_default() -> f32 {
@@ -312,6 +362,90 @@ pub struct LeafTraits {
     /// leaves turn first; whole boughs vary together). 0 = uniform.
     #[serde(default = "colour_spread_default")]
     pub colour_spread: f32,
+    /// Leaf form: broad leaf, needle or scale. Drives the foliage texture
+    /// and, through `lma_g_m2` / `crown_lai`, the leaf mass and area.
+    #[serde(default)]
+    pub leaf_type: LeafType,
+    /// Evergreens (`deciduous: false`): mean lifespan of a leaf (needle)
+    /// cohort, years. Each annual shoot keeps its foliage for about this
+    /// long; the oldest cohort is shed in autumn, progressively over
+    /// `max(1, L/3)` years around age `L` (see [`LeafTraits::cohort_survival`]).
+    /// Ignored for deciduous species. Picea abies 4-7, Abies alba ~8-10,
+    /// Pinus 2-4, Taxus 4-8 (see the species files for sources).
+    #[serde(default = "one_f32")]
+    pub leaf_longevity_years: f32,
+    /// Leaf mass per area (g dry mass per m2 of one-sided / projected leaf
+    /// area), used for the leaf mass of the mechanics, the carbon of the
+    /// flux view and the litter. Default 75 = the former code constant
+    /// (Poorter et al. 2009, New Phytol 182:565-588: deciduous trees
+    /// ~50-100 g/m2).
+    #[serde(default = "lma_default")]
+    pub lma_g_m2: f32,
+    /// Leaf area index of the crown (m2 of one-sided / projected leaf area
+    /// per m2 of crown projection) of a full, healthy crown. Default 4 =
+    /// the former code constant. Must use the same area basis as `lma_g_m2`.
+    #[serde(default = "lai_default")]
+    pub crown_lai: f32,
+}
+
+/// Leaf form (see [`LeafTraits::leaf_type`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LeafType {
+    /// Flat leaf blade (all broadleaves; default).
+    #[default]
+    Broad,
+    /// Needle (Pinaceae, Taxus).
+    Needle,
+    /// Scale leaves pressed to the shoot (Cupressaceae).
+    Scale,
+}
+
+fn lma_default() -> f32 {
+    75.0
+}
+
+fn lai_default() -> f32 {
+    4.0
+}
+
+impl LeafTraits {
+    /// Evergreen foliage: the leaves of an annual shoot live several years.
+    pub fn evergreen(&self) -> bool {
+        !self.deciduous && self.leaf_longevity_years > 1.0
+    }
+
+    /// Share (0..1) of a cohort of age `age_years` (0 = this year's shoot)
+    /// still on the shoot. Exactly 0 for every older cohort of a deciduous
+    /// species. Evergreens: a linear ramp from 1 to 0 over
+    /// `w = max(1, L/3)` years centred on `L` (`leaf_longevity_years`), so
+    /// the mean lifespan (integral of the curve) is `L`. Stylised: needle
+    /// survival curves are not linear, but cohort retention data are
+    /// usually summarised by the mean retention only.
+    pub fn cohort_survival(&self, age_years: f32) -> f32 {
+        if !self.evergreen() {
+            return if age_years <= 0.0 { 1.0 } else { 0.0 };
+        }
+        let l = self.leaf_longevity_years;
+        let w = (l / 3.0).max(1.0);
+        (0.5 + (l - age_years) / w).clamp(0.0, 1.0)
+    }
+
+    /// Share (0..1) of an evergreen's foliage carried by the older cohorts
+    /// just before the spring flush (`(S - 1) / S`, `S` = sum of the
+    /// cohort survivals): the leaf area left in winter. 0 for deciduous
+    /// species.
+    pub fn retained_share(&self) -> f32 {
+        if !self.evergreen() {
+            return 0.0;
+        }
+        let mut sum = 1.0;
+        let mut a = 1.0;
+        while a < self.leaf_longevity_years * 2.0 + 4.0 {
+            sum += self.cohort_survival(a);
+            a += 1.0;
+        }
+        (sum - 1.0) / sum
+    }
 }
 
 fn petiole_default() -> f32 {
@@ -647,6 +781,46 @@ pub struct ReproductionTraits {
     /// Fruit colour unripe / ripe (RGB 0..1).
     pub fruit_color_unripe: [f32; 3],
     pub fruit_color_ripe: [f32; 3],
+    /// Kind of fruit, for the renderer (texture and how the card hangs).
+    #[serde(default)]
+    pub fruit_kind: FruitKind,
+    /// Mean fresh mass of one fruit / cone (g). Informational (no carbon
+    /// cost of reproduction in the growth model).
+    #[serde(default)]
+    pub fruit_mass_g: f32,
+    /// Mean interval (years) between crop years: 1 = a crop every year
+    /// (default); > 1 = masting (Fagus, Picea) or alternate bearing
+    /// (Malus): each year after first flowering is a crop year with
+    /// probability `1 / crop_interval_years`, never two in a row; other
+    /// years flower and fruit at `off_year_crop` of the normal amount.
+    /// Stylised (no resource-budget model of masting).
+    #[serde(default = "one_f32")]
+    pub crop_interval_years: f32,
+    /// Flower and fruit amount of a non-crop year, relative (0..1).
+    #[serde(default = "off_year_default")]
+    pub off_year_crop: f32,
+}
+
+fn off_year_default() -> f32 {
+    0.15
+}
+
+/// Kind of fruit (renderer only, see [`ReproductionTraits::fruit_kind`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FruitKind {
+    /// Round fleshy fruit, drupe or pome (cherry, apple, plum; default).
+    #[default]
+    Fleshy,
+    /// Nut or acorn (Quercus, Juglans, Corylus, Castanea, Fagus).
+    Nut,
+    /// Winged fruit (samara: Acer, Fraxinus; Betula, Carpinus, Tilia nutlets with a wing or bract).
+    Samara,
+    /// Pendent woody cone (Picea, Pinus, Pseudotsuga, Larix).
+    ConePendent,
+    /// Erect cone, disintegrating on the tree (Abies).
+    ConeErect,
+    /// Fleshy aril (Taxus).
+    Aril,
 }
 
 impl Default for ReproductionTraits {
@@ -671,6 +845,10 @@ impl Default for ReproductionTraits {
             fruit_persistence_days: 20.0,
             fruit_color_unripe: [0.35, 0.45, 0.15],
             fruit_color_ripe: [0.45, 0.32, 0.15],
+            fruit_kind: FruitKind::Fleshy,
+            fruit_mass_g: 0.0,
+            crop_interval_years: 1.0,
+            off_year_crop: off_year_default(),
         }
     }
 }
@@ -846,20 +1024,83 @@ impl fmt::Display for GenomeError {
 }
 impl std::error::Error for GenomeError {}
 
+/// Accent-insensitive sort key of a French name (stable menu order).
+fn sort_key(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'à' | 'â' | 'ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'î' | 'ï' => 'i',
+            'ô' | 'ö' => 'o',
+            'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            'É' | 'È' => 'E',
+            c => c,
+        })
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// The parsed registry, in menu order (see [`Genome::registry`]).
+fn registry_cache() -> &'static [Genome] {
+    static CACHE: std::sync::OnceLock<Vec<Genome>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| {
+        let mut all: Vec<Genome> = SPECIES_FILES
+            .iter()
+            .map(|(id, text)| {
+                let mut g = Genome::from_ron(text).unwrap_or_else(|e| panic!("data/species/{id}.ron: {e}"));
+                g.id = (*id).to_string();
+                g
+            })
+            .collect();
+        all.sort_by(|a, b| (a.category, sort_key(&a.common_name_fr), &a.id).cmp(&(b.category, sort_key(&b.common_name_fr), &b.id)));
+        all
+    })
+}
+
 impl Genome {
     /// Built-in pedunculate oak (*Quercus robur*).
     pub fn quercus_robur() -> Genome {
-        Genome::from_ron(QUERCUS_ROBUR_RON).expect("built-in Quercus robur genome must parse")
+        Genome::by_id("quercus_robur").expect("built-in Quercus robur genome")
     }
 
     /// Built-in wild cherry (*Prunus avium*).
     pub fn prunus_avium() -> Genome {
-        Genome::from_ron(PRUNUS_AVIUM_RON).expect("built-in Prunus avium genome must parse")
+        Genome::by_id("prunus_avium").expect("built-in Prunus avium genome")
     }
 
-    /// All built-in species, in a stable order: oak, cherry.
+    /// Every species of `data/species/*.ron` (embedded at compile time), in
+    /// menu order: by category (broadleaves, fruit trees, conifers), then by
+    /// French name. Indices into this list are the species indices of the
+    /// front-end; they shift when a species is added, so persist the id or
+    /// the latin name, never an index.
+    pub fn registry() -> &'static [Genome] {
+        registry_cache()
+    }
+
+    /// All built-in species (owned copies of [`Genome::registry`]).
     pub fn builtin() -> Vec<Genome> {
-        vec![Genome::quercus_robur(), Genome::prunus_avium()]
+        registry_cache().to_vec()
+    }
+
+    /// The species shown first when nothing is chosen (the oak).
+    pub fn default_index() -> usize {
+        Genome::index_of("quercus_robur").unwrap_or(0)
+    }
+
+    /// Built-in species by registry id (`picea_abies`).
+    pub fn by_id(id: &str) -> Option<Genome> {
+        registry_cache().iter().find(|g| g.id == id).cloned()
+    }
+
+    /// Registry index of a species given by id or latin binomial.
+    pub fn index_of(id_or_latin: &str) -> Option<usize> {
+        registry_cache().iter().position(|g| g.id == id_or_latin || g.species == id_or_latin)
+    }
+
+    /// Built-in species by id or latin binomial.
+    pub fn find(id_or_latin: &str) -> Option<Genome> {
+        Genome::index_of(id_or_latin).map(|i| registry_cache()[i].clone())
     }
 
     /// Parse a genome from RON text.

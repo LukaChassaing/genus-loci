@@ -136,11 +136,27 @@ impl Phenology {
         self.chill
     }
 
-    /// Live (photosynthetic) leaf area fraction 0..1.
-    pub fn leaf_area(&self) -> f32 {
+    /// Live (photosynthetic) leaf area fraction 0..1, relative to the full
+    /// summer canopy. `retained` = `LeafTraits::retained_share()`: the share
+    /// of an evergreen's foliage carried by the older cohorts (0 for a
+    /// deciduous species, which gives exactly the deciduous formula).
+    ///
+    /// Evergreens (stylised cohort balance): before the flush the tree
+    /// carries `retained`; the new flush adds `1 - retained` as it expands
+    /// (late frost kills part of it); in autumn the oldest cohort, the same
+    /// amount in equilibrium, is shed (`fallen` 0..1 of it). Winter foliage
+    /// photosynthesises whenever the temperature allows (`sim.rs`: the
+    /// daily productivity is zero below 4 degC).
+    pub fn leaf_area(&self, retained: f32) -> f32 {
+        if retained <= 0.0 {
+            return match self.phase {
+                Phase::Dormant => 0.0,
+                _ => self.expansion * (1.0 - self.fallen) * (1.0 - self.frost_damage),
+            };
+        }
         match self.phase {
-            Phase::Dormant => 0.0,
-            _ => self.expansion * (1.0 - self.fallen) * (1.0 - self.frost_damage),
+            Phase::Dormant => retained,
+            _ => (retained + (1.0 - retained) * (self.expansion * (1.0 - self.frost_damage) - self.fallen)).clamp(0.0, 1.0),
         }
     }
 
@@ -212,11 +228,12 @@ impl Phenology {
                 if gate {
                     self.cdd += (p.senescence_temp_base_c - w.temp_c).max(0.0);
                 }
-                if (g.leaf.deciduous && self.cdd > 0.03 * p.senescence_cdd) || doy >= 300 {
+                // Evergreens go through the same cycle: "colouring" and
+                // "leaf fall" are then the yellowing and cast of the oldest
+                // needle cohort (autumn needle fall), the rest stays green
+                // (see `leaf_area`). The same trigger closes the ring.
+                if self.cdd > 0.03 * p.senescence_cdd || doy >= 300 {
                     self.phase = Phase::Colouring;
-                    ev = PhenoEvent::SenescenceStart;
-                } else if !g.leaf.deciduous && doy == 280 {
-                    // Evergreens: close the ring at a fixed date, keep leaves.
                     ev = PhenoEvent::SenescenceStart;
                 }
             }
@@ -289,11 +306,18 @@ pub(crate) struct Reproduction {
     pub frost_loss: f32,
     /// Age (years) of first flowering of this individual.
     first_age: f32,
+    /// Relative crop of this year (1 = a full crop year; see
+    /// `ReproductionTraits::crop_interval_years`). Exactly 1 every year for
+    /// species that bear every year.
+    pub crop: f32,
+    seed: u64,
 }
 
 impl Reproduction {
-    pub fn new(first_age: f32) -> Self {
+    pub fn new(first_age: f32, seed: u64) -> Self {
         Reproduction {
+            crop: 1.0,
+            seed,
             stage: ReproStage::Waiting,
             mature: false,
             chill: 0.0,
@@ -310,7 +334,17 @@ impl Reproduction {
         let r = &g.reproduction;
         if doy == 0 {
             self.stage = ReproStage::Waiting;
+            let was_crop = self.mature && self.crop >= 1.0;
             self.mature = age + 0.5 >= self.first_age;
+            // Masting / alternate bearing (stylised): a crop year with
+            // probability 1 / interval, never two in a row; a reduced
+            // flowering in between. Species bearing every year never draw.
+            if r.crop_interval_years > 1.0 {
+                let year = (age + 0.5) as u64;
+                let u = crate::rng::unit(crate::rng::hash(self.seed, crate::rng::S_CROP, year, 0));
+                let on = !was_crop && u < 1.0 / (r.crop_interval_years - 1.0).max(1.0);
+                self.crop = if on { 1.0 } else { r.off_year_crop.clamp(0.0, 1.0) };
+            }
             self.bloom = 0.0;
             self.fruit_days = 0.0;
             self.frost_loss = 0.0;
@@ -361,7 +395,7 @@ impl Reproduction {
             return 0.0;
         }
         let b = self.bloom;
-        smoothstep(b / 0.3) * (1.0 - smoothstep((b - 0.55) / 0.45))
+        smoothstep(b / 0.3) * (1.0 - smoothstep((b - 0.55) / 0.45)) * self.crop
     }
 
     /// Fruit presence 0..1 (swelling, then removal), before frost loss and
@@ -370,7 +404,7 @@ impl Reproduction {
         if self.stage != ReproStage::Fruiting {
             return 0.0;
         }
-        self.fruit_swell() * self.fruit_remaining(r)
+        self.fruit_swell() * self.fruit_remaining(r) * self.crop
     }
 
     /// Fruit size 0..1 (young fruits swell over ~12 days after petal fall).

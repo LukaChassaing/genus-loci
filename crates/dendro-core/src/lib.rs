@@ -44,7 +44,7 @@ pub mod tempgen;
 
 pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
-pub use genome::{MechanicsTraits, MycorrhizaType, SymbiosisTraits};
+pub use genome::{FruitKind, LeafType, MechanicsTraits, MycorrhizaType, SpeciesCategory, SymbiosisTraits};
 pub use genome::{
     Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
     Tolerances, WoodTraits,

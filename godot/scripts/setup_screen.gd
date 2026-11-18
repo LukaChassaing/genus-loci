@@ -11,13 +11,14 @@ const AGES: Array[int] = [0, 10, 40, 100]
 const AGE_LABELS: Array[String] = ["Graine", "10 ans", "40 ans", "100 ans"]
 
 var species: int = 0
-var species_seg: Segmented
+var species_menu: OptionButton   # grouped by category; item id = species index
 var soil_seg: Segmented
 var age_seg: Segmented
 var seed_edit: LineEdit
 var plant_button: Button
 var species_names: PackedStringArray = PackedStringArray()
 var species_sci: PackedStringArray = PackedStringArray()
+var species_cats: PackedStringArray = PackedStringArray()
 var soil_names: PackedStringArray = PackedStringArray()
 
 
@@ -27,6 +28,8 @@ func _ready() -> void:
 	var ts: TreeSim = TreeSim.new()
 	species_names = ts.get_species_common_names()
 	species_sci = ts.get_species_names()
+	species_cats = ts.get_species_categories()
+	species = ts.get_default_species()
 	soil_names = ts.get_soil_names()
 	var soils: Array = []
 	for i: int in soil_names.size():
@@ -34,10 +37,26 @@ func _ready() -> void:
 
 	add_child(UiStyle.caps_label("Arboretum", 13))
 	add_child(UiStyle.rule())
-	species_seg = _section("Espèce", Segmented.new().setup(Array(species_names), 0, 2, 17))
-	species_seg.picked.connect(func(i: int) -> void:
-		species = i
-		species_changed.emit(i))
+	# 22 species do not fit a button grid: a drop-down grouped by category (« Feuillus », « Fruitiers »,
+	# « Résineux »), each item's id being the species index.
+	species_menu = OptionButton.new()
+	species_menu.custom_minimum_size = Vector2(0, 36)
+	species_menu.add_theme_font_override("font", UiStyle.font())
+	species_menu.add_theme_font_size_override("font_size", 17)
+	UiStyle.apply_button(func(n: String, sb: StyleBox) -> void: species_menu.add_theme_stylebox_override(n, sb),
+		func(n: String, c: Color) -> void: species_menu.add_theme_color_override(n, c), 8.0, 6.0)
+	var last: String = ""
+	for i: int in species_names.size():
+		var cat: String = species_cats[i] if i < species_cats.size() else ""
+		if cat != "" and cat != last:
+			species_menu.add_separator(cat)
+			last = cat
+		species_menu.add_item(species_names[i], i)
+	species_menu.select(species_menu.get_item_index(species))
+	species_menu.item_selected.connect(func(k: int) -> void:
+		species = species_menu.get_item_id(k)
+		species_changed.emit(species))
+	_add_titled("Espèce", species_menu)
 	soil_seg = _section("Sol", Segmented.new().setup(soils, 0, 2, 15))
 	# seed row
 	var seed_row: HBoxContainer = HBoxContainer.new()
@@ -106,4 +125,4 @@ func _launch() -> void:
 
 
 func focus_first() -> void:
-	UiStyle.focus_later(species_seg.buttons[species])
+	UiStyle.focus_later(species_menu)

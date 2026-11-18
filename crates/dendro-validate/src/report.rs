@@ -225,12 +225,22 @@ pub struct Meta {
     pub notes: String,
 }
 
-pub fn subject_title(s: &str) -> &str {
+pub fn subject_title(s: &str) -> String {
+    if s == "physics" {
+        return "Physique, climat de Rennes, sol".to_string();
+    }
+    match dendro_core::Genome::by_id(s) {
+        Some(g) => format!("{} ({})", g.common_name_fr, g.species),
+        None => s.to_string(),
+    }
+}
+
+/// Short lower-case tag of a subject for the per-domain table.
+fn subject_tag(s: &str) -> String {
     match s {
-        "quercus_robur" => "Chêne pédonculé (Quercus robur)",
-        "prunus_avium" => "Merisier (Prunus avium)",
-        "physics" => "Physique, climat de Rennes, sol",
-        _ => s,
+        "quercus_robur" => "chêne".to_string(),
+        "physics" => "physique".to_string(),
+        _ => dendro_core::Genome::by_id(s).map_or_else(|| s.to_string(), |g| g.common_name_fr.to_lowercase()),
     }
 }
 
@@ -259,7 +269,7 @@ pub fn markdown(rows: &[Row], meta: &Meta) -> String {
         all.add(r);
     }
     for (s, t) in &by_subj {
-        let _ = writeln!(o, "{}", t.line(subject_title(s)));
+        let _ = writeln!(o, "{}", t.line(&subject_title(s)));
     }
     let _ = writeln!(o, "{}\n", all.line("**total**"));
     let _ = writeln!(
@@ -283,12 +293,7 @@ pub fn markdown(rows: &[Row], meta: &Meta) -> String {
         by_dom.entry((domain(&r.entry.quantity), r.subject.as_str())).or_default().add(r);
     }
     for ((d, s), t) in &by_dom {
-        let tag = match *s {
-            "quercus_robur" => "chêne",
-            "prunus_avium" => "merisier",
-            _ => "physique",
-        };
-        let _ = writeln!(o, "{}", t.line(&format!("{d} — {tag}")));
+        let _ = writeln!(o, "{}", t.line(&format!("{d} — {}", subject_tag(s))));
     }
     o.push('\n');
 

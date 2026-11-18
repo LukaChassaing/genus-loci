@@ -250,15 +250,17 @@ impl SaveFile {
         if let Some(g) = &self.species.genome {
             return Ok(g.clone());
         }
-        Genome::builtin().into_iter().find(|g| g.species == self.species.name).ok_or_else(|| SaveError::UnknownSpecies(self.species.name.clone()))
+        Genome::find(&self.species.name).ok_or_else(|| SaveError::UnknownSpecies(self.species.name.clone()))
     }
 
-    /// Index of the species in `Genome::builtin()` (None for an embedded or unknown genome).
+    /// Index of the species in `Genome::registry()` (None for an embedded or
+    /// unknown genome). Saves name the species by its latin binomial (older
+    /// saves too); a registry id is accepted as well.
     pub fn builtin_species_index(&self) -> Option<usize> {
         if self.species.genome.is_some() {
             return None;
         }
-        Genome::builtin().iter().position(|g| g.species == self.species.name)
+        Genome::index_of(&self.species.name)
     }
 
     /// The soil profile, by preset name.

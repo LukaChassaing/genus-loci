@@ -202,7 +202,7 @@ impl Simulation {
             reported_version: 0,
             leaf_key: 0,
             flower_key: 0,
-            repro: Reproduction::new(first_age),
+            repro: Reproduction::new(first_age, seed),
             prune: crate::pruning::PruneState::default(),
             genome,
             seed,
@@ -256,7 +256,7 @@ impl Simulation {
         self.today = w;
 
         // Water balance of the layered soil.
-        let leaf = self.phen.leaf_area();
+        let leaf = self.phen.leaf_area(self.genome.leaf.retained_share());
         let wd = self.soil.step(w.precip_mm, w.pet_mm, leaf, leaf > 0.3);
         // REW of stomatal closure onset (same threshold as the soil's
         // transpiration, see `rew_critical`).
@@ -304,7 +304,10 @@ impl Simulation {
         if self.in_summer {
             self.p_summer += p_day;
         }
-        if leaf > 0.3 {
+        // Water stress of the growing season only (an evergreen's winter
+        // foliage would otherwise dilute it; for a deciduous tree the leaf
+        // area is 0 while dormant, so this is the same test).
+        if leaf > 0.3 && self.phen.phase != Phase::Dormant {
             self.stress_sum += 1.0 - self.water_factor;
             self.stress_days += 1.0;
             if self.drought {
@@ -578,8 +581,19 @@ impl Simulation {
         self.soil.last.uptake
     }
 
-    /// Mean leaf colour of the canopy today (RGB 0..1).
+    /// Mean leaf colour of the canopy today (RGB 0..1). Evergreens stay
+    /// green all year (only the cast cohort, a small share, yellows).
     pub fn leaf_color(&self) -> [f32; 3] {
+        let ret = self.genome.leaf.retained_share();
+        if ret > 0.0 {
+            let green = phenology::leaf_colour(&self.genome.pigments, 1.0, 0.0);
+            if self.phen.phase == Phase::Dormant {
+                return green;
+            }
+            let now = phenology::leaf_colour(&self.genome.pigments, self.phen.expansion, self.phen.colouring);
+            let k = 1.0 - ret;
+            return [0, 1, 2].map(|i| green[i] * ret + now[i] * k);
+        }
         if self.phen.phase == Phase::Dormant {
             return phenology::MARCESCENT_BROWN;
         }
@@ -587,12 +601,19 @@ impl Simulation {
     }
 
     /// Leaf density factor 0..1 (visible foliage relative to full summer
-    /// canopy; dead marcescent leaves count half).
+    /// canopy; dead marcescent leaves count half; an evergreen keeps its
+    /// older cohorts in winter).
     pub fn leaf_density(&self) -> f32 {
+        let ret = self.genome.leaf.retained_share();
         match self.phen.phase {
-            Phase::Dormant => self.marcescent * 0.5,
-            _ => self.phen.leaf_area(),
+            Phase::Dormant if ret <= 0.0 => self.marcescent * 0.5,
+            _ => self.phen.leaf_area(ret),
         }
+    }
+
+    /// The species keeps its foliage over winter (evergreen, several leaf cohorts).
+    pub fn evergreen(&self) -> bool {
+        self.genome.leaf.evergreen()
     }
 
     /// Stage of this year's flowering / fruiting cycle.
@@ -1100,11 +1121,15 @@ impl Simulation {
         use crate::math::Vec3;
         let phase = self.phen.phase;
         let dormant = phase == Phase::Dormant;
-        if dormant && self.marcescent <= 0.0 {
-            return MeshData::default();
-        }
         let g = &self.genome;
         let lt = &g.leaf;
+        // Evergreens keep their older cohorts: green in winter, only the
+        // oldest cohort yellows and falls in autumn.
+        let evergreen = lt.evergreen();
+        if dormant && self.marcescent <= 0.0 && !evergreen {
+            return MeshData::default();
+        }
+        let year = self.year();
         let ext = self.shoots.ext;
         let height = self.shoots.height().max(0.1);
         let voxel = self.shoots.voxel;
@@ -1113,6 +1138,30 @@ impl Simulation {
             0.8
         } else {
             (0.2 + 0.8 * self.phen.expansion) * (1.0 - 0.5 * self.phen.frost_damage)
+        };
+        // Evergreens: only the expanding flush grows; the older cohorts (and
+        // the whole crown outside the flush) are drawn full size.
+        let flushing = matches!(phase, Phase::BudBurst | Phase::LeafExpansion);
+        let size_of = |n: &crate::growth::Node| -> f32 {
+            if !evergreen {
+                size_factor
+            } else if n.leafy && flushing {
+                let fresh = (0.2 + 0.8 * self.phen.expansion) * (1.0 - 0.5 * self.phen.frost_damage);
+                // A lumped unit carrying older needles keeps them full size.
+                (fresh + n.old_leaf).min(1.0)
+            } else {
+                1.0
+            }
+        };
+        // Share of a unit's foliage cast this autumn (oldest cohort).
+        let cast_share = |n: &crate::growth::Node| -> f32 {
+            let w = n.leaf_w();
+            if w <= 0.0 {
+                return 0.0;
+            }
+            let a = year.saturating_sub(n.birth_year).max(1) as f32;
+            let next = if n.leafy { lt.cohort_survival(1.0) } else { 0.0 } + if n.old_leaf > 0.0 { lt.cohort_survival(a + 1.0) } else { 0.0 };
+            (1.0 - next / w).clamp(0.0, 1.0)
         };
         let nodes = &self.shoots.nodes;
         let spur_r = lt.spur_max_radius_mm * 0.001;
@@ -1127,7 +1176,7 @@ impl Simulation {
         let mut leafy: Vec<usize> = Vec::new();
         let mut spurs: Vec<usize> = Vec::new();
         for (i, n) in nodes.iter().enumerate() {
-            if n.leafy {
+            if n.leaf_w() > 0.0 {
                 leafy.push(i);
             } else if spur_on && !n.is_snag() && spur_light(n) > lt.spur_min_light && n.radius() <= spur_r {
                 spurs.push(i);
@@ -1186,7 +1235,8 @@ impl Simulation {
                 let lit = n.light.clamp(0.0, 1.0);
                 // Shade shoots keep a fair share (shade leaves are larger and
                 // thinner, Niinemets 2010).
-                let area = lt.foliage_density * voxel * voxel * (0.55 + 0.45 * lit);
+                // Evergreens: one unit carries several needle cohorts.
+                let area = lt.foliage_density * voxel * voxel * (0.55 + 0.45 * lit) * if evergreen { n.leaf_w() } else { 1.0 };
                 let want = (area / (s_pref * s_pref)).max(n.unit_years as f32).min(60.0);
                 // Small units: one shoot card sized by the shoot itself.
                 let size = if want <= 3.0 {
@@ -1221,9 +1271,23 @@ impl Simulation {
         let spread_c = lt.colour_spread.clamp(0.0, 0.9);
         let colouring = self.phen.colouring;
         let summer = phenology::leaf_colour(&g.pigments, self.phen.expansion, 0.0);
+        let evergreen_green = phenology::leaf_colour(&g.pigments, 1.0, 0.0);
         let cluster_colour = |i: usize, lit: f32, ck: u64, pos: Vec3, winter_share: f32| -> Option<[f32; 4]> {
             let u = |s: u64| rng::unit(rng::mix(ck ^ s));
-            let (rgb, sen) = if dormant {
+            let n = &nodes[i];
+            // Evergreen clusters that are not part of the cast cohort (and
+            // every cluster in winter): green; the flush is fresh green.
+            let keep_green = evergreen && (dormant || u(24) >= cast_share(n));
+            let (rgb, sen) = if keep_green {
+                if n.leafy && flushing && n.old_leaf <= 0.0 {
+                    (phenology::leaf_colour(&g.pigments, self.phen.expansion, 0.0), 0.0)
+                } else {
+                    // Older needles a little darker.
+                    let age = year.saturating_sub(n.birth_year) as f32;
+                    let d = 1.0 - 0.04 * age.min(5.0);
+                    ([evergreen_green[0] * d, evergreen_green[1] * d, evergreen_green[2] * d], 0.0)
+                }
+            } else if dormant {
                 // Lower crown keeps its dead leaves more often.
                 let rel = pos.y / height;
                 if u(20) >= self.marcescent * (1.5 - rel) * winter_share {
@@ -1273,7 +1337,7 @@ impl Simulation {
             } else {
                 want
             };
-            let size = size0 * (want / kept).sqrt().min(1.6) * size_factor;
+            let size = size0 * (want / kept).sqrt().min(1.6) * size_of(n);
             let end = n.end(ext);
             let crown_out = (end - center).normalize_or(Vec3::Y);
             let lobe_out = (end - lc).normalize_or(crown_out);
@@ -1405,7 +1469,7 @@ impl Simulation {
         let fl_open = self.repro.flower_amount();
         let remaining = self.repro.fruit_remaining(r);
         let swell = self.repro.fruit_swell();
-        let set = r.fruit_set * (1.0 - self.repro.frost_loss);
+        let set = r.fruit_set * (1.0 - self.repro.frost_loss) * self.repro.crop;
         let fcol = self.flower_color();
         let rcol = self.fruit_color();
         let mut clusters = Vec::new();

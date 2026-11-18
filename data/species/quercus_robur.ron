@@ -10,6 +10,8 @@
     species: "Quercus robur",
     common_name: "Pedunculate oak",
     common_name_fr: "Chêne pédonculé",
+    // Menu group (no effect on growth).
+    category: Broadleaf,
     architecture: (
         // Borchert-Honda lambda of the stem (Borchert & Honda 1984, "Control
         // of development in the bifurcating branch system of Tabebuia rosea:

@@ -26,9 +26,47 @@ var _title_lbl: Label
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
-## Static species facts (kept modest and verifiable). Index = TreeSim species index.
+## Hand-drawn plates exist for these registry ids only (index = plate number, the `species` of the drawing code).
+const PLATE_IDS: Array[String] = ["quercus_robur", "prunus_avium"]
+static var _reg: TreeSim
+
+
+static func _registry() -> TreeSim:
+	if _reg == null:
+		_reg = TreeSim.new()
+	return _reg
+
+
+## Plate number (0 oak, 1 cherry) of a TreeSim species index, -1 when the species has no hand-drawn plate.
+static func plate_of(tree_index: int) -> int:
+	var ids: PackedStringArray = _registry().get_species_ids()
+	if tree_index < 0 or tree_index >= ids.size():
+		return -1
+	return PLATE_IDS.find(ids[tree_index])
+
+
+static func has_plate(tree_index: int) -> bool:
+	return plate_of(tree_index) >= 0
+
+
+## Static species facts (kept modest and verifiable). `i` = TreeSim species index. Species without a
+## hand-written card get their names and category from the core only (no unsourced facts).
 static func species_data(i: int) -> Dictionary:
-	if i == 1:
+	var plate: int = plate_of(i)
+	if plate < 0:
+		var reg: TreeSim = _registry()
+		var names: PackedStringArray = reg.get_species_common_names()
+		var latin: PackedStringArray = reg.get_species_names()
+		var ids: PackedStringArray = reg.get_species_ids()
+		var cats: PackedStringArray = reg.get_species_categories()
+		var k: int = clampi(i, 0, names.size() - 1)
+		return {
+			"id": ids[k], "common": names[k], "title": names[k], "latin": latin[k], "auth": "", "family": cats[k],
+			"ordinal": "", "height": "—", "longevity": "—", "flowering": "—", "fruit": "—", "soil": "—",
+			"caption": "",
+			"blurb": "%s (%s). La planche illustrée de cette espèce n'est pas encore dessinée ; ses traits et leurs sources sont dans docs/species/%s.md." % [names[k], cats[k].to_lower(), ids[k]],
+		}
+	if plate == 1:
 		return {
 			"id": "prunus_avium", "common": "Merisier", "title": "Le Merisier", "latin": "Prunus avium",
 			"auth": "L.", "family": "famille des Rosacées", "ordinal": "II",
@@ -75,14 +113,20 @@ func _ready() -> void:
 	h.add_child(sp)
 	_seg = Segmented.new().setup(["Chêne pédonculé", "Merisier"], species, 2, 14)
 	_seg.custom_minimum_size = Vector2(300, 0)
-	_seg.picked.connect(set_species)
+	_seg.picked.connect(_show_plate)
 	h.add_child(_seg)
 	resized.connect(queue_redraw)
 	_apply_species()
 
 
+## Shows the plate of TreeSim species `i` (the oak's when that species has no plate yet).
 func set_species(i: int) -> void:
-	species = clampi(i, 0, 1)
+	_show_plate(maxi(plate_of(i), 0))
+
+
+## Shows plate number `p` (0 oak, 1 cherry).
+func _show_plate(p: int) -> void:
+	species = clampi(p, 0, PLATE_IDS.size() - 1)
 	if _seg != null:
 		_seg.select(species)
 	_apply_species()
@@ -90,7 +134,7 @@ func set_species(i: int) -> void:
 
 
 func _apply_species() -> void:
-	_ts.set_species(species)
+	_ts.set_species(_ts.find_species(PLATE_IDS[species]))
 	_ts.reset(1)
 
 
@@ -101,7 +145,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			closed.emit()
 			get_viewport().set_input_as_handled()
 		elif k == KEY_LEFT or k == KEY_RIGHT:
-			set_species(1 - species)
+			_show_plate(1 - species)
 			get_viewport().set_input_as_handled()
 
 
@@ -374,7 +418,7 @@ func _draw() -> void:
 	for k: int in 14:
 		draw_rect(Rect2(Vector2.ZERO, size).grow(-float(k) * size.x * 0.012), Color(0, 0, 0, 0.05), false, size.x * 0.012)
 	_shapes()
-	var d: Dictionary = species_data(species)
+	var d: Dictionary = species_data(_ts.find_species(PLATE_IDS[species]))
 	_paper()
 	_frame()
 	var t: Dictionary = _texts()

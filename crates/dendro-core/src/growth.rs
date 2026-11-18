@@ -125,7 +125,7 @@ const VOXELS_PER_HEIGHT: f32 = 30.0;
 /// Soft cap on shoot nodes: above it bud break gets harder (safety valve).
 const NODE_SOFT_CAP: usize = 32_000;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct Node {
     /// Stable id (survives compaction), used for hashing.
     pub id: u32,
@@ -190,6 +190,58 @@ pub(crate) struct Node {
     v_lat: f32,
     pub foliage: f32,
     dead: bool,
+    /// Evergreens: foliage still carried from earlier cohorts (needles of
+    /// past years), in current-shoot units (0..~1 per lumped year; see
+    /// `LeafTraits::cohort_survival`). Exactly 0 for deciduous species.
+    pub old_leaf: f32,
+}
+
+impl std::fmt::Debug for Node {
+    /// Same text as `#[derive(Debug)]` gave before `old_leaf` existed
+    /// (`Simulation::state_hash` hashes it, and saves store that hash);
+    /// `old_leaf` is printed only when non-zero (evergreens).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("Node");
+        d.field("id", &self.id)
+            .field("parent", &self.parent)
+            .field("start", &self.start)
+            .field("dir", &self.dir)
+            .field("length", &self.length)
+            .field("grow_from", &self.grow_from)
+            .field("area", &self.area)
+            .field("path_end", &self.path_end)
+            .field("order", &self.order)
+            .field("limb_base_y", &self.limb_base_y)
+            .field("sag", &self.sag)
+            .field("unit_years", &self.unit_years)
+            .field("terminal", &self.terminal)
+            .field("leafy", &self.leafy)
+            .field("term_bud", &self.term_bud)
+            .field("lat_buds", &self.lat_buds)
+            .field("birth_year", &self.birth_year)
+            .field("starve", &self.starve)
+            .field("snag_since", &self.snag_since)
+            .field("bud_year", &self.bud_year)
+            .field("light", &self.light)
+            .field("grad", &self.grad)
+            .field("sprout", &self.sprout)
+            .field("wounded", &self.wounded)
+            .field("cut_end", &self.cut_end)
+            .field("q_main", &self.q_main)
+            .field("q_lat", &self.q_lat)
+            .field("s_lat", &self.s_lat)
+            .field("leaf_q", &self.leaf_q)
+            .field("leaf_n", &self.leaf_n)
+            .field("leaf_max", &self.leaf_max)
+            .field("v_main", &self.v_main)
+            .field("v_lat", &self.v_lat)
+            .field("foliage", &self.foliage)
+            .field("dead", &self.dead);
+        if self.old_leaf != 0.0 {
+            d.field("old_leaf", &self.old_leaf);
+        }
+        d.finish()
+    }
 }
 
 /// Fast `exp(-x)` for `x >= 0` (relative error < 2e-4): the light pass
@@ -226,6 +278,19 @@ pub(crate) fn leaf_units(n: &Node, unit_len: f32) -> f32 {
 }
 
 impl Node {
+    /// Foliage carried by this shoot unit, in current-shoot units: 1 for
+    /// the current annual shoot (`leafy`), plus the retained cohorts of an
+    /// evergreen (`old_leaf`). Exactly `leafy as 0/1` for deciduous species.
+    #[inline]
+    pub fn leaf_w(&self) -> f32 {
+        if self.is_snag() {
+            0.0
+        } else if self.leafy {
+            1.0 + self.old_leaf
+        } else {
+            self.old_leaf
+        }
+    }
     #[inline]
     pub fn end(&self, ext: f32) -> Vec3 {
         let l = if self.leafy { self.grow_from + (self.length - self.grow_from) * ext } else { self.length };
@@ -316,6 +381,7 @@ impl ShootSystem {
             v_lat: 0.0,
             foliage: 0.0,
             dead: false,
+            old_leaf: 0.0,
         };
         ShootSystem { nodes: vec![seedling], next_id: 1, ext: 1.0, voxel: 0.1, break_boost: 1.0, tree_h: 0.03, grid: Vec::new(), foliage_path: 0.0 }
     }
@@ -326,9 +392,11 @@ impl ShootSystem {
             n.q_main = if n.term_bud { n.light } else { 0.0 };
             n.q_lat = n.lat_buds as f32 * n.light;
             n.s_lat = n.lat_buds as f32 * pow_k(n.light, k);
-            n.leaf_q = if n.leafy { n.light } else { 0.0 };
-            n.leaf_n = if n.leafy { 1.0 } else { 0.0 };
-            n.leaf_max = n.leaf_q;
+            // Foliage of the shoot (current flush + retained cohorts).
+            let w = n.leaf_w();
+            n.leaf_q = if w > 0.0 { n.light * w } else { 0.0 };
+            n.leaf_n = w;
+            n.leaf_max = if w > 0.0 { n.light } else { 0.0 };
         }
         for i in (1..self.nodes.len()).rev() {
             let n = &self.nodes[i];
@@ -470,6 +538,8 @@ impl ShootSystem {
                 && node.terminal
                 && !node.leafy
                 && !par.leafy
+                && node.old_leaf == 0.0
+                && par.old_leaf == 0.0
                 && !par.term_bud
                 && par.lat_buds == 0
                 && par.is_snag() == node.is_snag()
@@ -575,6 +645,7 @@ impl ShootSystem {
             if k {
                 nd.snag_since = year;
                 nd.leafy = false;
+                nd.old_leaf = 0.0;
                 nd.term_bud = false;
                 nd.lat_buds = 0;
             } else if !nd.is_snag()
@@ -759,7 +830,15 @@ impl ShootSystem {
                 self.nodes[i].lat_buds -= broken;
             }
         }
+        // Evergreens: the shoots keep the foliage of their past flushes
+        // (cohort survival by age; an in-place extended LOD unit keeps the
+        // previous year's). Deciduous species: always 0.
+        let evergreen = g.leaf.evergreen();
         for n in self.nodes.iter_mut() {
+            if evergreen && !n.is_snag() {
+                let age = year.saturating_sub(n.birth_year).max(1) as f32;
+                n.old_leaf = g.leaf.cohort_survival(age);
+            }
             n.leafy = false;
             n.grow_from = n.length;
             // The pruning boost fades on growing axes (a remnant still
@@ -791,12 +870,33 @@ impl ShootSystem {
         let order = if terminal { parent.order } else { parent.order.saturating_add(1) };
         let mut d = parent.dir;
         if !terminal {
-            let u = parent.dir.any_perpendicular();
-            let w = parent.dir.cross(u);
-            let az = (a.phyllotaxis_deg * (k as f32 + (parent.id % 5) as f32)).to_radians()
-                + 0.6 * (rng::unit(h(1)) - 0.5);
-            let beta = a.branching_angle_deg.to_radians() * (0.85 + 0.3 * rng::unit(h(2)));
-            d = parent.dir * beta.dcos() + (u * az.dcos() + w * az.dsin()) * beta.dsin();
+            let planar = parent.order > 0 && a.lateral_planarity > 0.0;
+            if !a.whorled && !planar {
+                let u = parent.dir.any_perpendicular();
+                let w = parent.dir.cross(u);
+                let az = (a.phyllotaxis_deg * (k as f32 + (parent.id % 5) as f32)).to_radians()
+                    + 0.6 * (rng::unit(h(1)) - 0.5);
+                let beta = a.branching_angle_deg.to_radians() * (0.85 + 0.3 * rng::unit(h(2)));
+                d = parent.dir * beta.dcos() + (u * az.dcos() + w * az.dsin()) * beta.dsin();
+            } else {
+                // Frame of the parent axis: `u` horizontal (side), `w` the
+                // axis' own "up" (Hallé et al. 1978: plagiotropic axes have a
+                // dorsiventral symmetry, their laterals spread in the plane).
+                let side = parent.dir.cross(Vec3::Y);
+                let u = if side.length() > 1e-3 { side.normalize_or(Vec3::new(1.0, 0.0, 0.0)) } else { parent.dir.any_perpendicular() };
+                let w = parent.dir.cross(u);
+                let az = if a.whorled {
+                    // Whorl: buds evenly spaced, the whorl rotated at random.
+                    let n = a.lateral_buds_per_shoot.max(1) as f32;
+                    std::f32::consts::TAU * (k as f32 / n + rng::unit(rng::hash(seed, S_SHOOT, parent.id as u64, year as u64))) + 0.3 * (rng::unit(h(1)) - 0.5)
+                } else {
+                    (a.phyllotaxis_deg * (k as f32 + (parent.id % 5) as f32)).to_radians() + 0.6 * (rng::unit(h(1)) - 0.5)
+                };
+                let beta = a.branching_angle_deg.to_radians() * (0.85 + 0.3 * rng::unit(h(2)));
+                let flat = if planar { 1.0 - a.lateral_planarity.clamp(0.0, 1.0) } else { 1.0 };
+                let side_dir = (u * az.dcos() + w * (az.dsin() * flat)).normalize_or(u);
+                d = parent.dir * beta.dcos() + side_dir * beta.dsin();
+            }
         }
         let limb_base_y = if order == 0 {
             0.0
@@ -927,6 +1027,7 @@ impl ShootSystem {
             v_lat: 0.0,
             foliage: 0.0,
             dead: false,
+            old_leaf: 0.0,
         }
     }
 
@@ -983,8 +1084,9 @@ impl ShootSystem {
         let mut node_cell: Vec<(u32, u32, u32)> = Vec::with_capacity(self.nodes.len());
         for (i, n) in self.nodes.iter().enumerate() {
             let (y, c) = cell(n.end(1.0));
-            if n.leafy {
-                dens[y * plane + c] += leaf_units(n, unit_len);
+            let w = n.leaf_w();
+            if w > 0.0 {
+                dens[y * plane + c] += leaf_units(n, unit_len) * w;
             }
             node_cell.push((y as u32, c as u32, i as u32));
         }
@@ -1064,7 +1166,7 @@ impl ShootSystem {
         // cluster whose upper shoots shade the lower ones).
         let mut ranked: Vec<(u32, u32, f32, u32)> = node_cell
             .iter()
-            .filter(|&&(_, _, i)| self.nodes[i as usize].leafy)
+            .filter(|&&(_, _, i)| self.nodes[i as usize].leaf_w() > 0.0)
             .map(|&(y, c, i)| (y, c, self.nodes[i as usize].end(1.0).y, i))
             .collect();
         ranked.sort_unstable_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)).then(b.2.total_cmp(&a.2)).then(a.3.cmp(&b.3)));
@@ -1083,7 +1185,7 @@ impl ShootSystem {
             let k = node_u[k] as usize;
             let n = &mut self.nodes[i as usize];
             let i = i as usize;
-            let others = if n.leafy { rank[i] as f32 } else { dens[y as usize * plane + c as usize] };
+            let others = if n.leaf_w() > 0.0 { rank[i] as f32 } else { dens[y as usize * plane + c as usize] };
             n.light = (light[k] * exp_neg(SHADOW_SAME * others)).clamp(0.0, 1.0);
             // Phototropism towards the brightest sky sector, relative to an
             // isotropic (fully lit) bud whose vector would point straight up.
@@ -1100,9 +1202,10 @@ impl ShootSystem {
     pub fn compute_foliage(&mut self, hydraulic_path_max: f32, exponent: f32) -> f32 {
         let face = self.voxel * self.voxel;
         for n in self.nodes.iter_mut() {
-            n.foliage = if n.leafy {
+            let w = n.leaf_w();
+            n.foliage = if w > 0.0 {
                 let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).dpowf(exponent)).max(0.08);
-                n.light * face * eff
+                n.light * face * eff * w
             } else {
                 0.0
             };
@@ -1232,8 +1335,8 @@ impl ShootSystem {
         let rho = g.mechanics.green_density_kg_m3;
         let unit_len = 0.75 * self.voxel - 0.06;
         let cr = self.crown_radius().max(0.05);
-        let leaf_kg_total = PI * cr * cr * crate::flux::LAI_FULL * crate::flux::LMA * 1e-3 / crate::mechanics::LEAF_DRY_MATTER_CONTENT;
-        let units: f32 = self.nodes.iter().filter(|n| n.leafy && !n.is_snag()).map(|n| leaf_units(n, unit_len)).sum();
+        let leaf_kg_total = PI * cr * cr * g.leaf.crown_lai * g.leaf.lma_g_m2 * 1e-3 / crate::mechanics::LEAF_DRY_MATTER_CONTENT;
+        let units: f32 = self.nodes.iter().filter(|n| n.leaf_w() > 0.0).map(|n| leaf_units(n, unit_len) * n.leaf_w()).sum();
         let per_unit = if units > 0.0 { leaf_kg_total / units } else { 0.0 };
         let gv = Vec3::new(0.0, -crate::mechanics::GRAVITY, 0.0);
         // Basipetal sums of force and of moment about the origin.
@@ -1244,8 +1347,9 @@ impl ShootSystem {
             let fw = gv * (rho * nd.area * nd.length);
             let mut f = fw;
             let mut q = (nd.start + (end - nd.start) * 0.5).cross(fw);
-            if nd.leafy && !nd.is_snag() {
-                let fl = gv * (per_unit * leaf_units(nd, unit_len));
+            let w = nd.leaf_w();
+            if w > 0.0 {
+                let fl = gv * (per_unit * leaf_units(nd, unit_len) * w);
                 f += fl;
                 q += end.cross(fl);
             }
@@ -1333,7 +1437,8 @@ impl ShootSystem {
         let mut mass = vec![0.0f32; n];
         let mut moment = vec![Vec3::ZERO; n];
         for (i, nd) in self.nodes.iter().enumerate() {
-            let m = rho * nd.area * nd.length + if nd.leafy { leaf_kg } else { 0.0 };
+            let w = nd.leaf_w();
+            let m = rho * nd.area * nd.length + if w > 0.0 { leaf_kg * w } else { 0.0 };
             mass[i] = m;
             moment[i] = (nd.start + nd.dir * (0.5 * nd.length)) * m;
         }
@@ -1438,7 +1543,7 @@ impl ShootSystem {
     pub fn leaf_area_proxy(&self) -> f32 {
         let unit_len = 0.75 * self.voxel - 0.06;
         let face = self.voxel * self.voxel;
-        self.nodes.iter().filter(|n| n.leafy).map(|n| leaf_units(n, unit_len) * face).sum()
+        self.nodes.iter().filter(|n| n.leaf_w() > 0.0).map(|n| leaf_units(n, unit_len) * face * n.leaf_w()).sum()
     }
 
     /// Remove the subtree rooted at `root` (its descendants, and `root`
@@ -1465,8 +1570,9 @@ impl ShootSystem {
             if gone[i] {
                 let nd = &self.nodes[i];
                 wood += nd.area * nd.length;
-                if nd.leafy {
-                    leaf += leaf_units(nd, unit_len) * face;
+                let w = nd.leaf_w();
+                if w > 0.0 {
+                    leaf += leaf_units(nd, unit_len) * face * w;
                 }
             }
         }

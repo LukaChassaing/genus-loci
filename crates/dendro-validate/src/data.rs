@@ -21,6 +21,10 @@ pub struct Entry {
     pub max: Option<f64>,
     pub unit: String,
     pub spread_kind: String,
+    /// FORMAT.md: a plain string. `Some("...")` is accepted too (some
+    /// files were written that way); `None` reads as empty and is reported
+    /// by `check` ("empty source").
+    #[serde(deserialize_with = "string_or_some")]
     pub source: String,
     pub url: Option<String>,
     pub accessed: String,
@@ -37,6 +41,19 @@ pub struct RefFile {
     pub entries: Vec<Entry>,
 }
 
+fn string_or_some<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum S {
+        Plain(String),
+        Opt(Option<String>),
+    }
+    Ok(match S::deserialize(d)? {
+        S::Plain(s) => s,
+        S::Opt(o) => o.unwrap_or_default(),
+    })
+}
+
 pub const SPREAD_KINDS: &[&str] = &["range", "sd", "ci95", "quantiles", "single", "max_record"];
 pub const SOURCE_KINDS: &[&str] = &["primary", "review", "handbook", "wikipedia", "secondary"];
 pub const READ_KINDS: &[&str] = &["full", "abstract", "table", "via_wikipedia", "snippet"];
@@ -45,8 +62,8 @@ pub const READ_KINDS: &[&str] = &["full", "abstract", "table", "via_wikipedia", 
 /// its meaning made clear in FORMAT.md) so that a typo is caught.
 pub const KNOWN_UNITS: &[&str] = &[
     "-", "%", "% crown mass", "0-5 scale", "Ellenberg L (1-9)", "GPa", "Hz", "L/day", "L/day/m2", "MJ/m2/yr", "MPa", "bendings/day",
-    "category", "cm", "cm DBH", "contestation", "d", "day of year", "days", "days/yr", "degC", "deg", "doy", "flushes", "fraction",
-    "fraction of plots", "fraction of sample trees", "g", "g/m2", "h/yr", "hours", "kg/m3", "l/day", "m", "m/s", "m2/ha", "m2/m2", "m3",
+    "category", "cm", "cm DBH", "cm/yr", "contestation", "d", "day of year", "days", "days/yr", "degC", "deg", "doy", "flushes", "fraction",
+    "fraction of plots", "fraction of sample trees", "g", "g/m2", "g/m2/yr", "h/yr", "hours", "kNm", "kg/m3", "l/day", "m", "m/s", "m2/ha", "m2/m2", "m3",
     "m3/ha", "m3/ha/yr", "mm", "mm/day", "mm/yr", "pH", "qualitative", "ratio", "relation (pente non obtenue)", "relation qualitative",
     "rings", "t", "trees/ha", "um", "years",
 ];

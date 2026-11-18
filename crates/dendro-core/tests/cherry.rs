@@ -140,12 +140,17 @@ fn mean(v: &[f32]) -> f32 {
 
 #[test]
 fn builtin_species() {
+    // The registry holds every data/species file; oak and cherry among them,
+    // the oak being the default species.
     let b = Genome::builtin();
-    assert_eq!(b.len(), 2);
-    assert_eq!(b[0].species, "Quercus robur");
-    assert_eq!(b[1].species, "Prunus avium");
-    assert_eq!(b[0].common_name_fr, "Chêne pédonculé");
-    assert_eq!(b[1].common_name_fr, "Merisier");
+    assert!(b.len() >= 2);
+    let oak = &b[Genome::index_of("quercus_robur").unwrap()];
+    let cherry = &b[Genome::index_of("Prunus avium").unwrap()];
+    assert_eq!(oak.species, "Quercus robur");
+    assert_eq!(cherry.species, "Prunus avium");
+    assert_eq!(oak.common_name_fr, "Chêne pédonculé");
+    assert_eq!(cherry.common_name_fr, "Merisier");
+    assert_eq!(Genome::default_index(), Genome::index_of("quercus_robur").unwrap());
     let g = Genome::prunus_avium();
     assert_eq!(Genome::from_ron(&g.to_ron()).unwrap(), g);
     // Renderer traits.

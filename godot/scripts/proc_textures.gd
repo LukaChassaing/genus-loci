@@ -87,6 +87,80 @@ static func make_leaf_cluster_texture(lobes: int = 10, serration: float = 0.0, l
 	return ImageTexture.create_from_image(atlas)
 
 
+## Needle-spray atlas for conifers (same 512 x 256 layout and conventions as make_leaf_cluster_texture: left tile
+## one shoot, right tile a branchlet spray; v = 0 at the distal end, near-white albedo, alpha = silhouette).
+## `needle_len` is the needle length as a fraction of the tile (= 1 / cluster_size_leaves of the genome).
+## `tufted` 0..1 (genome `tip_bunching`): 0 = needles all along the shoot, both sides, a bottle brush seen
+## from the side (Picea, Abies, Taxus); 1 = long needles in tufts crowded at the shoot tips (Pinus, Larix
+## short shoots). `spread` 0..1 (genome `leaf_droop`): needle angle from the shoot, forward (0) to square (1).
+static func make_needle_cluster_texture(needle_len: float = 0.12, tufted: float = 0.0, spread: float = 0.5) -> ImageTexture:
+	var n: int = LEAF_SIZE
+	var atlas: Image = Image.create_empty(2 * n, n, false, Image.FORMAT_RGBA8)
+	var nl: float = clampf(needle_len, 0.04, 0.45)
+	for tile: int in 2:
+		var data: PackedByteArray = _new_card_image(n, 120)
+		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+		rng.seed = 7071 + tile
+		var shoots: Array[Array] = []
+		if tile == 0:
+			shoots.append([Vector2(0.5, 1.0), Vector2(0.5, 0.06)])
+		else:
+			shoots.append([Vector2(0.5, 1.0), Vector2(0.48, 0.08)])
+			shoots.append([Vector2(0.49, 0.72), Vector2(0.12, 0.30)])
+			shoots.append([Vector2(0.50, 0.55), Vector2(0.88, 0.22)])
+			shoots.append([Vector2(0.49, 0.88), Vector2(0.20, 0.62)])
+			shoots.append([Vector2(0.50, 0.82), Vector2(0.82, 0.58)])
+		for sh: Array in shoots:
+			var p0: Vector2 = sh[0]
+			var p1: Vector2 = sh[1]
+			_stalk(data, n, p0, p0.lerp(p1, 0.5), p1, 0.006, Color(0.45, 0.36, 0.26))
+			var axis: Vector2 = (p1 - p0).normalized()
+			var side_n: Vector2 = Vector2(-axis.y, axis.x)
+			var length: float = (p1 - p0).length()
+			# Needles per unit shoot length: dense brush, or tufts at the tip.
+			var count: int = int(length / (nl * 0.11)) if tufted < 0.5 else int(18.0 + 10.0 * length)
+			for k: int in count:
+				var t: float = rng.randf()
+				if tufted >= 0.5:
+					t = 1.0 - pow(rng.randf(), 0.25) * 0.35  # crowded at the tip
+				var at: Vector2 = p0.lerp(p1, t)
+				var sgn: float = 1.0 if rng.randf() < 0.5 else -1.0
+				# Angle from the shoot axis (towards the tip); foreshortened needles seen end-on are shorter.
+				var a_deg: float = lerpf(35.0, 80.0, spread) + rng.randf_range(-15.0, 15.0)
+				if tufted >= 0.5:
+					a_deg = rng.randf_range(5.0, 55.0)
+				var a: float = deg_to_rad(a_deg)
+				var dirv: Vector2 = (axis * cos(a) + side_n * sgn * sin(a)).normalized()
+				var ln: float = nl * rng.randf_range(0.55, 1.0) * (1.0 - 0.25 * t * (1.0 - tufted))
+				var shade: float = rng.randf_range(0.62, 0.98)
+				_needle(data, n, at, at + dirv * ln, 0.0042, shade)
+		var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
+		atlas.blit_rect(img, Rect2i(0, 0, n, n), Vector2i(tile * n, 0))
+	atlas.generate_mipmaps()
+	return ImageTexture.create_from_image(atlas)
+
+
+## One needle: a thin segment `a` -> `b` (UV units) of half-width `hw`, tapering to the tip, grey `shade`.
+static func _needle(data: PackedByteArray, n: int, a: Vector2, b: Vector2, hw: float, shade: float) -> void:
+	var x0: int = maxi(0, int((minf(a.x, b.x) - hw) * n) - 1)
+	var x1: int = mini(n - 1, int((maxf(a.x, b.x) + hw) * n) + 1)
+	var y0: int = maxi(0, int((minf(a.y, b.y) - hw) * n) - 1)
+	var y1: int = mini(n - 1, int((maxf(a.y, b.y) + hw) * n) + 1)
+	var ab: Vector2 = b - a
+	var l2: float = maxf(ab.length_squared(), 1e-8)
+	for yi: int in range(y0, y1 + 1):
+		for xi: int in range(x0, x1 + 1):
+			var p: Vector2 = Vector2((float(xi) + 0.5) / n, (float(yi) + 0.5) / n)
+			var t: float = clampf((p - a).dot(ab) / l2, 0.0, 1.0)
+			var d: float = (p - a - ab * t).length()
+			var w: float = hw * (1.0 - 0.6 * t)
+			var cov: float = clampf((w - d) * n + 0.6, 0.0, 1.0)
+			if cov <= 0.0:
+				continue
+			var v: float = shade * (0.85 + 0.15 * (1.0 - t))
+			_put(data, n, xi, yi, v, v, v, cov)
+
+
 static func _paint_leaf(data: PackedByteArray, n: int, ox: float, oy: float, ang: float, length: float, shade: float,
 		cfg: Dictionary, wscale: float = 1.0) -> void:
 	var dir: Vector2 = Vector2(sin(ang), -cos(ang))  # image y grows downward, "up" = -y
@@ -492,11 +566,14 @@ static func make_flower_texture() -> ImageTexture:
 ## Small cluster of round, glossy cherries on long stalks hanging from the bottom-centre... the card's
 ## v = 0 edge is the distal end, so the stalks rise from the bottom of the image and the fruit hang at
 ## the top. Albedo is a grey shading (vertex colour gives green -> red).
-static func make_fruit_texture() -> ImageTexture:
+static func make_fruit_texture(single: bool = false) -> ImageTexture:
 	var n: int = BLOSSOM_SIZE
 	var data: PackedByteArray = _new_card_image(n, 190)
 	var base: Vector2 = Vector2(0.5, 1.0)
 	var cherries: Array[Array] = [[Vector2(0.30, 0.34), 0.17], [Vector2(0.68, 0.30), 0.18], [Vector2(0.50, 0.12), 0.15]]
+	if single:
+		# One large pome (apple, pear) on a short stalk.
+		cherries = [[Vector2(0.50, 0.42), 0.36]]
 	for c: Array in cherries:
 		var p: Vector2 = c[0]
 		_stalk(data, n, base, Vector2(lerpf(base.x, p.x, 0.3), lerpf(base.y, p.y, 0.5)), p - Vector2(0.0, c[1] * 0.8), 0.010, Color(0.50, 0.60, 0.30))
@@ -525,6 +602,76 @@ static func make_fruit_texture() -> ImageTexture:
 				var col: Color = Color(v, v, v).lerp(Color(1.4, 1.4, 1.4), spec * 0.8)
 				col = Color(minf(col.r, 1.0), minf(col.g, 1.0), minf(col.b, 1.0))
 				_put(data, n, xi, yi, col.r, col.g, col.b, a)
+	var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## A pendent woody cone (Picea, Pinus, Larix: `erect` false) or an erect cone (Abies: `erect` true), drawn as an
+## elongated ovoid of overlapping scales. Same conventions as make_fruit_texture (stalk at the bottom of the image
+## = the attachment, v = 0 at the distal end; grey shading, vertex colour gives the hue). Conifer strobili (the
+## "flowers" of the flower mesh) use the same picture, small and tinted red.
+static func make_cone_texture(slender: float = 0.32) -> ImageTexture:
+	var n: int = BLOSSOM_SIZE
+	var data: PackedByteArray = _new_card_image(n, 160)
+	var c: Vector2 = Vector2(0.5, 0.47)
+	var half_len: float = 0.40
+	var half_w: float = half_len * clampf(slender, 0.15, 0.8)
+	_stalk(data, n, Vector2(0.5, 1.0), Vector2(0.5, 0.94), Vector2(0.5, c.y + half_len * 0.95), 0.012, Color(0.45, 0.35, 0.25))
+	for yi: int in n:
+		for xi: int in n:
+			var q: Vector2 = Vector2((float(xi) + 0.5) / n - c.x, (float(yi) + 0.5) / n - c.y)
+			var ty: float = q.y / half_len  # -1 distal tip .. 1 base
+			if absf(ty) > 1.0:
+				continue
+			# Ovoid outline, blunt at the base, tapering to the tip.
+			var prof: float = sqrt(maxf(0.0, 1.0 - ty * ty)) * (0.78 + 0.22 * ty)
+			var w: float = half_w * prof
+			var d: float = (w - absf(q.x)) * n
+			var a: float = clampf(d + 0.5, 0.0, 1.0)
+			if a <= 0.0:
+				continue
+			# Scales: a lattice of rounded tiles, each lighter at its exposed tip (round body shading).
+			var u: float = q.x / maxf(w, 1e-4)
+			var row: float = (ty + 1.0) * 9.0
+			var col: float = u * 2.2 + 0.5 * floorf(row)
+			var fr: Vector2 = Vector2(fposmod(col, 1.0) - 0.5, fposmod(row, 1.0) - 0.5)
+			var scale_v: float = 0.55 + 0.45 * clampf(1.0 - fr.length() * 1.6, 0.0, 1.0)
+			var body: float = 0.55 + 0.45 * sqrt(maxf(0.0, 1.0 - u * u)) * (0.9 - 0.25 * u)
+			var v: float = body * scale_v
+			_put(data, n, xi, yi, v, v * 0.97, v * 0.94, a)
+	var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## Two winged samaras (Acer, Fraxinus-like) hanging from the attachment, grey shading.
+static func make_samara_texture() -> ImageTexture:
+	var n: int = BLOSSOM_SIZE
+	var data: PackedByteArray = _new_card_image(n, 170)
+	var base: Vector2 = Vector2(0.5, 1.0)
+	for side: float in [-1.0, 1.0]:
+		var seed_c: Vector2 = Vector2(0.5 + 0.06 * side, 0.62)
+		_stalk(data, n, base, Vector2(0.5, 0.82), seed_c, 0.008, Color(0.5, 0.45, 0.32))
+		var tip: Vector2 = Vector2(0.5 + 0.34 * side, 0.12)
+		var ax: Vector2 = (tip - seed_c).normalized()
+		var pr: Vector2 = Vector2(-ax.y, ax.x)
+		var ln: float = (tip - seed_c).length()
+		for yi: int in n:
+			for xi: int in n:
+				var p: Vector2 = Vector2((float(xi) + 0.5) / n, (float(yi) + 0.5) / n) - seed_c
+				var t: float = p.dot(ax) / ln
+				if t < -0.1 or t > 1.0:
+					continue
+				var s2: float = p.dot(pr)
+				var w: float = 0.11 * sin(PI * clampf(t * 0.95 + 0.05, 0.0, 1.0)) * (0.6 + 0.4 * t) + (0.035 if t < 0.15 else 0.0)
+				var a: float = clampf((w - absf(s2)) * n + 0.5, 0.0, 1.0)
+				if a <= 0.0:
+					continue
+				var v: float = 0.65 + 0.3 * t + (0.05 if fposmod(t * 14.0 + s2 * 20.0, 1.0) < 0.15 else 0.0)
+				if t < 0.15:
+					v = 0.55
+				_put(data, n, xi, yi, v, v, v * 0.95, a)
 	var img: Image = Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, data)
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)

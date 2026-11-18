@@ -40,7 +40,7 @@ fn species_block(o: &mut String, name: &str, sp: &SpeciesCtx) {
         o,
         "| âge | H m | DBH cm | houppier m | cerne mm (5 ans) | prof. racines m | 1re rafale critique défeuillé m/s | feuillé m/s | transpiration juillet L/j | biomasse ligneuse sèche t |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
     );
-    for &a in crate::measure::sample_ages(&sp.genome.species).iter().filter(|&&a| a as usize <= sp.runs[0].years.len()) {
+    for &a in crate::measure::sample_ages(sp.runs[0].years.len() as u32).iter().filter(|&&a| a as usize <= sp.runs[0].years.len()) {
         let col = |f: &dyn Fn(&crate::measure::YearRec) -> f64| -> String { mm(&sp.runs.iter().map(|r| f(&r.years[a as usize - 1])).collect::<Vec<_>>()) };
         let ring: Vec<f64> = sp
             .runs
@@ -103,7 +103,8 @@ fn species_block(o: &mut String, name: &str, sp: &SpeciesCtx) {
 
 pub fn trees_section(cx: &Ctx) -> String {
     let mut o = String::from("## Trajectoires simulées (arbre isolé, site de référence)\n\nMédiane [min–max] des graines.\n\n");
-    species_block(&mut o, "Chêne pédonculé", &cx.oak);
-    species_block(&mut o, "Merisier", &cx.cherry);
+    for sp in &cx.species {
+        species_block(&mut o, &sp.genome.common_name_fr, sp);
+    }
     o
 }

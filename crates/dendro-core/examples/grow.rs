@@ -1,7 +1,7 @@
 //! Grow a tree and print its dimensions every 10 years.
 //!
 //! cargo run -p dendro-core --release --example grow -- --years 100 [--seed N]
-//!     [--species oak|cherry] [--soil N] [--obj out.obj] [--drought-year Y]
+//!     [--species oak|cherry|<registry id>] [--soil N] [--obj out.obj] [--drought-year Y]
 //!     [--rings] [--pheno]
 
 use dendro_core::{ClimateParams, Genome, Phase, ReproStage, Simulation, SoilProfile};
@@ -25,7 +25,7 @@ fn main() {
         match a.as_str() {
             "--years" => years = args.next().and_then(|v| v.parse().ok()).expect("--years N"),
             "--seed" => seed = args.next().and_then(|v| v.parse().ok()).expect("--seed N"),
-            "--species" => species = args.next().expect("--species oak|cherry"),
+            "--species" => species = args.next().expect("--species oak|cherry|<id>"),
             "--soil" => soil = args.next().and_then(|v| v.parse().ok()).expect("--soil N (preset index)"),
             "--obj" => obj = Some(args.next().expect("--obj PATH")),
             "--drought-year" => drought_year = args.next().and_then(|v| v.parse().ok()),
@@ -33,7 +33,7 @@ fn main() {
             "--pheno" => print_pheno = true,
             "-h" | "--help" => {
                 println!(
-                    "usage: grow [--years N] [--seed N] [--species oak|cherry] [--soil N] [--obj PATH] [--drought-year Y] [--rings] [--pheno]"
+                    "usage: grow [--years N] [--seed N] [--species oak|cherry|<registry id>] [--soil N] [--obj PATH] [--drought-year Y] [--rings] [--pheno]"
                 );
                 let names: Vec<String> = SoilProfile::presets().into_iter().map(|p| p.name).collect();
                 println!("soil presets: {names:?}");
@@ -44,9 +44,13 @@ fn main() {
     }
 
     let genome = match species.as_str() {
-        "oak" | "quercus" | "quercus_robur" => Genome::quercus_robur(),
-        "cherry" | "prunus" | "prunus_avium" => Genome::prunus_avium(),
-        other => panic!("unknown species {other} (oak|cherry)"),
+        "oak" | "quercus" => Genome::quercus_robur(),
+        "cherry" | "prunus" => Genome::prunus_avium(),
+        // Any registry id (data/species/<id>.ron) or latin name.
+        other => Genome::find(other).unwrap_or_else(|| {
+            let ids: Vec<&str> = Genome::registry().iter().map(|g| g.id.as_str()).collect();
+            panic!("unknown species {other}; known: oak, cherry, {ids:?}")
+        }),
     };
     let mut presets = SoilProfile::presets();
     assert!(soil < presets.len(), "soil index out of range (0..{})", presets.len());

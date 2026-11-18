@@ -21,6 +21,9 @@ const MONTHS: Array[String] = ["janvier", "février", "mars", "avril", "mai", "j
 const MONTH_DAYS: Array[int] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 const PHASES: Array[String] = ["Dormance hivernale", "Débourrement", "Expansion des feuilles",
 	"Été — feuillage mature", "Coloration automnale", "Chute des feuilles"]
+## The same phases for an evergreen (the « autumn » is the cast of the oldest needle cohort).
+const PHASES_EVERGREEN: Array[String] = ["Repos hivernal — feuillage persistant", "Débourrement", "Allongement des pousses",
+	"Été — feuillage mature", "Automne — les plus vieilles aiguilles jaunissent", "Chute des plus vieilles aiguilles"]
 const MAX_SPEED_DAYS: float = 3650.0 # 10 years / s
 
 var _age: Label
@@ -312,7 +315,8 @@ func _build_bottom_bar(root: Control) -> void:
 	species_option.clip_text = true
 	species_option.fit_to_longest_item = false
 	species_option.custom_minimum_size = Vector2(190, 0)
-	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(i))
+	# Items carry the species index as their id (category headers are separators).
+	species_option.item_selected.connect(func(i: int) -> void: species_selected.emit(species_option.get_item_id(i)))
 	h2.add_child(species_option)
 
 	var so_lbl: Label = Label.new()
@@ -567,7 +571,7 @@ func update_from(sim: TreeSim) -> void:
 	_age.text = "Âge : %s ans" % ("%.1f" % age).replace(".", ",")
 	var year: int = sim.get_year()
 	_date.text = "Date : %s — année %d" % [date_text(sim.get_day_of_year()), year]
-	_phase.text = "Saison : " + PHASES[clampi(sim.get_phase(), 0, 5)]
+	_phase.text = "Saison : " + (PHASES_EVERGREEN if sim.get_evergreen() else PHASES)[clampi(sim.get_phase(), 0, 5)]
 	_height.text = "Hauteur : %s m" % ("%.1f" % sim.get_height_m()).replace(".", ",")
 	_diam.text = "Diamètre du tronc : %s cm" % ("%.1f" % sim.get_trunk_diameter_cm()).replace(".", ",")
 	_root_depth.text = "Profondeur des racines : %s m" % ("%.1f" % sim.get_root_depth_m()).replace(".", ",")
@@ -606,20 +610,27 @@ func select_soil(index: int) -> void:
 		soil_option.select(index)
 
 
-## Fills the species selector with the French common names (scientific names go to the info panel).
-func set_species_names(common: PackedStringArray, scientific: PackedStringArray) -> void:
+## Fills the species selector with the French common names (scientific names go to the info panel), grouped
+## under their category (« Feuillus », « Fruitiers », « Résineux »; the core lists species already grouped).
+## Each item's id is the species index.
+func set_species_names(common: PackedStringArray, scientific: PackedStringArray, categories: PackedStringArray = PackedStringArray()) -> void:
 	_species_common = common
 	_species_sci = scientific
 	species_option.clear()
+	var last: String = ""
 	for i: int in common.size():
-		species_option.add_item(common[i])
+		var cat: String = categories[i] if i < categories.size() else ""
+		if cat != "" and cat != last:
+			species_option.add_separator(cat)
+			last = cat
+		species_option.add_item(common[i], i)
 
 
 ## Selects the entry and shows the species in the info panel (common name bold, scientific italic).
 func select_species(index: int) -> void:
 	if index < 0 or index >= _species_common.size():
 		return
-	species_option.select(index)
+	species_option.select(species_option.get_item_index(index))
 	var sci: String = _species_sci[index] if index < _species_sci.size() else ""
 	_name_lbl.text = "[b]%s[/b] — [i]%s[/i]" % [_species_common[index], sci]
 

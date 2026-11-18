@@ -233,6 +233,9 @@ pub struct MechSite {
     pub root_depth_m: f32,
     /// Share of the root length in saturated soil layers today (0..1).
     pub saturated_root_fraction: f32,
+    /// Leaf mass per area (g dry / m², `LeafTraits::lma_g_m2`): with
+    /// `LEAF_DRY_MATTER_CONTENT`, the fresh leaf mass of the crown.
+    pub leaf_lma_g_m2: f32,
 }
 
 /// The load case: a steady wind (plus, later, extra masses).
@@ -585,8 +588,8 @@ impl MechanicsModel {
         }
         let full_area = cells.len() as f32 * cell * cell;
         let crown_area = full_area * f;
-        // Fresh leaf mass (kg/m²): flux.rs LMA (g dry / m²) / LDMC.
-        let leaf_kg_m2 = crate::flux::LMA * 1e-3 / LEAF_DRY_MATTER_CONTENT;
+        // Fresh leaf mass (kg/m²): the species' LMA (g dry / m²) / LDMC.
+        let leaf_kg_m2 = self.site.leaf_lma_g_m2 * 1e-3 / LEAF_DRY_MATTER_CONTENT;
         let leaf_kg = self.site.leaf_area_m2 * f * leaf_kg_m2;
         let mut p = Prepared {
             wind,
@@ -877,7 +880,7 @@ impl Simulation {
                 end: n.end(ext).to_array(),
                 radius_m: n.radius(),
                 decay_radius_m: decay[i],
-                leaf_weight: if n.leafy && !n.is_snag() { crate::growth::leaf_units(n, unit_len) } else { 0.0 },
+                leaf_weight: if n.leaf_w() > 0.0 { crate::growth::leaf_units(n, unit_len) * n.leaf_w() } else { 0.0 },
                 dead: n.is_snag(),
             })
             .collect();
@@ -893,7 +896,8 @@ impl Simulation {
             }
         }
         let site = MechSite {
-            leaf_area_m2: std::f32::consts::PI * cr * cr * crate::flux::LAI_FULL,
+            leaf_area_m2: std::f32::consts::PI * cr * cr * self.genome.leaf.crown_lai,
+            leaf_lma_g_m2: self.genome.leaf.lma_g_m2,
             leaf_fraction: self.leaf_density().clamp(0.0, 1.0),
             crown_cell_m: self.shoots.voxel,
             dbh_m: self.dbh_cm() * 0.01,
