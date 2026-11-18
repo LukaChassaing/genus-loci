@@ -1,0 +1,366 @@
+// Sycamore maple, Acer pseudoplatanus L.
+// Starting point: quercus_robur.ron (large spreading broadleaf). References:
+// data/validation/acer_pseudoplatanus.ron (39 entries), trait sheet
+// docs/species/acer_pseudoplatanus.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: opposite branching (one bud per metamer; a 90 degree divergence
+// approximates the decussate arrangement); winged double samara drawn with the generic Samara
+// texture; sooty bark disease after heatwaves (Cryptostroma corticale) and Asian longhorn beetle
+// are not simulated; no mean budburst or leaf fall date in the references (estimated, not
+// validated); juvenile height values (4 m at 10 years, 16 m at 20 years) come from a secondary
+// German source on rich sites.
+(
+    species: "Acer pseudoplatanus",
+    common_name: "Sycamore maple",
+    common_name_fr: "Érable sycomore",
+    category: Broadleaf,
+    // Large tree with a broad rounded crown whose diameter can exceed the height [atlas_crown];
+    // opposite palmate leaves; strong, wind-firm root system [atlas_roots]. Height 30-35 m
+    // [atlas_height, wpd_height], up to 35-40 m [wpf_height]; DBH 60-80 cm [atlas_dbh], 60 cm at
+    // 120 years [wpd_dbh120]; 4 m at 10 years and 16 m at 20 years [wpd_h10, wpd_h20].
+    architecture: (
+        // estimated: strong leader in the fast juvenile phase.
+        apical_dominance_young: 0.78,
+        // estimated: broad decurrent crown.
+        apical_dominance_mature: 0.44,
+        // estimated.
+        maturity_age_years: 40.0,
+        apical_dominance_branches: 0.52,
+        // estimated.
+        juvenile_phase_years: 12.0,
+        // estimated.
+        lateral_competition: 2.2,
+        // calibrated: 4 m at 10 years and 16 m at 20 years [wpd_h10, wpd_h20].
+        vigour_per_light: 5.8,
+        bud_break_threshold: 1.0,
+        // estimated.
+        internode_length_m: 0.05,
+        // calibrated: more than 1 m/yr on base-rich soils [eu_growth]; height CAI culminates at
+        // 12-14 years [sl_h_cai].
+        max_shoot_length_m: 1.0,
+        // estimated: opposite buds.
+        lateral_buds_per_shoot: 4,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // estimated.
+        branching_angle_deg: 50.0,
+        // approximation of the opposite decussate arrangement (one bud per metamer in the engine).
+        phyllotaxis_deg: 90.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        // calibrated by eye.
+        limb_setpoint_low_deg: 62.0,
+        // calibrated by eye.
+        limb_setpoint_high_deg: 32.0,
+        twig_setpoint_deg: 65.0,
+        // calibrated: crown diameter can exceed height [atlas_crown] (qualitative).
+        crown_spread_ratio: 1.25,
+        phototropism: 0.12,
+        sinuosity_deg: 8.0,
+        // estimated.
+        leader_loss_probability: 0.10,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated.
+        shedding_threshold: 0.08,
+        shade_survival_years: 3,
+        shedding_mean_threshold: 0.0,
+        // estimated.
+        clear_bole_fraction: 0.15,
+        clear_bole_max_m: 4.0,
+        clear_bole_limb_ratio: 0.5,
+        // not modelled.
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated.
+        epicormic_rate: 0.02,
+        // calibrated: max 30-35 m [atlas_height, wpd_height], 35-40 m [wpf_height].
+        hydraulic_path_max_m: 35.0,
+        // calibrated: fast juvenile growth, culmination of height MAI at 20-25 years [sl_h_mai].
+        hydraulic_exponent: 1.5,
+        hydraulic_foliage_exponent: 1.2,
+    ),
+    // Sycamore leaf: opposite, 5-lobed palmate, 10-20 cm, long petiole, coarse-toothed lobes
+    // (general knowledge, no source read).
+    leaf: (
+        // estimated.
+        length_cm: 14.0,
+        // estimated.
+        width_cm: 15.0,
+        // five main lobes.
+        lobes: 5,
+        // toothed lobes.
+        serration: 0.6,
+        deciduous: true,
+        // none.
+        marcescence: 0.0,
+        marcescence_max_age_years: 30.0,
+        // rendering.
+        leaves_per_shoot: 6.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering.
+        foliage_density: 4.0,
+        // rendering.
+        tip_bunching: 0.2,
+        // rendering: long petiole.
+        petiole_ratio: 0.7,
+        // rendering: large horizontal leaves, drooping.
+        leaf_droop: 0.5,
+        // rendering.
+        spur_foliage: 0.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        colour_spread: 0.55,
+    ),
+    // Calibrated by eye: dull yellow to brown autumn colour, some tar spots.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 0.7,
+        // calibrated by eye.
+        anthocyanins: 0.15,
+        // calibrated by eye.
+        tannins: 0.4,
+    ),
+    // Flowering mid-April [atlas_flowering doy 105] or May-June after the leaves in the British
+    // Isles [wpe_flowering doy 121-181]: divergent. No budburst or leaf fall date in the
+    // references: ESTIMATED (sycamore leafs out in April), not validated.
+    phenology: (
+        // estimated.
+        chilling_requirement_days: 50.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // estimated: leafing in early-mid April; no date to calibrate on.
+        gdd_budburst: 250.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // estimated; no date to calibrate on.
+        senescence_photoperiod_h: 12.2,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        leaf_fall_days: 21.0,
+    ),
+    // Density: dry wood 615 kg/m3 (12 %) [wdb_density].
+    wood: (
+        // measured [wdb_density] (dry wood).
+        density_kg_m3: 615.0,
+        // estimated: Q. robur 9.0 scaled by density.
+        elasticity_gpa: 8.7,
+        // diffuse-porous wood.
+        ring_porous: false,
+        // estimated (rendering).
+        earlywood_share: 0.5,
+        // rendering.
+        ring_contrast: 0.2,
+        // estimated: perishable wood.
+        snag_years_per_m: 120.0,
+        // calibrated on [wpd_dbh120 60 cm at 120 years] (see report).
+        growth_coefficient: 0.00028,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering.
+        bark_irregularity: 0.05,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        // rendering.
+        root_flare: 0.55,
+        root_flare_height_radii: 2.5,
+        // rendering.
+        buttress_lobes: 4,
+    ),
+    // Rendering: smooth pinkish-grey when young, then flaking into orange-brown plates
+    // [docs/species/acer_pseudoplatanus.md].
+    bark: (
+        // calibrated by eye.
+        color: (0.52, 0.45, 0.40),
+        // calibrated by eye.
+        young_color: (0.50, 0.46, 0.32),
+        // calibrated by eye.
+        old_darkening: (0.05, 0.04, 0.03),
+        // calibrated by eye.
+        lenticels: 0.1,
+        // calibrated by eye.
+        fissures: 0.45,
+        // calibrated by eye.
+        gloss: 0.0,
+    ),
+    // Strong root system, wind-firm despite a large crown [atlas_roots]. No depth in the
+    // references; values estimated.
+    roots: (
+        // estimated.
+        taproot_dominance: 0.6,
+        // estimated.
+        taproot_decline_years: 12.0,
+        // estimated.
+        max_depth_m: 3.5,
+        // estimated.
+        lateral_spread: 1.4,
+        lateral_count: 8,
+        lateral_depth_m: 0.45,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.1/5]; < 0.3 triggers the bench rule "growth on gley
+        // clay".
+        waterlogging_tolerance: 0.22,
+        // estimated.
+        hypoxia_sensitivity: 1.0,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated.
+        frost_c: -2.5,
+        // measured [niinemets_drought 2.75/5].
+        drought: 0.55,
+        // estimated: adult trees are less tolerant than the rating (3.73/5 [niinemets_shade]) which
+        // mixes ages; adults tolerate less than juveniles [Atlas].
+        shade: 0.5,
+        // measured, in sense: juveniles tolerant, adults less [niinemets_shade 3.73/5, Atlas];
+        // split chosen by hand.
+        shade_juvenile: Some(0.75),
+        // estimated.
+        shade_juvenile_years: 10.0,
+        // estimated.
+        shade_mature_years: 40.0,
+    ),
+    // First flowering 10-20 [atlas_flower_age], 20-25 [wpf_flower_age], 25-40 [wpd_flower_age],
+    // 15-30 years [eu_generation].
+    reproduction: (
+        // measured: overlap of [atlas_flower_age 10-20, wpf_flower_age 20-25, eu_generation 15-30];
+        // [wpd_flower_age] says 25-40.
+        first_flowering_age_years: 20.0,
+        // pendulous yellow-green panicles; display chosen by eye.
+        flower_display: 0.4,
+        // paired samaras are conspicuous.
+        fruit_display: 0.9,
+        // calibrated: flowering mid-April, as the leaves expand [atlas_flowering doy 105]; the
+        // British Isles source says May-June [wpe_flowering].
+        bloom_gdd: 270.0,
+        // estimated.
+        bloom_duration_gdd: 110.0,
+        // estimated.
+        min_wood_age_years: 1,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        // rendering.
+        fruit_cluster_cm: 7.0,
+        // rendering.
+        flower_color: (0.72, 0.78, 0.35),
+        fruit_set: 0.3,
+        flower_frost_c: -2.5,
+        // estimated: samaras ripen in September-October.
+        fruit_ripening_days: 140.0,
+        // estimated.
+        fruit_persistence_days: 70.0,
+        // rendering.
+        fruit_color_unripe: (0.58, 0.68, 0.28),
+        // rendering.
+        fruit_color_ripe: (0.66, 0.52, 0.30),
+        // double samara.
+        fruit_kind: Samara,
+        // estimated: no mast interval in the references.
+        crop_interval_years: 2.0,
+        // estimated.
+        off_year_crop: 0.35,
+    ),
+    // 350-400 years [atlas_longevity], 500 [eu_longevity, wpf_longevity], 600-800 [wpd_longevity]:
+    // divergent. No programmed decline.
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    // Arbuscular mycorrhizal (Wang & Qiu 2006, as cited in ADDING_A_SPECIES.md, not read); no
+    // mycorrhiza entry in the reference file. Calibrations are estimates (flux view only).
+    symbiosis: (
+        // Wang & Qiu 2006 (as cited in ADDING_A_SPECIES.md, not read).
+        mycorrhiza: Arbuscular,
+        // estimated.
+        carbon_cost: 0.08,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        // estimated.
+        hyphal_reach_m: 0.1,
+    ),
+    // Excellent wound healing [eu_wounds]; good regrowth after disturbance. Calibrations chosen for
+    // these qualitative rankings.
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.45,
+        // estimated.
+        sprout_vigour: 1.6,
+        // estimated.
+        stump_sprouting: 0.7,
+        root_suckering: 0.0,
+        compensatory_growth: 0.35,
+        // estimated from [eu_wounds].
+        woundwood_ratio: 2.6,
+        // estimated from [eu_wounds] ("excellent wound healing").
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [atlas_longevity 350-400]; other sources up to 500-800 (divergent).
+        typical_lifespan_years: 400.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (615/640); no green-wood table for this species was read. Sycamore
+        // density as in the genome.
+        green_density_kg_m3: 986.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 54.8,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 8.3,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

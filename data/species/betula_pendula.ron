@@ -1,0 +1,381 @@
+// Silver birch, Betula pendula Roth.
+// Starting point: prunus_avium.ron (short-lived, fast, light-demanding pioneer) for the strategy,
+// quercus_robur.ron for the structure. References: data/validation/betula_pendula.ron (35 entries),
+// trait sheet docs/species/betula_pendula.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: free (polycyclic) shoot growth of birch is represented only through a
+// long annual shoot cap; the black fissured bark base and the white upper bark are one bark colour;
+// the winged nutlet is drawn as a Samara; no height-age curve in a stand: the thesis value (24-25 m
+// at 30 years) is too vague to use (docs/species/betula_pendula.md), so growth is calibrated on 10
+// m at 10 years [wpf_juvenile] and the usual height/diameter only.
+(
+    species: "Betula pendula",
+    common_name: "Silver birch",
+    common_name_fr: "Bouleau verruqueux",
+    category: Broadleaf,
+    // Medium, fast tree with a narrow crown and pendulous twigs, white bark with horizontal
+    // lenticels [Atlas]; height 15-25 m, max 30 m [atlas_height, wpe_height, eu_height]; DBH
+    // usually under 40 cm, up to 90 cm [wpe_dbh, wpd_dbh]; about 10 m at 10 years [wpf_juvenile].
+    // Rauh model commonly cited, not verified here.
+    architecture: (
+        // estimated: strong leader (pioneer, narrow crown).
+        apical_dominance_young: 0.8,
+        // estimated: the leader stays dominant; narrow ovoid crown.
+        apical_dominance_mature: 0.6,
+        // estimated: short-lived tree, matures early.
+        maturity_age_years: 30.0,
+        // estimated.
+        apical_dominance_branches: 0.5,
+        // estimated.
+        juvenile_phase_years: 8.0,
+        // estimated.
+        lateral_competition: 1.6,
+        // calibrated (first lever of height): about 10 m at 10 years [wpf_juvenile], secondary
+        // source.
+        vigour_per_light: 7.5,
+        bud_break_threshold: 1.0,
+        // estimated.
+        internode_length_m: 0.05,
+        // calibrated: ~10 m in 10 years [wpf_juvenile] needs about 1 m/yr; birch shoots grow freely
+        // all summer (polycyclic, represented only by this cap).
+        max_shoot_length_m: 1.2,
+        // estimated.
+        lateral_buds_per_shoot: 3,
+        lateral_buds_per_metamer: 0.4,
+        // estimated.
+        bud_lifetime_years: 2,
+        // estimated.
+        branching_angle_deg: 40.0,
+        // estimated (spiral, 2/5).
+        phyllotaxis_deg: 144.0,
+        max_order: 120,
+        // estimated.
+        gravitropism: 0.45,
+        lateral_gravitropism: 0.3,
+        // calibrated by eye: low limbs sweep outward and droop at the tips.
+        limb_setpoint_low_deg: 70.0,
+        // calibrated by eye.
+        limb_setpoint_high_deg: 38.0,
+        // calibrated by eye: pendulous twigs (> 90 degrees: hanging), [Atlas: "pendulous twigs"].
+        twig_setpoint_deg: 105.0,
+        // calibrated by eye: narrow crown (no crown width in the references).
+        crown_spread_ratio: 0.5,
+        phototropism: 0.12,
+        // estimated.
+        sinuosity_deg: 6.0,
+        // estimated.
+        leader_loss_probability: 0.04,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated: light-demanding [niinemets_shade 2.03/5]; lower branches die early.
+        shedding_threshold: 0.13,
+        // estimated.
+        shade_survival_years: 2,
+        shedding_mean_threshold: 0.0,
+        // estimated: natural pruning of lower branches.
+        clear_bole_fraction: 0.3,
+        // estimated.
+        clear_bole_max_m: 7.0,
+        clear_bole_limb_ratio: 0.5,
+        // not modelled: the tree declines instead (see longevity).
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated.
+        epicormic_rate: 0.01,
+        // calibrated: usual height 15-25 m, max 30 m [wpe_height, atlas_height].
+        hydraulic_path_max_m: 27.0,
+        // calibrated: fast start, early plateau.
+        hydraulic_exponent: 1.0,
+        // calibrated: pioneer with a steep efficiency decline with distance (upper end of the range
+        // in ADDING_A_SPECIES.md).
+        hydraulic_foliage_exponent: 1.5,
+        // spiral, no planar fans.
+        lateral_planarity: 0.0,
+    ),
+    // Birch leaf: small, triangular-rhombic, doubly serrate, 3-7 cm, long slender petiole (general
+    // knowledge, no source read).
+    leaf: (
+        // estimated.
+        length_cm: 5.5,
+        // estimated.
+        width_cm: 4.0,
+        // unlobed.
+        lobes: 0,
+        // doubly serrate.
+        serration: 0.9,
+        deciduous: true,
+        // none.
+        marcescence: 0.0,
+        marcescence_max_age_years: 30.0,
+        // rendering.
+        leaves_per_shoot: 9.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering: light, airy crown.
+        foliage_density: 3.5,
+        // rendering.
+        tip_bunching: 0.2,
+        // rendering: long petiole, fluttering leaves.
+        petiole_ratio: 0.3,
+        // rendering.
+        leaf_droop: 0.5,
+        // rendering.
+        spur_foliage: 0.0,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        // rendering.
+        colour_spread: 0.35,
+    ),
+    // Calibrated by eye: clear golden-yellow autumn colour.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 1.1,
+        // calibrated by eye.
+        anthocyanins: 0.05,
+        // calibrated by eye.
+        tannins: 0.1,
+    ),
+    // Chilling: at least 105 days of cold in a forcing experiment (Myking & Heide 1995 via
+    // [wpf_chilling], not read). Catkins flower around doy 105 in Poland [wpp_flower]; seeds ripen
+    // about doy 227 [atlas_seed_ripening]. No budburst or leaf fall date in the references.
+    // Budburst and senescence below are ESTIMATED (birch leafs out early, colours in October) and
+    // not validated.
+    phenology: (
+        // estimated: [wpf_chilling] reports >= 105 days in a forcing experiment (secondary source,
+        // experiment not read, other chilling definition); the model needs a value <= ~80 so that
+        // the chilling term has levelled off at 80 days (engine test tests/realism.rs), hence 75: a
+        // known divergence from the reference.
+        chilling_requirement_days: 75.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // estimated: early budburst (before oak); no date to calibrate on.
+        gdd_budburst: 200.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // estimated; no date to calibrate on.
+        senescence_photoperiod_h: 12.2,
+        senescence_temp_base_c: 17.0,
+        senescence_cdd: 190.0,
+        // estimated.
+        leaf_fall_days: 18.0,
+    ),
+    // Density: dry wood 610 kg/m3 [wpd_density], 640 kg/m3 (12 %) [wdb_density].
+    wood: (
+        // measured, between [wpd_density 610] and [wdb_density 640] (dry wood).
+        density_kg_m3: 625.0,
+        // estimated: as Q. robur (similar density).
+        elasticity_gpa: 9.0,
+        // diffuse-porous wood.
+        ring_porous: false,
+        // estimated (rendering).
+        earlywood_share: 0.5,
+        // rendering.
+        ring_contrast: 0.2,
+        // estimated: perishable wood, dead branches fall quickly.
+        snag_years_per_m: 40.0,
+        // calibrated (see report) on usual DBH < 40 cm, up to 90 cm [wpe_dbh, wpd_dbh], 321 cm
+        // girth at 171 years [wpp_old_girth].
+        growth_coefficient: 0.00036,
+        // estimated: slender pendulous twigs.
+        twig_radius_mm: 1.6,
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering.
+        bark_irregularity: 0.05,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        // rendering.
+        root_flare: 0.35,
+        root_flare_height_radii: 2.5,
+        // rendering.
+        buttress_lobes: 3,
+    ),
+    // Rendering: white papery bark with horizontal lenticels [Atlas]; the base of old trunks turns
+    // black and fissured (not separately drawn).
+    bark: (
+        // calibrated by eye.
+        color: (0.88, 0.86, 0.82),
+        // calibrated by eye: reddish-brown young twigs.
+        young_color: (0.50, 0.30, 0.22),
+        // calibrated by eye.
+        old_darkening: (0.0, 0.0, 0.0),
+        // calibrated by eye [Atlas: horizontal lenticels].
+        lenticels: 0.9,
+        // calibrated by eye.
+        fissures: 0.1,
+        // calibrated by eye.
+        gloss: 0.35,
+    ),
+    // No rooting depth in the references. Birch roots are shallow and spreading (general knowledge,
+    // estimated).
+    roots: (
+        // estimated.
+        taproot_dominance: 0.4,
+        // estimated.
+        taproot_decline_years: 5.0,
+        // estimated.
+        max_depth_m: 2.0,
+        // estimated.
+        lateral_spread: 1.6,
+        lateral_count: 8,
+        // estimated.
+        lateral_depth_m: 0.3,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.67/5]; does not survive on wet clay or peat
+        // [EUFORGEN].
+        waterlogging_tolerance: 0.33,
+        // estimated.
+        hypoxia_sensitivity: 0.5,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated: very hardy (to -40 degC [wpf_frost] for the wood, not for new leaves).
+        frost_c: -4.0,
+        // measured [niinemets_drought 1.85/5]: poorly adapted.
+        drought: 0.37,
+        // measured [niinemets_shade 2.03/5]: light-demanding.
+        shade: 0.41,
+    ),
+    // First seed at 10 years for an isolated tree [atlas_flower_open], 5 [wpd_fruit_age], 20-25 in
+    // a dense stand [atlas_flower_dense]; seed peak every 2-3 years with yearly flowering
+    // [atlas_seed_peak].
+    reproduction: (
+        // measured [atlas_flower_open 10, wpd_fruit_age 5]: isolated tree.
+        first_flowering_age_years: 8.0,
+        // inconspicuous catkins.
+        flower_display: 0.0,
+        // estimated: small winged nutlets in hanging catkins, approximated by the Samara texture.
+        fruit_display: 0.35,
+        // calibrated on [wpp_flower doy 105] (Poland): catkins open with the early leaves.
+        bloom_gdd: 230.0,
+        // estimated.
+        bloom_duration_gdd: 90.0,
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        // rendering.
+        fruit_cluster_cm: 4.0,
+        flower_color: (0.65, 0.62, 0.30),
+        fruit_set: 0.3,
+        // estimated: hardy.
+        flower_frost_c: -4.0,
+        // calibrated on seed ripening around doy 227 [atlas_seed_ripening].
+        fruit_ripening_days: 110.0,
+        // estimated.
+        fruit_persistence_days: 60.0,
+        // rendering.
+        fruit_color_unripe: (0.50, 0.60, 0.25),
+        // rendering.
+        fruit_color_ripe: (0.58, 0.50, 0.30),
+        // winged nutlet (approximation).
+        fruit_kind: Samara,
+        // measured [atlas_seed_peak]: 2-3 years.
+        crop_interval_years: 2.5,
+        // measured, qualitatively [atlas_seed_peak]: yearly flowering, seed peak every 2-3 years;
+        // the fraction is a guess.
+        off_year_crop: 0.4,
+    ),
+    // Short-lived pioneer: 90-100 years, rarely 150 [atlas_longevity, atlas_longevity_max,
+    // eu_longevity, wpd_longevity]. The engine never kills a tree: a vigour decline from ~70 years
+    // stands for senescence (stylised; rates are guesses).
+    longevity: (
+        // stylised: onset of the decline, set before the 90-100 years life span [atlas_longevity].
+        decline_onset_years: 70.0,
+        // stylised.
+        decline_years: 40.0,
+        // stylised.
+        decline_min_vigour: 0.3,
+    ),
+    // Ectomycorrhizal, many fungi (Atlas, docs/species/betula_pendula.md). Calibrations as the oak
+    // pilot (flux view only).
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        // estimated.
+        hyphal_reach_m: 0.3,
+    ),
+    // Birch coppices weakly and compartmentalises poorly (general knowledge, estimated).
+    // Calibrations chosen for these qualitative rankings.
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.3,
+        // estimated.
+        sprout_vigour: 1.4,
+        // estimated.
+        stump_sprouting: 0.4,
+        // none.
+        root_suckering: 0.0,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        // estimated.
+        compartmentalization: 0.35,
+        // estimated.
+        decay_infection_rate: 0.08,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [atlas_longevity 90-100, eu_longevity 100].
+        typical_lifespan_years: 100.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (625/640); no green-wood table for this species was read. Birch
+        // density as in the genome.
+        green_density_kg_m3: 1002.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 55.7,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 8.4,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)

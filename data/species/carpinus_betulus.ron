@@ -1,0 +1,362 @@
+// European hornbeam, Carpinus betulus L.
+// Starting point: quercus_robur.ron (adjusted for a smaller, fluted, shade-tolerant tree).
+// References: data/validation/carpinus_betulus.ron (40 entries), trait sheet
+// docs/species/carpinus_betulus.md.
+// Fields written without a comment keep the quercus_robur.ron pilot value (status: proxy /
+// stylised, not re-tuned for this species). Statuses used in comments: measured [reference id of
+// data/validation/<id>.ron], proxy (another species, named), estimated (general knowledge, no
+// source read), calibrated (tuned so the simulated tree matches the references). Rendering fields
+// (bark, leaf shape, colours) are calibrated by eye.
+// Known gaps of the engine: fluted ("muscled") trunk cross-section is not drawn (round stem); the
+// winged trilobed nutlet is approximated by the Samara fruit texture; no reference gives a height-
+// age or a diameter-age curve, so growth is calibrated on the 10 m at 20 years [wpf_growth] and on
+// the usual 20-25 m height only.
+(
+    species: "Carpinus betulus",
+    common_name: "European hornbeam",
+    common_name_fr: "Charme commun",
+    category: Broadleaf,
+    // Small to medium tree, 20-25 m [atlas_height_usual], often 15-20 m [wpf_height]; > 30 m only
+    // in old-growth [atlas_height_old_growth], record 34.2 m [wpp_record_height]. Irregular ovoid
+    // then rounded crown, fluted twisted stem; often an understorey tree
+    // (docs/species/carpinus_betulus.md). Architectural model not verified.
+    architecture: (
+        // estimated.
+        apical_dominance_young: 0.7,
+        // estimated: stem dissolves into several limbs, irregular rounded crown.
+        apical_dominance_mature: 0.46,
+        // estimated.
+        maturity_age_years: 40.0,
+        apical_dominance_branches: 0.52,
+        // estimated.
+        juvenile_phase_years: 10.0,
+        // estimated: many similar limbs, fluted stem.
+        lateral_competition: 1.8,
+        // calibrated: about 10 m at 20 years [wpf_growth].
+        vigour_per_light: 6.5,
+        bud_break_threshold: 1.0,
+        // estimated.
+        internode_length_m: 0.03,
+        // calibrated: about 10 m at 20 years [wpf_growth] in a stand; slow thereafter.
+        max_shoot_length_m: 0.55,
+        // estimated.
+        lateral_buds_per_shoot: 3,
+        lateral_buds_per_metamer: 0.4,
+        bud_lifetime_years: 3,
+        // estimated.
+        branching_angle_deg: 48.0,
+        // estimated (general botanical knowledge): distichous leaves.
+        phyllotaxis_deg: 180.0,
+        max_order: 120,
+        gravitropism: 0.35,
+        lateral_gravitropism: 0.3,
+        // calibrated by eye.
+        limb_setpoint_low_deg: 60.0,
+        // calibrated by eye.
+        limb_setpoint_high_deg: 35.0,
+        twig_setpoint_deg: 65.0,
+        // estimated: rounded crown.
+        crown_spread_ratio: 0.7,
+        phototropism: 0.12,
+        // estimated: twisted, sinuous stems (docs/species/carpinus_betulus.md).
+        sinuosity_deg: 14.0,
+        // estimated.
+        leader_loss_probability: 0.12,
+        leader_loss_angle_deg: 22.0,
+        sag_coefficient: 3.0,
+        sag_min_radius_mm: 40.0,
+        sag_max_deg_per_year: 0.4,
+        sag_max_total_deg: 8.0,
+        sag_max_droop_deg: 10.0,
+        sag_min_inclination_deg: 50.0,
+        straightening_deg_per_year: 1.5,
+        straightening_keep_deg: 12.0,
+        straightening_min_radius_mm: 40.0,
+        // estimated: shade-tolerant [niinemets_shade 3.97/5].
+        shedding_threshold: 0.07,
+        // estimated.
+        shade_survival_years: 4,
+        shedding_mean_threshold: 0.0,
+        // estimated; clear bole of 8-10 m in a closed stand [wpd_bole], not for an isolated tree.
+        clear_bole_fraction: 0.2,
+        // estimated.
+        clear_bole_max_m: 4.0,
+        clear_bole_limb_ratio: 0.5,
+        // not modelled (short-lived tree).
+        retrenchment_onset_years: 0.0,
+        retrenchment_rate: 0.08,
+        retrenchment_ramp_years: 100.0,
+        retrenchment_reach: 0.72,
+        // estimated.
+        epicormic_rate: 0.02,
+        // calibrated: usual height 20-25 m [atlas_height_usual], record 34 m [wpp_record_height] is
+        // out of reach by design.
+        hydraulic_path_max_m: 28.0,
+        // calibrated.
+        hydraulic_exponent: 1.5,
+        hydraulic_foliage_exponent: 1.2,
+        // estimated: plagiotropic twigs (ADDING_A_SPECIES.md lists Carpinus).
+        lateral_planarity: 0.3,
+    ),
+    // Hornbeam leaf: ovate, doubly serrate, parallel veins, 6-10 cm (general knowledge).
+    // Marcescence: dead leaves kept all winter, shed at budburst [atlas_marcescence].
+    leaf: (
+        // estimated.
+        length_cm: 8.0,
+        // estimated.
+        width_cm: 4.5,
+        // unlobed.
+        lobes: 0,
+        // doubly serrate margin.
+        serration: 0.9,
+        deciduous: true,
+        // measured, qualitatively [atlas_marcescence]: dead leaves retained all winter; the
+        // fraction is a choice (full retention in adults).
+        marcescence: 0.95,
+        // the whole life: retention is general in the adult, not limited to young trees
+        // [atlas_marcescence].
+        marcescence_max_age_years: 300.0,
+        // rendering.
+        leaves_per_shoot: 8.0,
+        // rendering.
+        cluster_size_leaves: 3.0,
+        // rendering.
+        foliage_density: 4.5,
+        // rendering.
+        tip_bunching: 0.25,
+        // rendering.
+        petiole_ratio: 0.1,
+        // rendering.
+        leaf_droop: 0.3,
+        // rendering.
+        spur_foliage: 1.5,
+        spur_max_radius_mm: 40.0,
+        spur_min_light: 0.05,
+        colour_spread: 0.55,
+    ),
+    // Calibrated by eye: yellow to yellow-brown autumn colour.
+    pigments: (
+        chlorophyll: 1.0,
+        // calibrated by eye.
+        carotenoids: 0.9,
+        // calibrated by eye.
+        anthocyanins: 0.1,
+        // calibrated by eye.
+        tannins: 0.5,
+    ),
+    // Budburst doy 90 (31 March) in the understorey, RENECOFOR, the earliest of the broadleaves
+    // studied [ren_budburst]; end of yellowing doy 292 [ren_yellow]. Parameters calibrated, not
+    // measured. Marcescence: dead leaves stay through winter; the engine drops them at the next
+    // budburst (see marcescence).
+    phenology: (
+        chilling_requirement_days: 45.0,
+        chill_temp_min_c: -100.0,
+        chill_temp_max_c: 5.0,
+        gdd_base_c: 5.0,
+        // calibrated on [ren_budburst 90].
+        gdd_budburst: 180.0,
+        chill_forcing_gdd: 130.0,
+        forcing_start_doy: 31,
+        chill_start_doy: 304,
+        leaf_expansion_gdd: 190.0,
+        // calibrated on [ren_yellow 292].
+        senescence_photoperiod_h: 12.5,
+        senescence_temp_base_c: 17.0,
+        // calibrated on [ren_yellow 292].
+        senescence_cdd: 90.0,
+        leaf_fall_days: 21.0,
+    ),
+    // Density: dry wood 735 kg/m3 (12 %) [wdb_density], 820 kg/m3 [wpd_density]; middle value used.
+    wood: (
+        // measured, mid-way between [wdb_density 735] and [wpd_density 820] (dry wood, divergent
+        // sources).
+        density_kg_m3: 780.0,
+        // estimated: Q. robur 9.0 scaled by density.
+        elasticity_gpa: 10.0,
+        // diffuse-porous wood.
+        ring_porous: false,
+        // estimated (rendering).
+        earlywood_share: 0.5,
+        // rendering: very faint rings (rings of 0.12 mm in the bark [wpd_ring] are not a wood
+        // measurement).
+        ring_contrast: 0.15,
+        // estimated.
+        snag_years_per_m: 150.0,
+        // calibrated (see report).
+        growth_coefficient: 0.00030,
+        twig_radius_mm: 2.5,
+        max_ring_width_mm: 9.0,
+        collar_flare: 0.25,
+        pipe_exponent: 2.3,
+        limb_draw_boost: 1.6,
+        // rendering: fluted, "muscled" trunk (docs/species/carpinus_betulus.md).
+        bark_irregularity: 0.18,
+        adaptive_stress_mpa: 11.1,
+        adaptive_min_diameter_cm: 5.0,
+        adaptive_max_budget_share: 0.3,
+        // rendering.
+        root_flare: 0.5,
+        root_flare_height_radii: 2.5,
+        // rendering: fluted stem base.
+        buttress_lobes: 7,
+    ),
+    // Rendering: smooth grey bark with pale vertical streaks, fluted trunk.
+    bark: (
+        // calibrated by eye.
+        color: (0.52, 0.50, 0.47),
+        // calibrated by eye.
+        young_color: (0.40, 0.33, 0.24),
+        // calibrated by eye.
+        old_darkening: (0.02, 0.02, 0.02),
+        // calibrated by eye.
+        lenticels: 0.05,
+        // calibrated by eye.
+        fissures: 0.15,
+        // calibrated by eye.
+        gloss: 0.1,
+    ),
+    // Superficial system (35 cm deep in wet soil) [wpd_roots], hence windthrow-prone; not tolerant
+    // of exposure [fr_exposure].
+    roots: (
+        // estimated.
+        taproot_dominance: 0.3,
+        // estimated.
+        taproot_decline_years: 8.0,
+        // estimated: superficial [wpd_roots 0.35 m in wet soil]; the genetic depth is not given.
+        max_depth_m: 1.8,
+        // estimated.
+        lateral_spread: 1.4,
+        lateral_count: 8,
+        // estimated: superficial.
+        lateral_depth_m: 0.25,
+        sinker_tendency: 0.25,
+        branching_probability: 0.3,
+        max_order: 3,
+        annual_extension_m: 0.9,
+        max_penetration_mpa: 3.2,
+        // measured [niinemets_waterlogging 1.65/5]; but a fall-back to beech on wet soils is
+        // reported (docs/species/carpinus_betulus.md: divergent).
+        waterlogging_tolerance: 0.33,
+        // estimated.
+        hypoxia_sensitivity: 0.4,
+        drought_deepening: 0.6,
+        hydrotropism: 0.4,
+        root_shoot_ratio: 0.25,
+        root_shoot_stress_gain: 0.8,
+        fine_root_per_m: 1000.0,
+        rapid_taper: 1.2,
+    ),
+    // Scale 0-1 = Niinemets & Valladares rating / 5 (bench convention).
+    tolerances: (
+        // estimated: very hardy (to -30 degC [wpd_frost] for the wood, not for new leaves).
+        frost_c: -3.0,
+        // measured [niinemets_drought 2.66/5].
+        drought: 0.53,
+        // measured [niinemets_shade 3.97/5]: strongly tolerant, slightly less than beech.
+        shade: 0.8,
+    ),
+    // Wind-pollinated catkins in March-April [atlas_flowering doy 60-105]; fruit ripens in autumn
+    // [atlas_fruit_maturity]. First flowering age not found in the references.
+    reproduction: (
+        // estimated (the references give no age; general knowledge).
+        first_flowering_age_years: 20.0,
+        // inconspicuous catkins.
+        flower_display: 0.0,
+        // estimated: hanging clusters of winged nutlets, approximated by the Samara texture (no
+        // trilobed-bract fruit in the engine).
+        fruit_display: 0.5,
+        // calibrated: catkins open with the leaves, within doy 60-105 [atlas_flowering].
+        bloom_gdd: 190.0,
+        // estimated.
+        bloom_duration_gdd: 90.0,
+        min_wood_age_years: 0,
+        min_light: 0.3,
+        max_wood_radius_mm: 30.0,
+        flower_density: 1.0,
+        flower_cluster_cm: 6.0,
+        // rendering.
+        fruit_cluster_cm: 6.0,
+        // rendering.
+        flower_color: (0.70, 0.65, 0.35),
+        fruit_set: 0.3,
+        flower_frost_c: -2.5,
+        // estimated: autumn ripening [atlas_fruit_maturity].
+        fruit_ripening_days: 150.0,
+        // estimated.
+        fruit_persistence_days: 60.0,
+        // rendering.
+        fruit_color_unripe: (0.55, 0.65, 0.25),
+        // rendering.
+        fruit_color_ripe: (0.62, 0.52, 0.30),
+        // approximation: winged nutlet with a trilobed bract.
+        fruit_kind: Samara,
+        // estimated: abundant seeding [atlas_seeding].
+        crop_interval_years: 2.0,
+        // estimated.
+        off_year_crop: 0.4,
+    ),
+    // About 150 years [wpd_longevity], < 100 in France [wpf_longevity max], 199 recorded [wpp_age].
+    // No programmed decline.
+    longevity: (
+        decline_onset_years: 0.0,
+        decline_years: 50.0,
+        decline_min_vigour: 0.3,
+    ),
+    // Ectomycorrhizal (about 25 basidiomycetes) [docs/species/carpinus_betulus.md]. Calibrations as
+    // the oak pilot (flux view only).
+    symbiosis: (
+        mycorrhiza: Ecto,
+        carbon_cost: 0.15,
+        phosphorus_share: 0.6,
+        nitrogen_share: 0.4,
+        water_share: 0.05,
+        hyphal_reach_m: 0.35,
+    ),
+    // Vigorous resprouting: stump shoots and root suckers, coppice 20-35 years [fr_coppice], good
+    // response to pollarding [atlas_resprout]. Calibrations chosen for these qualitative rankings
+    // (close to lime).
+    pruning: (
+        // estimated.
+        epicormic_potential: 0.7,
+        // estimated.
+        sprout_vigour: 2.0,
+        // estimated from [atlas_resprout, fr_coppice].
+        stump_sprouting: 0.9,
+        // estimated from [atlas_resprout] (root suckers).
+        root_suckering: 0.15,
+        compensatory_growth: 0.35,
+        woundwood_ratio: 2.2,
+        compartmentalization: 0.7,
+        decay_infection_rate: 0.04,
+        decay_axial_m_per_year: 0.06,
+        decay_radial_mm_per_year: 5.0,
+        pathogen_dormant_risk: 0.03,
+        pathogen_summer_risk: 0.02,
+        pathogen_dieback_years: 4.0,
+        reserve_in_branches: 0.3,
+        root_balance_rate: 0.3,
+        sap_bleeding: 0.05,
+        // measured [wpd_longevity 150]; [wpf_longevity] says under 100, [wpp_age] records 199.
+        typical_lifespan_years: 150.0,
+    ),
+    mechanics: (
+        // estimated: the Q. robur proxy (USDA Wood Handbook white oak, green) scaled by the ratio
+        // of basal densities (780/640); no green-wood table for this species was read. Density as
+        // in the genome.
+        green_density_kg_m3: 1250.0,
+        // estimated, same scaling as green_density_kg_m3 (the dry-wood MOR of the reference file is
+        // a 12 % value, not a green one).
+        green_mor_mpa: 69.5,
+        // estimated, same scaling as green_density_kg_m3.
+        green_moe_gpa: 10.5,
+        // estimated, as the Q. robur pilot (Vollsinger et al. 2005 range for three hardwoods; this
+        // species not measured).
+        crown_drag_coefficient: 0.2,
+        // estimated, as the Q. robur pilot.
+        vogel_exponent: -1.0,
+        // estimated: Sitka spruce Creg of ForestGALES used as in the Q. robur pilot; no broadleaf
+        // tree-pulling coefficient found (docs/sources.md, Ecarts connus). Not valid for a shallow
+        // root plate.
+        anchorage_nm_per_kg: 178.1,
+    ),
+)
