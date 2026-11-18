@@ -1,0 +1,278 @@
+// Plum, Prunus domestica L. Fruit tree of the registry, derived from the Malus
+// pilot (and from the cherry, Prunus avium, for the genus traits).
+//
+// WHAT IS SIMULATED: an own-rooted plum ("franc de pied": seedling or sucker),
+// 3-8 m, short-lived (30-50 y) [fr_wiki_longevity_franc]. Rootstocks (Pixy,
+// St Julien A, Torinel [rhs_*]) are VERGER greffe entries and not targets.
+// The species is the worst documented of the batch: no height/DBH-age table,
+// no Breton phenology. Values not backed by an entry carry the marker
+// "proxy Malus domestica pilot, estimated".
+//
+// Reference values: data/validation/prunus_domestica.ron (ids in brackets) and
+// docs/species/prunus_domestica.md. Status: "measured", "proxy", "estimated",
+// "calibrated".
+(
+    species: "Prunus domestica",
+    common_name: "Plum",
+    common_name_fr: "Prunier",
+    category: FruitTree, // proxy Malus domestica pilot, estimated
+    architecture: (
+        // Medium tree, often umbrella- or vase-shaped [it_wiki_height]
+        // (qualitative): short excurrent youth then a spreading crown. Values estimated.
+        apical_dominance_young: 0.62,
+        apical_dominance_mature: 0.40,
+        maturity_age_years: 20.0,
+        juvenile_phase_years: 8.0,
+        apical_dominance_branches: 0.5, // proxy Malus domestica pilot, estimated
+        lateral_competition: 1.8, // proxy Malus domestica pilot, estimated
+        // Calibrated: franc 3-8 m [fr_wiki_height] [it_wiki_height]; the 6-12 m of
+        // [wdb_plum_height] mixes cultivated trees.
+        vigour_per_light: 6.2,
+        bud_break_threshold: 1.0, // proxy Malus domestica pilot, estimated
+        internode_length_m: 0.03, // proxy Malus domestica pilot, estimated
+        // Calibrated.
+        max_shoot_length_m: 0.5,
+        lateral_buds_per_shoot: 5, // proxy Malus domestica pilot, estimated
+        lateral_buds_per_metamer: 0.3, // proxy Malus domestica pilot, estimated
+        bud_lifetime_years: 4, // proxy Malus domestica pilot, estimated
+        // Cherry-like genus habit (proxy Prunus avium, estimated).
+        branching_angle_deg: 50.0,
+        phyllotaxis_deg: 144.0, // proxy Malus domestica pilot, estimated
+        max_order: 120, // proxy Malus domestica pilot, estimated
+        gravitropism: 0.45, // proxy Malus domestica pilot, estimated
+        lateral_gravitropism: 0.3, // proxy Malus domestica pilot, estimated
+        limb_setpoint_low_deg: 70.0, // proxy Malus domestica pilot, estimated
+        limb_setpoint_high_deg: 50.0, // proxy Malus domestica pilot, estimated
+        twig_setpoint_deg: 70.0, // proxy Malus domestica pilot, estimated
+        // Umbrella / vase shape [it_wiki_height]: wide crown (calibrated).
+        crown_spread_ratio: 1.7,
+        phototropism: 0.12, // proxy Malus domestica pilot, estimated
+        sinuosity_deg: 9.0, // proxy Malus domestica pilot, estimated
+        leader_loss_probability: 0.15, // proxy Malus domestica pilot, estimated
+        leader_loss_angle_deg: 30.0, // proxy Malus domestica pilot, estimated
+        sag_coefficient: 5.0, // proxy Malus domestica pilot, estimated
+        sag_min_radius_mm: 25.0, // proxy Malus domestica pilot, estimated
+        sag_max_deg_per_year: 0.8, // proxy Malus domestica pilot, estimated
+        sag_max_total_deg: 14.0, // proxy Malus domestica pilot, estimated
+        sag_max_droop_deg: 15.0, // proxy Malus domestica pilot, estimated
+        sag_min_inclination_deg: 45.0, // proxy Malus domestica pilot, estimated
+        straightening_deg_per_year: 1.0, // proxy Malus domestica pilot, estimated
+        straightening_keep_deg: 10.0, // proxy Malus domestica pilot, estimated
+        straightening_min_radius_mm: 30.0, // proxy Malus domestica pilot, estimated
+        shedding_threshold: 0.10, // proxy Malus domestica pilot, estimated
+        shade_survival_years: 2, // proxy Malus domestica pilot, estimated
+        shedding_mean_threshold: 0.0, // proxy Malus domestica pilot, estimated
+        clear_bole_fraction: 0.15, // proxy Malus domestica pilot, estimated
+        clear_bole_max_m: 2.0, // proxy Malus domestica pilot, estimated
+        clear_bole_limb_ratio: 0.5, // proxy Malus domestica pilot, estimated
+        // Franc 30-50 y [fr_wiki_longevity_franc]: dieback from ~30 y (estimated).
+        retrenchment_onset_years: 30.0,
+        retrenchment_rate: 0.10, // proxy Malus domestica pilot, estimated
+        retrenchment_ramp_years: 20.0,
+        retrenchment_reach: 0.6, // proxy Malus domestica pilot, estimated
+        epicormic_rate: 0.03, // proxy Malus domestica pilot, estimated
+        // Height ceiling, calibrated on 3-8 m [fr_wiki_height] up to 12 m [wdb_plum_height].
+        hydraulic_path_max_m: 11.0,
+        hydraulic_exponent: 1.2,
+        hydraulic_foliage_exponent: 1.2, // proxy Malus domestica pilot, estimated
+    ),
+    leaf: (
+        // Leaf size not read in the sources; Prunus ovate-elliptic leaf, serrate
+        // (estimated, see trait sheet).
+        length_cm: 7.0,
+        width_cm: 4.0,
+        lobes: 0, // proxy Malus domestica pilot, estimated
+        serration: 0.6,
+        deciduous: true, // proxy Malus domestica pilot, estimated
+        marcescence: 0.0, // proxy Malus domestica pilot, estimated
+        marcescence_max_age_years: 1.0, // proxy Malus domestica pilot, estimated
+        leaves_per_shoot: 8.0, // proxy Malus domestica pilot, estimated
+        cluster_size_leaves: 3.0, // proxy Malus domestica pilot, estimated
+        foliage_density: 4.0, // proxy Malus domestica pilot, estimated
+        tip_bunching: 0.3, // proxy Malus domestica pilot, estimated
+        petiole_ratio: 0.25,
+        leaf_droop: 0.4, // proxy Malus domestica pilot, estimated
+        // Fruit on short shoots and brindilles (estimated, no source read).
+        spur_foliage: 5.0,
+        spur_max_radius_mm: 40.0, // proxy Malus domestica pilot, estimated
+        spur_min_light: 0.1, // proxy Malus domestica pilot, estimated
+        colour_spread: 0.5, // proxy Malus domestica pilot, estimated
+    ),
+    pigments: (
+        chlorophyll: 1.0, // proxy Malus domestica pilot, estimated
+        carotenoids: 0.8,
+        anthocyanins: 0.3, // proxy Malus domestica pilot, estimated
+        tannins: 0.5, // proxy Malus domestica pilot, estimated
+        anthocyanin_persistence: 0.0, // proxy Malus domestica pilot, estimated
+    ),
+    phenology: (
+        // European plum 700-1100 h [uga_chill_european] (Georgia, temperature
+        // threshold not stated): same order as the apple (estimated).
+        chilling_requirement_days: 55.0,
+        chill_temp_min_c: -100.0, // proxy Malus domestica pilot, estimated
+        chill_temp_max_c: 5.0, // proxy Malus domestica pilot, estimated
+        gdd_base_c: 5.0, // proxy Malus domestica pilot, estimated
+        // Calibrated: flowers March-April, before the leaves [fr_wiki_flowering]
+        // (doy 60-120); one week before the apple [maine_bloom_vs_apple].
+        gdd_budburst: 260.0,
+        chill_forcing_gdd: 250.0, // proxy Malus domestica pilot, estimated
+        forcing_start_doy: 31, // proxy Malus domestica pilot, estimated
+        chill_start_doy: 304, // proxy Malus domestica pilot, estimated
+        leaf_expansion_gdd: 180.0,
+        senescence_photoperiod_h: 12.0, // proxy Malus domestica pilot, estimated
+        senescence_temp_base_c: 17.0, // proxy Malus domestica pilot, estimated
+        senescence_cdd: 170.0, // proxy Malus domestica pilot, estimated
+        leaf_fall_days: 20.0, // proxy Malus domestica pilot, estimated
+    ),
+    wood: (
+        // Basic density 610 kg/m3 [wdb_plum_basic] (795 at 12 % moisture
+        // [wdb_plum_density12], 750 oven-dry [de_wiki_density]).
+        density_kg_m3: 610.0,
+        // MOE 10.19 GPa [wdb_plum_moe] (12 % moisture: not a green value).
+        elasticity_gpa: 10.2,
+        ring_porous: false, // proxy Malus domestica pilot, estimated
+        earlywood_share: 0.4, // proxy Malus domestica pilot, estimated
+        ring_contrast: 0.25, // proxy Malus domestica pilot, estimated
+        // Calibrated: DBH 30-40 cm [wdb_plum_dbh] (mixed cultivated trees; no free-standing
+        // DBH-age table [absence_prunus_0_dbh]).
+        growth_coefficient: 0.00075,
+        twig_radius_mm: 2.5, // proxy Malus domestica pilot, estimated
+        max_ring_width_mm: 10.0, // proxy Malus domestica pilot, estimated
+        pipe_exponent: 2.2, // proxy Malus domestica pilot, estimated
+        limb_draw_boost: 1.3, // proxy Malus domestica pilot, estimated
+        bark_irregularity: 0.06, // proxy Malus domestica pilot, estimated
+        adaptive_stress_mpa: 11.1, // proxy Malus domestica pilot, estimated
+        adaptive_min_diameter_cm: 5.0, // proxy Malus domestica pilot, estimated
+        adaptive_max_budget_share: 0.3, // proxy Malus domestica pilot, estimated
+        collar_flare: 0.25, // proxy Malus domestica pilot, estimated
+        root_flare: 0.3, // proxy Malus domestica pilot, estimated
+        root_flare_height_radii: 1.5, // proxy Malus domestica pilot, estimated
+        buttress_lobes: 0, // proxy Malus domestica pilot, estimated
+        snag_years_per_m: 120.0, // proxy Malus domestica pilot, estimated
+    ),
+    bark: (
+        // Dark grey-brown bark with horizontal lenticels like the cherry (estimated).
+        color: (0.30, 0.23, 0.22),
+        young_color: (0.48, 0.32, 0.24), // proxy Malus domestica pilot, estimated
+        old_darkening: (0.12, 0.10, 0.08), // proxy Malus domestica pilot, estimated
+        lenticels: 0.6,
+        fissures: 0.5, // proxy Malus domestica pilot, estimated
+        gloss: 0.15, // proxy Malus domestica pilot, estimated
+    ),
+    roots: (
+        // No root data [absence_prunus_2_root]; shallow and spreading with suckers
+        // (estimated).
+        taproot_dominance: 0.3,
+        taproot_decline_years: 8.0, // proxy Malus domestica pilot, estimated
+        max_depth_m: 1.6,
+        lateral_spread: 2.2,
+        lateral_count: 9, // proxy Malus domestica pilot, estimated
+        lateral_depth_m: 0.4, // proxy Malus domestica pilot, estimated
+        sinker_tendency: 0.15, // proxy Malus domestica pilot, estimated
+        branching_probability: 0.35, // proxy Malus domestica pilot, estimated
+        max_order: 3, // proxy Malus domestica pilot, estimated
+        annual_extension_m: 0.8, // proxy Malus domestica pilot, estimated
+        max_penetration_mpa: 2.5, // proxy Malus domestica pilot, estimated
+        waterlogging_tolerance: 0.2, // proxy Malus domestica pilot, estimated
+        hypoxia_sensitivity: 0.5, // proxy Malus domestica pilot, estimated
+        hypoxia_air_porosity: 0.12, // proxy Malus domestica pilot, estimated
+        drought_deepening: 0.3, // proxy Malus domestica pilot, estimated
+        hydrotropism: 0.4, // proxy Malus domestica pilot, estimated
+        root_shoot_ratio: 0.25, // proxy Malus domestica pilot, estimated
+        root_shoot_stress_gain: 0.5, // proxy Malus domestica pilot, estimated
+        fine_root_per_m: 1000.0, // proxy Malus domestica pilot, estimated
+        rapid_taper: 1.0, // proxy Malus domestica pilot, estimated
+    ),
+    tolerances: (
+        frost_c: -2.0, // proxy Malus domestica pilot, estimated
+        drought: 0.45,
+        // Light-demanding (estimated).
+        shade: 0.3,
+    ),
+    reproduction: (
+        // Franc: not found [absence_prunus_1_age]; 5 y as the cherry (estimated); the 3-4 y
+        // of [rhs_pixy_first_fruit] are grafted trees.
+        first_flowering_age_years: 5.0,
+        flower_display: 1.0, // proxy Malus domestica pilot, estimated
+        fruit_display: 1.0, // proxy Malus domestica pilot, estimated
+        // Calibrated, see gdd_budburst.
+        bloom_gdd: 240.0,
+        bloom_duration_gdd: 100.0,
+        min_wood_age_years: 2, // proxy Malus domestica pilot, estimated
+        min_light: 0.25, // proxy Malus domestica pilot, estimated
+        max_wood_radius_mm: 30.0, // proxy Malus domestica pilot, estimated
+        flower_density: 3.0, // proxy Malus domestica pilot, estimated
+        flower_cluster_cm: 5.0,
+        // Fruit 2-3 cm for the insititia type (trait sheet); up to 8 cm for
+        // cultivated varieties.
+        fruit_cluster_cm: 2.5,
+        flower_color: (0.98, 0.97, 0.94),
+        fruit_set: 0.3,
+        // Full bloom: 10 % killed at -2.2 degC, 90 % at -5.0 degC
+        // [nmsu_plum_full_bloom_10] [nmsu_plum_full_bloom_90]; first bloom -2.8 / -5.0, tight cluster
+        // -4.4 / -8.9, swollen bud -10 / -17.8 (single threshold in the engine: stages not
+        // representable). Commercial cultivar, not a franc.
+        flower_frost_c: -2.2,
+        // Estimated: maturity from June to end of September depending on variety
+        // [it_wiki_fruit_maturity] (doy 152-273); mid-season after an April bloom.
+        fruit_ripening_days: 110.0,
+        fruit_persistence_days: 25.0,
+        fruit_color_unripe: (0.45, 0.55, 0.22),
+        fruit_color_ripe: (0.30, 0.12, 0.35),
+        fruit_kind: Fleshy, // proxy Malus domestica pilot, estimated
+        // Annual bearing assumed (no alternation source read, estimated).
+        crop_interval_years: 1.0,
+        off_year_crop: 0.15,
+    ),
+    longevity: (
+        // Franc 30-50 y [fr_wiki_longevity_franc]: much shorter than the cherry (110 y).
+        decline_onset_years: 28.0,
+        decline_years: 20.0,
+        decline_min_vigour: 0.3, // proxy Malus domestica pilot, estimated
+    ),
+    symbiosis: (
+        // Rosaceae: arbuscular (Wang & Qiu 2006); no plum source [absence_prunus_3_mycorrhiza].
+        mycorrhiza: Arbuscular,
+        carbon_cost: 0.10, // proxy Malus domestica pilot, estimated
+        phosphorus_share: 0.7, // proxy Malus domestica pilot, estimated
+        nitrogen_share: 0.2, // proxy Malus domestica pilot, estimated
+        water_share: 0.03, // proxy Malus domestica pilot, estimated
+        hyphal_reach_m: 0.12, // proxy Malus domestica pilot, estimated
+    ),
+    pruning: (
+        epicormic_potential: 0.6, // proxy Malus domestica pilot, estimated
+        sprout_vigour: 1.6, // proxy Malus domestica pilot, estimated
+        // Estimated (proxy cherry 0.35).
+        stump_sprouting: 0.5,
+        // Type insititia: suckers abundantly and forms thickets [fr_wiki_suckers]; cherry
+        // 0.8 (proxy). The engine only uses this value for coppice cuts: suckers are
+        // not produced spontaneously (engine gap).
+        root_suckering: 0.9,
+        compensatory_growth: 0.35, // proxy Malus domestica pilot, estimated
+        woundwood_ratio: 1.6, // proxy Malus domestica pilot, estimated
+        compartmentalization: 0.5, // proxy Malus domestica pilot, estimated
+        decay_infection_rate: 0.08, // proxy Malus domestica pilot, estimated
+        decay_axial_m_per_year: 0.1, // proxy Malus domestica pilot, estimated
+        decay_radial_mm_per_year: 6.0, // proxy Malus domestica pilot, estimated
+        pathogen_dormant_risk: 0.25, // proxy Malus domestica pilot, estimated
+        pathogen_summer_risk: 0.08, // proxy Malus domestica pilot, estimated
+        pathogen_dieback_years: 3.0, // proxy Malus domestica pilot, estimated
+        reserve_in_branches: 0.35, // proxy Malus domestica pilot, estimated
+        root_balance_rate: 0.4, // proxy Malus domestica pilot, estimated
+        sap_bleeding: 0.1, // proxy Malus domestica pilot, estimated
+        // Own-rooted plum 30-50 y [fr_wiki_longevity_franc] (secondary source).
+        typical_lifespan_years: 40.0,
+    ),
+    mechanics: (
+        // Not found: estimated from basic density 610 with ~65 % moisture (dry mass).
+        green_density_kg_m3: 1000.0,
+        // MOR 88.4 MPa and MOE 10.19 GPa are not green [wdb_plum_mor] [wdb_plum_moe]:
+        // green estimated at ~0.6 x MOR and ~0.85 x MOE.
+        green_mor_mpa: 53.0,
+        green_moe_gpa: 8.7,
+        crown_drag_coefficient: 0.2, // proxy Malus domestica pilot, estimated
+        vogel_exponent: -1.0, // proxy Malus domestica pilot, estimated
+        anchorage_nm_per_kg: 178.1, // proxy Malus domestica pilot, estimated
+    ),
+)
+
