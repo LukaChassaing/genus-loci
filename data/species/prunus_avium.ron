@@ -160,11 +160,22 @@
         // Calibration: a, b and the requirement are tuned so that leaf-out
         // falls in early-mid April, about a week before the oak, together
         // with the bloom.
+        // Recalibrated with the WGEN temperature generator (crate::tempgen): the
+        // former climate had March 0.6 degC too cold and about half the
+        // day-to-day variance, so the same thresholds now gave budburst
+        // 6-10 days earlier (warmer March; with a wider spread, warm days add
+        // forcing above 5 degC and cold days add chill days below 5 degC:
+        // the two effects were not measured separately). Thresholds raised
+        // to restore the earlier
+        // calibrated mean dates (measured, 5 seeds x 40 years: oak
+        // budburst day 113.2 before / 112.8 after; cherry 103.3 / 102.6,
+        // cherry bloom 101.6 / 100.5, 0-based).
+        // gdd_budburst was 185.
         chilling_requirement_days: 45.0,
         chill_temp_min_c: -100.0,
         chill_temp_max_c: 5.0,
         gdd_base_c: 5.0,
-        gdd_budburst: 185.0,
+        gdd_budburst: 233.0,
         chill_forcing_gdd: 250.0,
         forcing_start_doy: 31,
         chill_start_doy: 304,
@@ -297,8 +308,9 @@
         // sum from Feb 1 and chilling penalty as leaf-out): early-mid April
         // at Rennes; the mean onset of cherry bloom in Germany was 17 April
         // in 1991-2020 (Deutscher Wetterdienst phenological network), a
-        // cooler climate.
-        bloom_gdd: 172.0,
+        // cooler climate. Raised from 172 with the WGEN climate (see
+        // phenology above).
+        bloom_gdd: 218.0,
         bloom_duration_gdd: 110.0,
         // Umbels of 2-6 flowers on short spurs of 2-year and older wood,
         // throughout the outer crown (bloom reads as a white cloud; only the

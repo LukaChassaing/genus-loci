@@ -40,6 +40,7 @@ mod roots;
 pub mod save;
 mod sim;
 pub mod soil;
+pub mod tempgen;
 
 pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};

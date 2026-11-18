@@ -782,6 +782,37 @@ func prepare_shot() -> void:
 
 # ---------------------------------------------------------------------------------------------- self-test
 
+## Screen point for the hover check: a point of a first-order limb (see `prune_hint_point`) where the
+## pick ray hits that limb itself; failing that (a dense crown hides every limb behind twigs), the first
+## candidate whose hit segment has something to cut (non-empty preview mesh: the tip of a twig, t = 1,
+## removes nothing). Candidates: limbs of radius closest to `radius_m` x 1, 1.25, 0.8, 1.5, 0.6, at
+## 40, 60, 20 and 80 % of their first segment. Falls back to the first candidate.
+func _visible_limb_point(radius_m: float) -> Vector2:
+	var c: Camera3D = cam.get_camera()
+	var view_h: float = get_viewport().get_visible_rect().size.y
+	var tol: float = PICK_TOL_PX * deg_to_rad(OrbitCamera.FOV_DEG) / maxf(view_h, 1.0)
+	var first: Vector2 = Vector2(-1, -1)
+	var cuttable: Vector2 = Vector2(-1, -1)
+	for k: float in [1.0, 1.25, 0.8, 1.5, 0.6]:
+		for f: float in [0.4, 0.6, 0.2, 0.8]:
+			var hp: PackedFloat32Array = sim.prune_hint_point(radius_m * k, f)
+			if hp[3] < 0.0:
+				continue
+			var sp: Vector2 = c.unproject_position(Vector3(hp[0], hp[1], hp[2]))
+			if first.x < 0.0:
+				first = sp
+			var h: Dictionary = sim.prune_pick(c.project_ray_origin(sp), c.project_ray_normal(sp), tol)
+			if not h.get("hit", false):
+				continue
+			if int(h["node_id"]) == int(hp[3]):
+				return sp
+			if cuttable.x < 0.0:
+				var m: ArrayMesh = sim.build_prune_preview_mesh(int(h["node_id"]), float(h["t"]), false)
+				if m != null and m.get_surface_count() > 0:
+					cuttable = sp
+	return cuttable if cuttable.x >= 0.0 else first
+
+
 func selftest(check: Callable) -> void:
 	var tree: SceneTree = get_tree()
 	host.call("_apply_seed", 77)
@@ -797,9 +828,11 @@ func selftest(check: Callable) -> void:
 	Input.parse_input_event(ev)
 	await tree.process_frame
 	check.call("prune: key T activates the tool", active and panel.visible and hud.prune_button.button_pressed)
-	# Hover on a limb: highlight, marker and tooltip.
-	var hp: PackedFloat32Array = sim.prune_hint_point(0.02, 0.4)
-	var sp: Vector2 = cam.get_camera().unproject_position(Vector3(hp[0], hp[1], hp[2]))
+	# Hover on a limb: highlight, marker and tooltip. The target is a point of a ~2 cm limb that the
+	# pick ray actually reaches: a point hidden behind a twig would test the twig instead (seen with
+	# seed 77: a 0.55 cm twig tip in front of the limb, whose cut removes nothing and has an empty
+	# preview mesh). Only the aim changes; the checks below are the same.
+	var sp: Vector2 = _visible_limb_point(0.02)
 	_forced_hover = true
 	hover_at(sp)
 	check.call("prune: hover picks a branch and previews the cut", hover.get("hit", false) and preview_mi.visible

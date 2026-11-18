@@ -192,11 +192,22 @@
         // France leaf out from mid-April, Lebourgeois et al. 2010, Int J
         // Biometeorol 54:563-581; late April-early May across Europe, Eaton
         // et al. 2016, European Atlas of Forest Tree Species).
+        // Recalibrated with the WGEN temperature generator (crate::tempgen): the
+        // former climate had March 0.6 degC too cold and about half the
+        // day-to-day variance, so the same thresholds now gave budburst
+        // 6-10 days earlier (warmer March; with a wider spread, warm days add
+        // forcing above 5 degC and cold days add chill days below 5 degC:
+        // the two effects were not measured separately). Thresholds raised
+        // to restore the earlier
+        // calibrated mean dates (measured, 5 seeds x 40 years: oak
+        // budburst day 113.2 before / 112.8 after; cherry 103.3 / 102.6,
+        // cherry bloom 101.6 / 100.5, 0-based).
+        // gdd_budburst was 270.
         chilling_requirement_days: 45.0,
         chill_temp_min_c: -100.0,
         chill_temp_max_c: 5.0,
         gdd_base_c: 5.0,
-        gdd_budburst: 270.0,
+        gdd_budburst: 308.0,
         chill_forcing_gdd: 130.0,
         forcing_start_doy: 31,
         chill_start_doy: 304,
@@ -381,8 +392,9 @@
         // inconspicuous at tree scale; acorns are not drawn either.
         flower_display: 0.0,
         fruit_display: 0.0,
-        // Catkins open with the leaves.
-        bloom_gdd: 260.0,
+        // Catkins open with the leaves (raised from 260 with the WGEN
+        // climate, like gdd_budburst: mean bloom day 112.5 vs budburst 112.8).
+        bloom_gdd: 298.0,
         bloom_duration_gdd: 120.0,
         // Flowers on the current-year shoots.
         min_wood_age_years: 0,

@@ -445,16 +445,18 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
         "rennes_temp_mean_jan" => cl(|s| s.t_month[0], "température moyenne de janvier").calib(),
         "rennes_temp_mean_jul" => cl(|s| s.t_month[6], "température moyenne de juillet").calib(),
         "rennes_temp_mean_aug" => cl(|s| s.t_month[7], "température moyenne d'août").calib(),
-        "rennes_temp_max_mean_annual" => cl(|s| s.tx_mean, "Tx moyenne annuelle"),
-        "rennes_temp_min_mean_annual" => cl(|s| s.tn_mean, "Tn moyenne annuelle"),
+        "rennes_temp_max_mean_annual" => cl(|s| s.tx_mean, "Tx moyenne annuelle").calib(),
+        "rennes_temp_min_mean_annual" => cl(|s| s.tn_mean, "Tn moyenne annuelle").calib(),
         "rennes_dtr_jan" => cl(|s| s.dtr_month[0], "amplitude Tx-Tn de janvier").calib(),
         "rennes_dtr_jul" => cl(|s| s.dtr_month[6], "amplitude Tx-Tn de juillet").calib(),
-        "rennes_frost_days_tn0" => cl(|s| s.frost_days, "jours Tn ≤ 0 °C par an"),
+        // Tn <= 0, Tx >= 25 and Tx <= 0: monthly counts of the fiche used to fit
+        // the standard deviations of the temperature generator (tempgen.rs).
+        "rennes_frost_days_tn0" => cl(|s| s.frost_days, "jours Tn ≤ 0 °C par an").calib(),
         "rennes_frost_days_tn_m5" => cl(|s| s.tn_le_m5, "jours Tn ≤ -5 °C par an"),
         "rennes_frost_days_tn_m10" => cl(|s| s.tn_le_m10, "jours Tn ≤ -10 °C par an"),
-        "rennes_ice_days_tx0" => cl(|s| s.tx_le_0, "jours Tx ≤ 0 °C par an"),
+        "rennes_ice_days_tx0" => cl(|s| s.tx_le_0, "jours Tx ≤ 0 °C par an").calib(),
         "rennes_hot_days_tx30" => cl(|s| s.tx_ge_30, "jours Tx ≥ 30 °C par an"),
-        "rennes_summer_days_tx25" => cl(|s| s.tx_ge_25, "jours Tx ≥ 25 °C par an"),
+        "rennes_summer_days_tx25" => cl(|s| s.tx_ge_25, "jours Tx ≥ 25 °C par an").calib().warn("calé sur les comptages mensuels d'avril-juin et septembre-octobre, pas juillet-août"),
         "rennes_record_high" | "rennes_record_high_wiki" => cl(|s| s.record_tx_80y, "Tx maximale sur 80 ans (médiane des fenêtres de 80 ans)"),
         "rennes_record_high_jun" => cl(|s| s.record_tx_june_80y, "Tx maximale de juin sur 80 ans (médiane des fenêtres)"),
         "rennes_record_low" => {
