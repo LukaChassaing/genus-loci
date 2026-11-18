@@ -35,6 +35,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dendro-validate"
+version = "0.0.1"
+dependencies = [
+ "dendro-core",
+ "ron",
+ "serde",
+]
+
+[[package]]
 name = "gdextension-api"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

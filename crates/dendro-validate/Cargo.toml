@@ -1,0 +1,16 @@
+[package]
+name = "dendro-validate"
+description = "Validation bench: engine outputs against published reference values (data/validation)"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[features]
+# Measurements that need the dynamic-wind API of the `m1-vent-dynamique`
+# branch (daily gusts, natural frequency, damping, wind damage).
+vent = []
+
+[dependencies]
+dendro-core = { path = "../dendro-core" }
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"
