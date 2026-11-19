@@ -42,6 +42,7 @@ mod sim;
 pub mod soil;
 pub mod tempgen;
 pub mod vitality;
+pub mod wind;
 
 pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
@@ -50,15 +51,16 @@ pub use genome::{
     Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
     Tolerances, WoodTraits,
 };
-pub use mechanics::{CriticalSpeeds, FailureMode, MechSegment, MechSite, MechanicsModel, MechanicsSnapshot, SegmentRole, WeakPoint, WindLoad};
+pub use mechanics::{CriticalSpeeds, DynamicFactor, Dynamics, FailureMode, MechSegment, MechSite, MechanicsModel, MechanicsSnapshot, SegmentRole, WeakPoint, WindLoad};
 pub use mesh::MeshData;
 pub use phenology::{Phase, ReproStage, Season};
 pub use pruning::{
     Action, BoleMetrics, CutKind, CutPreview, CutSpec, JournalEntry, LogEvent, PickHit, PruneMetrics, PruningTraits, ShootInfo, WoundState,
 };
 pub use rings::Ring;
-pub use save::{Replay, ReplayResult, SaveError, SaveFile, SaveMeta, SAVE_VERSION};
+pub use save::{Replay, ReplayResult, SaveError, SaveFile, SaveMeta, SAVE_VERSION_MIN, SAVE_VERSION};
 pub use vitality::{DeathCause, VitalityInfo};
+pub use wind::{DamageKind, WindDamage, WindDebris};
 pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
 pub use sim::{
     ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, FLOWER_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET,

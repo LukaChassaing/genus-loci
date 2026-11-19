@@ -65,7 +65,7 @@
 
 use crate::fmath::DMath;
 use crate::genome::MechanicsTraits;
-use crate::math::Vec3;
+use crate::math::{Quat, Vec3};
 use crate::sim::Simulation;
 
 // ----------------------------------------------------------------------
@@ -155,6 +155,34 @@ pub const WET_SOIL_FACTOR: f32 = 135.8 / 153.2;
 /// mode (twigs break in every gale).
 pub const LIMB_MIN_DIAMETER_M: f32 = 0.05;
 pub const LIMB_DBH_FRACTION: f32 = 0.2;
+/// Below this diameter at the collar nothing breaks in the simulation.
+pub const BREAK_MIN_DIAMETER_M: f32 = 0.05;
+/// The sections the simulation actually breaks in a gale
+/// (`crate::wind`) are the structural ones (stem and limbs, see
+/// [`LIMB_MIN_DIAMETER_M`]): crown branches below 20 % of the DBH carry
+/// the crown drag of their leafy tips without mutual sheltering, which
+/// overestimates their load (docs/sources.md); their loss, like the
+/// stripping of twigs and leaves in every gale, is not modelled.
+///
+/// Uprooting is only checked from this DBH (m). Estimated: the anchorage
+/// law `Creg x stem mass` is a regression on pulled trees of plantation
+/// size (Nicoll et al. 2006), and applied to open-grown saplings of 5-10 cm
+/// it overturns every one of them in the first gale above ~25 m/s, while
+/// saplings bend down rather than overturn. Young trees can still snap.
+pub const UPROOT_MIN_DBH_M: f32 = 0.2;
+/// The stem can break from this diameter up (m; its leafless sections,
+/// whatever the DBH). Tried at 2.5 cm (so that a young tree's leader, not
+/// the 5 cm threshold, decides where the stem fails): the thin leaders of
+/// 10-year oaks then snapped in 17-30 m/s summer gusts and the trees turned
+/// into bushes of resprouts breaking again and again (seed 42: 6 m tall at
+/// 50 years, 500 breaks in 200 years); kept at the limb threshold, 5 cm,
+/// until the load on young crowns is better known (docs/sources.md).
+pub const STEM_BREAK_MIN_DIAMETER_M: f32 = LIMB_MIN_DIAMETER_M;
+/// Slack of [`MechanicsModel::screen`]'s lower bound (estimated): the wind
+/// moment is taken to grow at most as `K U²` above the reference speed
+/// (drag grows at most as U², the Vogel exponents being <= 0), K covering
+/// the growth of the dynamic factor with speed and the weight's P-Δ moment.
+pub const SCREEN_SLACK: f32 = 1.05;
 /// Upper end of the critical speed search (m/s). Gusts beyond ~80 m/s are
 /// unknown in western Europe.
 pub const MAX_SEARCH_SPEED_MS: f32 = 80.0;
@@ -168,6 +196,30 @@ pub const SAFETY_CAP: f32 = 999.0;
 /// (Greenhill 1881, Proc Camb Philos Soc, not read: constant as quoted by
 /// McMahon 1973, Science 179:1201-1204, who found trees ~4x below it).
 const GREENHILL: f32 = 0.792;
+
+/// Woody segments at least this thick bend in the dynamics (Rayleigh mode
+/// shape), and the stem segments among them in the large-deflection model
+/// (limbs are not bowed: a cost choice, see `MechanicsModel::pass`); thinner
+/// wood, leafy shoots and dead wood move rigidly with their parent axis. Estimated: the
+/// reconfiguration of leaves and twigs is already in the measured crown
+/// drag and its Vogel exponent (Vollsinger et al. 2005 tested whole
+/// juvenile crowns), so letting twigs bend too would count it twice.
+pub const FLEX_MIN_DIAMETER_M: f32 = 0.025;
+/// Large-deflection iterations: at most this many fixed-point steps, run
+/// only when the axes turn by more than `LARGE_DEFLECTION_MIN_RAD`; stop
+/// when no rotation changes by more than `LARGE_DEFLECTION_TOL_RAD`;
+/// under-relaxation factor; cap on one segment's own rotation (numerical
+/// guards, not physics).
+const LARGE_DEFLECTION_ITERATIONS: usize = 4;
+pub const LARGE_DEFLECTION_MIN_RAD: f32 = 0.15;
+const LARGE_DEFLECTION_TOL_RAD: f32 = 0.005;
+const LARGE_DEFLECTION_RELAX: f32 = 0.6;
+const LARGE_DEFLECTION_MAX_SEG_RAD: f32 = 0.35;
+/// EN 1991-1-4:2005: minimum height of the profile laws (Table 4.1,
+/// terrain category II, z0 = 0.05 m; our z0 is 0.03 m) and averaging period
+/// of the peak factor (B.2, T = 600 s).
+const EC_Z_MIN_M: f32 = 2.0;
+const EC_PEAK_PERIOD_S: f32 = 600.0;
 
 // ----------------------------------------------------------------------
 // Public types
@@ -269,6 +321,10 @@ pub struct WindLoad {
     /// Extra mass per segment (kg, segment order; missing = 0), applied at
     /// the segment midpoint: the slot for snow and intercepted water.
     pub extra_mass_kg: Vec<f32>,
+    /// Quasi-static small-deflection statics only (no dynamic factor, no
+    /// large deflections): the first, static M1 model, for hand-checked
+    /// cases.
+    pub quasi_static: bool,
 }
 
 impl WindLoad {
@@ -327,6 +383,9 @@ pub struct MechanicsSnapshot {
     pub segment_stress_mpa: Vec<f32>,
     pub segment_role: Vec<SegmentRole>,
     pub segment_ids: Vec<u32>,
+    /// The section can break in the simulation (stem and limb sections, see
+    /// [`BREAK_MIN_DIAMETER_M`]).
+    pub segment_breakable: Vec<bool>,
     /// Lowest safety factor of each mode (capped).
     pub stem_safety: f32,
     pub limb_safety: f32,
@@ -359,6 +418,13 @@ pub struct MechanicsSnapshot {
     pub crown_drag_coefficient: f32,
     /// Self-weight elastic buckling height / tree height (Greenhill).
     pub buckling_safety: f32,
+    /// First sway mode: natural frequency (Hz), total damping ratio in this
+    /// wind (still-air + aerodynamic), dynamic factor applied to the wind
+    /// loads, horizontal displacement of the stem top (m).
+    pub natural_frequency_hz: f32,
+    pub damping_ratio: f32,
+    pub dynamic_factor: f32,
+    pub top_deflection_m: f32,
 }
 
 // ----------------------------------------------------------------------
@@ -378,6 +444,14 @@ struct Seg {
     di: f32,
     /// Section modulus π (D⁴ − Di⁴) / (32 D) (m³).
     zmod: f32,
+    /// Bending stiffness E I (N m²) of the segments that bend in the
+    /// dynamics and large-deflection model, 0 for the rigid ones (leafy
+    /// shoots, dead wood, wood thinner than [`FLEX_MIN_DIAMETER_M`]).
+    ei: f32,
+    /// Bends in the large-deflection model: a flexible stem section of at
+    /// least 20 % of the DBH (the thin leader in the crown of a big tree
+    /// moves with it, like the crown branches).
+    bows: bool,
     /// Green wood mass (kg).
     mass: f32,
     leaf_share: f32,
@@ -385,6 +459,9 @@ struct Seg {
     /// Counts for the stem (resp. limb) mode.
     stem_mode: bool,
     limb_mode: bool,
+    /// Can break in the simulation: stem or limb mode (see
+    /// [`BREAK_MIN_DIAMETER_M`]).
+    breakable: bool,
 }
 
 const NO_PARENT: usize = usize::MAX;
@@ -399,6 +476,10 @@ pub struct MechanicsModel {
     stem_mass: f32,
     height: f32,
     crown_mid_y: f32,
+    /// Highest segment of the stem path (top deflection).
+    trunk_top: usize,
+    /// The stem path, collar first.
+    trunk: Vec<usize>,
 }
 
 /// Direction- and foliage-dependent coefficients of one load case.
@@ -406,10 +487,15 @@ struct Prepared {
     wind: Vec3,
     leaf_fraction: f32,
     crown_area: f32,
-    /// Per segment: wood drag `½ ρ Cd d L sin²θ × exposure` (N per (m/s)²),
+    /// Crown width across the wind (m), for the dynamic factor.
+    crown_width: f32,
+    /// Per segment: wood drag `½ ρ Cd d L × exposure` without the cross-flow
+    /// factor (`wood_base`, for the deformed geometry), and with it:
+    /// wood drag `½ ρ Cd d L sin²θ × exposure` (N per (m/s)²),
     /// whether that wood reconfigures (not the stem), crown drag
     /// `½ ρ A0 share` (m² kg/m³), leaf mass and extra mass (kg), wind
     /// profile factor at the midpoint and at the tip.
+    wood_base: Vec<f32>,
     wood_k: Vec<f32>,
     wood_bends: Vec<bool>,
     crown_k: Vec<f32>,
@@ -422,18 +508,68 @@ struct Prepared {
     prof_end_b: Vec<f32>,
     wood_reconf: Reconf,
     crown_reconf: Reconf,
+    /// Dynamics of the first sway mode (see [`Dynamics`]).
+    dynamics: Dynamics,
+    /// Mode shape (displacement along the wind, normalised to 1 at its
+    /// maximum) at each segment's midpoint and tip.
+    shape_mid: Vec<f32>,
+    shape_end: Vec<f32>,
+    /// Bending moment vectors at rest (self-weight, undeformed): the
+    /// large-deflection model bends the axes by the wind's share only, the
+    /// rest geometry being the equilibrium under weight (the sag model of
+    /// growth.rs already drew it).
+    m0: Vec<Vec3>,
+    quasi_static: bool,
+    table: ProfileTable,
+}
+
+/// First sway mode of the tree (Rayleigh estimate, see
+/// [`MechanicsModel::dynamics`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Dynamics {
+    /// Natural frequency of the fundamental sway mode (Hz).
+    pub natural_frequency_hz: f32,
+    /// Damping ratio in still air (structural + leaves, Jackson et al.
+    /// 2019), without the aerodynamic part of a mean wind.
+    pub damping_ratio: f32,
+    /// Generalised (modal) mass, mode shape normalised to 1 at its
+    /// maximum (kg).
+    pub modal_mass_kg: f32,
+}
+
+/// Deformed geometry of the large-deflection model.
+struct Geom {
+    start: Vec<Vec3>,
+    end: Vec<Vec3>,
+    dir: Vec<Vec3>,
+    /// Share of the leafy sail still facing the wind: `|R n · n|` with n the
+    /// wind direction and R the rotation of the segment.
+    sail: Vec<f32>,
 }
 
 struct PassOut {
     stem: f32,
     limb: f32,
+    /// Lowest safety of the sections the simulation can break.
+    breakable: f32,
     anchorage: f32,
     base_moment: f32,
     drag: f32,
     drag_height: f32,
+    /// Dynamic factor and total damping ratio of this load case.
+    dynamic_factor: f32,
+    damping: f32,
+    /// Bending moment vector at the base of every segment (N m), kept for
+    /// the large-deflection iterations.
+    moments: Vec<Vec3>,
     /// (bending moment N m, stress Pa, safety) per segment, when asked.
     detail: Vec<(f32, f32, f32)>,
+    /// Horizontal displacement of the stem top (m), deformed geometry.
+    top_deflection: f32,
+    /// Computed on a deformed geometry (large deflections).
+    deformed: bool,
 }
+
 
 /// `U(z) / U(10 m)` of the logarithmic profile over open ground:
 /// `ln(z / z0) / ln(10 / z0)` (neutral surface layer; e.g. Stull 1988, "An
@@ -448,6 +584,133 @@ pub fn wind_profile(z: f32) -> f32 {
 fn profile(z: f32) -> f32 {
     let z = z.max(PROFILE_MIN_HEIGHT_M);
     (z / ROUGHNESS_LENGTH_M).dln() / (REFERENCE_HEIGHT_M / ROUGHNESS_LENGTH_M).dln()
+}
+
+/// Turbulence intensity `I_v(z) = 1 / ln(z / z0)` over flat open terrain
+/// (EN 1991-1-4:2005, eq. 4.7, turbulence and orography factors 1), with
+/// `z` floored at `z_min` = 2 m (Table 4.1, terrain category II).
+pub fn turbulence_intensity(z: f32) -> f32 {
+    1.0 / (z.max(EC_Z_MIN_M) / ROUGHNESS_LENGTH_M).dln()
+}
+
+/// Peak gust over the 10-minute mean wind at height `z`:
+/// `√(1 + 7 I_v(z))`, from the peak velocity pressure `q_p = (1 + 7 I_v)
+/// q_m` of EN 1991-1-4:2005, eq. 4.8. At 10 m over open ground (z0 =
+/// 0.03 m) it is 1.49: a daily maximum gust of 30 m/s comes with a mean
+/// wind of ~20 m/s.
+pub fn gust_factor(z: f32) -> f32 {
+    (1.0 + 7.0 * turbulence_intensity(z)).sqrt()
+}
+
+/// Result of [`dynamic_factor`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DynamicFactor {
+    /// Dynamic factor `c_d` (peak load with resonance / quasi-static peak
+    /// gust load).
+    pub cd: f32,
+    /// Size factor `c_s` (non-simultaneous gusts over the crown); reported,
+    /// not applied (see the module documentation).
+    pub cs: f32,
+    /// Background and resonant response parts B², R².
+    pub background: f32,
+    pub resonant: f32,
+    /// Peak factor.
+    pub peak_factor: f32,
+}
+
+/// Structural factor of EN 1991-1-4:2005 (§6.3.1 and Annex B, procedure 1:
+/// Davenport's gust response factor for one mode) for a structure of height
+/// `h` and width `b` (m), natural frequency `n` (Hz), damping ratio `zeta`
+/// (logarithmic decrement δ = 2π ζ) in a mean wind `v_mean_10` (m/s, 10-min
+/// mean at 10 m over open ground):
+/// * reference height `z_s = 0.6 h` (Fig. 6.1), mean wind there from the
+///   logarithmic profile, `I_v(z_s)`;
+/// * integral length scale `L = 300 (z_s / 200)^α`, `α = 0.67 + 0.05 ln
+///   z0` (eq. B.1);
+/// * spectrum `S_L = 6.8 f_L / (1 + 10.2 f_L)^(5/3)`, `f_L = n L / v_m`
+///   (eq. B.2);
+/// * background `B² = 1 / (1 + 0.9 ((b + h) / L)^0.63)` (eq. B.3);
+/// * resonance `R² = π² / (2 δ) S_L R_h R_b`, `R_ℓ = 1/η − (1 − e^(−2η)) /
+///   (2 η²)`, `η_h = 4.6 h f_L / L`, `η_b = 4.6 b f_L / L` (eqs. B.6-B.8);
+/// * peak factor `k_p = √(2 ln(ν T)) + 0.6 / √(2 ln(ν T))` ≥ 3, `ν = n
+///   √(R² / (B² + R²))` ≥ 0.08 Hz, T = 600 s (eqs. B.4-B.5);
+/// * `c_s = (1 + 7 I_v B) / (1 + 7 I_v)`, `c_d = (1 + 2 k_p I_v √(B² +
+///   R²)) / (1 + 7 I_v B)` (eqs. 6.2-6.3).
+///
+/// The standard is written for buildings and chimneys; trees enter it as
+/// one vertical cantilever with the mode, frequency and damping of
+/// [`MechanicsModel::dynamics`]. The formulas are quoted from the standard
+/// as we know it (text not re-read in this session: see docs/sources.md).
+pub fn dynamic_factor(h: f32, b: f32, n: f32, zeta: f32, v_mean_10: f32) -> DynamicFactor {
+    let h = h.max(0.5);
+    let b = b.max(0.1);
+    let zs = (0.6 * h).max(EC_Z_MIN_M);
+    let iv = turbulence_intensity(zs);
+    let vm = (v_mean_10 * profile(zs)).max(0.5);
+    let alpha = 0.67 + 0.05 * ROUGHNESS_LENGTH_M.dln();
+    let l = 300.0 * (zs / 200.0).dpowf(alpha);
+    let fl = n.max(0.01) * l / vm;
+    let sl = 6.8 * fl / (1.0 + 10.2 * fl).dpowf(5.0 / 3.0);
+    let b2 = 1.0 / (1.0 + 0.9 * ((b + h) / l).dpowf(0.63));
+    let r = |eta: f32| if eta < 1e-4 { 1.0 } else { 1.0 / eta - (1.0 - (-2.0 * eta).dexp()) / (2.0 * eta * eta) };
+    let delta = 2.0 * std::f32::consts::PI * zeta.max(0.005);
+    let r2 = std::f32::consts::PI * std::f32::consts::PI / (2.0 * delta) * sl * r(4.6 * h * fl / l) * r(4.6 * b * fl / l);
+    let nu = (n * (r2 / (b2 + r2)).sqrt()).max(0.08);
+    let x = (2.0 * (nu * EC_PEAK_PERIOD_S).dln()).max(1e-3).sqrt();
+    let kp = (x + 0.6 / x).max(3.0);
+    let bb = b2.sqrt();
+    let cs = (1.0 + 7.0 * iv * bb) / (1.0 + 7.0 * iv);
+    let cd = (1.0 + 2.0 * kp * iv * (b2 + r2).sqrt()) / (1.0 + 7.0 * iv * bb);
+    DynamicFactor { cd, cs, background: b2, resonant: r2, peak_factor: kp }
+}
+
+/// Unit quaternion of the rotation vector `v` (axis × angle), angle below
+/// ~0.35 rad: `(cos(a/2), sin(a/2) v/a)` by its Taylor series to third
+/// order, renormalised (relative error < 1e-5 at 0.35 rad), without the
+/// libm calls of `Quat::from_axis_angle` in the inner loop.
+#[inline]
+fn small_rotation(v: Vec3) -> Quat {
+    let a2 = v.dot(v);
+    let w = 1.0 - a2 / 8.0;
+    let k = 0.5 * (1.0 - a2 / 24.0);
+    let (x, y, z) = (v.x * k, v.y * k, v.z * k);
+    let norm = (w * w + x * x + y * y + z * z).sqrt();
+    Quat { w: w / norm, x: x / norm, y: y / norm, z: z / norm }
+}
+
+/// Wind profile factor and its powers for the two Vogel exponents,
+/// tabulated every `PROFILE_TABLE_STEP_M` from the ground up (linear
+/// interpolation, a few hundred libm calls per load case instead of
+/// several per segment in the large-deflection passes).
+struct ProfileTable {
+    k: Vec<f32>,
+    kb_wood: Vec<f32>,
+    kb_crown: Vec<f32>,
+}
+
+const PROFILE_TABLE_STEP_M: f32 = 0.25;
+
+impl ProfileTable {
+    fn new(top: f32, b_crown: f32) -> Self {
+        let n = ((top.max(1.0) + 20.0) / PROFILE_TABLE_STEP_M) as usize + 2;
+        let mut t = ProfileTable { k: Vec::with_capacity(n), kb_wood: Vec::with_capacity(n), kb_crown: Vec::with_capacity(n) };
+        for i in 0..n {
+            let k = profile(i as f32 * PROFILE_TABLE_STEP_M);
+            t.k.push(k);
+            t.kb_wood.push(k.dpowf(BARE_WOOD_VOGEL_EXPONENT));
+            t.kb_crown.push(k.dpowf(b_crown));
+        }
+        t
+    }
+    /// (k, k^B_wood, k^B_crown) at height `y`.
+    #[inline]
+    fn at(&self, y: f32) -> (f32, f32, f32) {
+        let x = (y.max(0.0) / PROFILE_TABLE_STEP_M).min((self.k.len() - 2) as f32);
+        let i = x as usize;
+        let f = x - i as f32;
+        let l = |v: &[f32]| v[i] + (v[i + 1] - v[i]) * f;
+        (l(&self.k), l(&self.kb_wood), l(&self.kb_crown))
+    }
 }
 
 /// `x^b` for the reconfiguration laws, factorised so that a pass costs one
@@ -498,6 +761,7 @@ impl MechanicsModel {
             }
         }
         let mut on_trunk = vec![false; n];
+        let mut trunk_top = 0;
         if n > 0 {
             let mut cur = 0;
             on_trunk[0] = true;
@@ -505,10 +769,12 @@ impl MechanicsModel {
                 cur = thickest[cur];
                 on_trunk[cur] = true;
             }
+            trunk_top = cur;
         }
         let structural_d = LIMB_MIN_DIAMETER_M.max(LIMB_DBH_FRACTION * site.dbh_m);
         let leaf_total: f32 = segments.iter().map(|s| s.leaf_weight.max(0.0)).sum();
         let rho = traits.green_density_kg_m3;
+        let e = traits.green_moe_gpa * 1e9;
         let mut segs = Vec::with_capacity(n);
         let (mut wood_mass, mut stem_mass, mut height) = (0.0f32, 0.0f32, 0.0f32);
         let (mut leaf_y, mut leaf_w) = (0.0f32, 0.0f32);
@@ -520,7 +786,8 @@ impl MechanicsModel {
             let r = s.radius_m.max(1e-5);
             let d = 2.0 * r;
             let di = (2.0 * s.decay_radius_m).clamp(0.0, 0.98 * d);
-            let zmod = std::f32::consts::PI * (d * d * d * d - di * di * di * di) / (32.0 * d);
+            let d4 = d * d * d * d - di * di * di * di;
+            let zmod = std::f32::consts::PI * d4 / (32.0 * d);
             // Decayed wood keeps most of its (wet) mass: full section.
             let mass = rho * std::f32::consts::PI * r * r * len;
             let leaf_share = if leaf_total > 0.0 { s.leaf_weight.max(0.0) / leaf_total } else { 0.0 };
@@ -532,6 +799,7 @@ impl MechanicsModel {
                 SegmentRole::Branch
             };
             let structural = !s.dead && s.leaf_weight <= 0.0 && d >= structural_d;
+            let flexible = !s.dead && s.leaf_weight <= 0.0 && d >= FLEX_MIN_DIAMETER_M && len > 0.0;
             wood_mass += mass;
             if on_trunk[i] {
                 stem_mass += mass;
@@ -552,15 +820,19 @@ impl MechanicsModel {
                 d,
                 di,
                 zmod: zmod.max(1e-12),
+                ei: if flexible { e * std::f32::consts::PI * d4 / 64.0 } else { 0.0 },
+                bows: flexible && on_trunk[i],
                 mass,
                 leaf_share,
                 role,
                 stem_mode: on_trunk[i] && structural,
                 limb_mode: role == SegmentRole::Limb,
+                breakable: (on_trunk[i] && !s.dead && s.leaf_weight <= 0.0 && d >= STEM_BREAK_MIN_DIAMETER_M) || role == SegmentRole::Limb,
             });
         }
         let crown_mid_y = if leaf_w > 0.0 { leaf_y / leaf_w } else { 0.5 * height };
-        MechanicsModel { traits, site, segs, wood_mass, stem_mass, height, crown_mid_y }
+        let trunk = (0..n).filter(|&i| on_trunk[i]).collect();
+        MechanicsModel { traits, site, segs, wood_mass, stem_mass, height, crown_mid_y, trunk_top, trunk }
     }
 
     pub fn segment_count(&self) -> usize {
@@ -585,6 +857,95 @@ impl MechanicsModel {
         let depth = SHALLOW_ROOTING_FACTOR + (1.0 - SHALLOW_ROOTING_FACTOR) * t;
         let wet = 1.0 - (1.0 - WET_SOIL_FACTOR) * s.saturated_root_fraction.clamp(0.0, 1.0);
         self.traits.anchorage_nm_per_kg * self.stem_mass * depth * wet
+    }
+
+    /// Fundamental sway mode for the foliage and extra masses of `load`
+    /// (its speed is ignored).
+    ///
+    /// Rayleigh's method with the static deflection shape: the tree is
+    /// loaded sideways (along the wind) by the weight of each of its masses
+    /// (wood at the segment midpoints, fresh leaves at the leafy tips,
+    /// extra loads), the deflection `u_j` follows from the curvature `M /
+    /// (E I)` integrated from the collar along every axis (small rotations,
+    /// green MOE), and `ω² = g Σ m u / Σ m u²` (Rayleigh 1877, "The Theory
+    /// of Sound"; e.g. Clough & Penzien, "Dynamics of Structures"; for a
+    /// uniform cantilever this shape gives a frequency 0.4 % above the exact
+    /// one, checked in the tests). Only the structural axes bend in this
+    /// shape (the stem and limb sections of the failure modes, at least
+    /// max(5 cm, 20 % of the DBH) across): the root-soil plate, crown
+    /// branches, twigs, leafy shoots and dead wood are rigid bodies carried
+    /// by them, which makes the estimate an upper bound. Why: with every
+    /// axis from 2.5 cm flexible, the static shape is dominated by the tips
+    /// of slender crown branches (their own, local modes), not by the sway
+    /// of the stem that pull-and-release tests measure (Jackson et al. 2019);
+    /// the leaves at those tips then weighed far too much in the mode
+    /// (winter / summer frequency +30 to +48 % for the oak and the cherry,
+    /// against +18 to +19 % measured; +14 % once only the structural axes
+    /// bend: docs/sources.md). Damping in still air: `damping_leafless + leaf
+    /// fraction x damping_leaves` (traits, Jackson et al. 2019).
+    pub fn dynamics(&self, load: &WindLoad) -> Dynamics {
+        self.prepare(load).dynamics
+    }
+
+    /// Mode shape (unnormalised displacement along `wind` at midpoints and
+    /// tips) and Rayleigh frequency for the given leaf and extra masses.
+    fn rayleigh(&self, wind: Vec3, leaf_mass: &[f32], extra: &[f32]) -> (Vec<f32>, Vec<f32>, f32, f32) {
+        let n = self.segs.len();
+        let mut fsum = vec![Vec3::ZERO; n];
+        let mut qsum = vec![Vec3::ZERO; n];
+        for (i, s) in self.segs.iter().enumerate() {
+            let fw = wind * (GRAVITY * (s.mass + extra[i]));
+            let fl = wind * (GRAVITY * leaf_mass[i]);
+            fsum[i] = fw + fl;
+            qsum[i] = s.mid.cross(fw) + s.end.cross(fl);
+        }
+        for i in (1..n).rev() {
+            let pi = self.segs[i].parent;
+            if pi != NO_PARENT {
+                let (f, q) = (fsum[i], qsum[i]);
+                fsum[pi] += f;
+                qsum[pi] += q;
+            }
+        }
+        // Small-rotation kinematics: rotation vector θ accumulated along the
+        // axes, displacement u of a point = u(base) + θ(base) × (p − base).
+        let mut theta = vec![Vec3::ZERO; n];
+        let mut ustart = vec![Vec3::ZERO; n];
+        let mut mid = vec![0.0f32; n];
+        let mut end = vec![0.0f32; n];
+        for (i, s) in self.segs.iter().enumerate() {
+            let (tp, up, sp) = if s.parent == NO_PARENT { (Vec3::ZERO, Vec3::ZERO, s.start) } else { (theta[s.parent], ustart[s.parent], self.segs[s.parent].start) };
+            let u0 = up + tp.cross(s.start - sp);
+            let mut t = tp;
+            if s.ei > 0.0 && (s.stem_mode || s.limb_mode) {
+                let m = qsum[i] - s.start.cross(fsum[i]);
+                let mb = m - s.dir * m.dot(s.dir);
+                t += mb * (s.len / s.ei);
+            }
+            let ue = u0 + t.cross(s.end - s.start);
+            let um = (u0 + ue) * 0.5;
+            theta[i] = t;
+            ustart[i] = u0;
+            mid[i] = um.dot(wind);
+            end[i] = ue.dot(wind);
+        }
+        let (mut a, mut b) = (0.0f64, 0.0f64);
+        for (i, s) in self.segs.iter().enumerate() {
+            let (mw, ml) = ((s.mass + extra[i]) as f64, leaf_mass[i] as f64);
+            a += mw * mid[i] as f64 + ml * end[i] as f64;
+            b += mw * (mid[i] as f64) * (mid[i] as f64) + ml * (end[i] as f64) * (end[i] as f64);
+        }
+        let freq = if a > 0.0 && b > 0.0 { ((GRAVITY as f64 * a / b).sqrt() / std::f64::consts::TAU) as f32 } else { 0.0 };
+        let umax = mid.iter().chain(end.iter()).fold(0.0f32, |m, &x| m.max(x.abs())).max(1e-30);
+        let mut mgen = 0.0f64;
+        for (i, s) in self.segs.iter().enumerate() {
+            let (pm, pe) = ((mid[i] / umax) as f64, (end[i] / umax) as f64);
+            mgen += (s.mass + extra[i]) as f64 * pm * pm + leaf_mass[i] as f64 * pe * pe;
+        }
+        for x in mid.iter_mut().chain(end.iter_mut()) {
+            *x /= umax;
+        }
+        (mid, end, freq, mgen as f32)
     }
 
     fn prepare(&self, load: &WindLoad) -> Prepared {
@@ -648,6 +1009,15 @@ impl MechanicsModel {
         let cell_area = cell * cell;
         let full_area = leaf_in.iter().filter(|&&l| l > 0.0).count() as f32 * cell_area;
         let crown_area = full_area * f;
+        // Width of the leafy silhouette across the wind (dynamic factor).
+        let (mut lu0, mut lu1) = (i32::MAX, i32::MIN);
+        for (k, &l) in leaf_in.iter().enumerate() {
+            if l > 0.0 {
+                let u = (k / nw.max(1)) as i32;
+                (lu0, lu1) = (lu0.min(u), lu1.max(u));
+            }
+        }
+        let crown_width = if lu1 >= lu0 { (lu1 - lu0 + 1) as f32 * cell } else { self.segs.iter().map(|s| s.d).fold(0.0, f32::max) };
         // Crown wood: its exposure per cell (see `CROWN_WOOD_*` and
         // docs/sources.md). (1) Mutual hiding of the elements of one cell,
         // random overlap (Beer-Lambert): projected area a on a cell of area
@@ -683,6 +1053,8 @@ impl MechanicsModel {
             wind,
             leaf_fraction: f,
             crown_area,
+            crown_width,
+            wood_base: Vec::with_capacity(n),
             wood_k: Vec::with_capacity(n),
             wood_bends: Vec::with_capacity(n),
             crown_k: Vec::with_capacity(n),
@@ -695,6 +1067,12 @@ impl MechanicsModel {
             // Bare wood: rigid (1) up to RECONF_MIN_MS, then (u / 10)^B.
             wood_reconf: Reconf::new(BARE_WOOD_VOGEL_EXPONENT, RECONF_MIN_MS),
             crown_reconf: Reconf::new(self.traits.vogel_exponent, CROWN_CD_REFERENCE_MS),
+            dynamics: Dynamics::default(),
+            shape_mid: Vec::new(),
+            shape_end: Vec::new(),
+            m0: Vec::new(),
+            quasi_static: load.quasi_static,
+            table: ProfileTable::new(if load.quasi_static { 0.0 } else { self.height }, self.traits.vogel_exponent),
         };
         for (i, s) in self.segs.iter().enumerate() {
             let c = s.dir.dot(wind);
@@ -711,7 +1089,9 @@ impl MechanicsModel {
             } else {
                 wood_factor[cid]
             };
-            p.wood_k.push(0.5 * AIR_DENSITY * WOOD_DRAG_COEFFICIENT * s.d * s.len * sin2 * exposure);
+            let base = 0.5 * AIR_DENSITY * WOOD_DRAG_COEFFICIENT * s.d * s.len * exposure;
+            p.wood_base.push(base);
+            p.wood_k.push(base * sin2);
             p.wood_bends.push(s.role != SegmentRole::Trunk);
             // Crown drag by frontal area: each envelope cell carries
             // `½ ρ Cd(U) S f`, shared among the leafy tips of the cell in
@@ -721,60 +1101,135 @@ impl MechanicsModel {
             p.crown_k.push(ck);
             p.leaf_mass.push(leaf_kg * s.leaf_share);
             p.extra.push(load.extra_mass_kg.get(i).copied().unwrap_or(0.0).max(0.0));
-            let (km, ke) = (profile(s.mid.y), profile(s.end.y));
+            // Exact profile for the quasi-static model (hand-checked tests),
+            // the interpolated table otherwise (cost).
+            let (km, kmw, ke, kec) = if load.quasi_static {
+                let (km, ke) = (profile(s.mid.y), profile(s.end.y));
+                (km, km.dpowf(BARE_WOOD_VOGEL_EXPONENT), ke, ke.dpowf(self.traits.vogel_exponent))
+            } else {
+                let (km, kmw, _) = p.table.at(s.mid.y);
+                let (ke, _, kec) = p.table.at(s.end.y);
+                (km, kmw, ke, kec)
+            };
             p.prof_mid.push(km);
             p.prof_end.push(ke);
-            p.prof_mid_b.push(if p.wood_bends[i] { km.dpowf(BARE_WOOD_VOGEL_EXPONENT) } else { 1.0 });
-            p.prof_end_b.push(if s.leaf_share > 0.0 { ke.dpowf(self.traits.vogel_exponent) } else { 1.0 });
+            p.prof_mid_b.push(if p.wood_bends[i] { kmw } else { 1.0 });
+            p.prof_end_b.push(if s.leaf_share > 0.0 { kec } else { 1.0 });
+        }
+        let (mid, end, freq, mgen) = self.rayleigh(p.wind, &p.leaf_mass, &p.extra);
+        let t = &self.traits;
+        p.dynamics = Dynamics { natural_frequency_hz: freq, damping_ratio: t.damping_leafless + f * t.damping_leaves, modal_mass_kg: mgen };
+        p.shape_mid = mid;
+        p.shape_end = end;
+        if !p.quasi_static {
+            p.m0 = self.pass_on(&p, 0.0, None, false).moments;
         }
         p
     }
 
-    /// One O(n) pass at 10 m wind speed `u`.
-    fn pass(&self, p: &Prepared, u: f32, detail: bool) -> PassOut {
+    /// Dynamic factor and total damping at 10 m gust speed `u`, given the
+    /// quasi-static modal drag `s1 = Σ F_j φ_j²` (N) of the pass.
+    fn dynamic_at(&self, p: &Prepared, u: f32, s1: f32) -> (f32, f32) {
+        let dynm = &p.dynamics;
+        if p.quasi_static || u <= 0.0 || dynm.natural_frequency_hz <= 0.0 || dynm.modal_mass_kg <= 0.0 {
+            return (1.0, dynm.damping_ratio);
+        }
+        // Mean wind of the gust (EN 1991-1-4 eq. 4.8, see `gust_factor`).
+        let vm = u / gust_factor(REFERENCE_HEIGHT_M);
+        // Aerodynamic damping of the sway in that mean wind: the drag of a
+        // body moving at q̇ in a mean wind V varies by dF/dV q̇, i.e. a
+        // modal damping `c = Σ dF_j/dV φ_j²` and `ζ_a = c / (4π n M)` (the
+        // reasoning of EN 1991-1-4 Annex F, eq. F.18, for one mode). Drag
+        // grows as V^(2+B) (B: Vogel exponent of the reconfiguration range,
+        // leaf-weighted; 0 outside it), so `dF/dV = (2 + B) F / V`, with F
+        // the modal drag scaled from the gust to the mean wind. Estimated
+        // reduction of a measured quantity: no tree measurement of ζ_a in
+        // storms was found.
+        let uc = vm * profile(self.crown_mid_y);
+        let b = if (RECONF_MIN_MS..RECONF_MAX_MS).contains(&uc) { p.leaf_fraction * self.traits.vogel_exponent + (1.0 - p.leaf_fraction) * BARE_WOOD_VOGEL_EXPONENT } else { 0.0 };
+        let scale = (vm / u).dpowf(2.0 + b);
+        let za = (2.0 + b) * s1 * scale / uc.max(0.5) / (4.0 * std::f32::consts::PI * dynm.natural_frequency_hz * dynm.modal_mass_kg);
+        let zeta = (dynm.damping_ratio + za).min(1.0);
+        let df = dynamic_factor(self.height, p.crown_width, dynm.natural_frequency_hz, zeta, vm);
+        (df.cd, zeta)
+    }
+
+    /// One O(n) pass at 10 m wind speed `u` on the rest geometry (`geom`
+    /// None) or a deformed one.
+    fn pass_on(&self, p: &Prepared, u: f32, geom: Option<&Geom>, detail: bool) -> PassOut {
         let n = self.segs.len();
         let mut fsum = vec![Vec3::ZERO; n];
         let mut qsum = vec![Vec3::ZERO; n];
-        let (mut drag, mut drag_h) = (0.0f32, 0.0f32);
+        let mut wf = vec![Vec3::ZERO; if u > 0.0 { n } else { 0 }];
+        let mut wq = vec![Vec3::ZERO; if u > 0.0 { n } else { 0 }];
+        let (mut drag, mut drag_h, mut s1) = (0.0f32, 0.0f32, 0.0f32);
         let (ub_wood, ub_crown) = if u > 0.0 {
             ((u / p.wood_reconf.u_ref).dpowf(p.wood_reconf.b), (u / p.crown_reconf.u_ref).dpowf(p.crown_reconf.b))
         } else {
             (1.0, 1.0)
         };
         let cd_ref = self.traits.crown_drag_coefficient;
+        let down = Vec3::new(0.0, -GRAVITY, 0.0);
         for (i, s) in self.segs.iter().enumerate() {
-            let down = Vec3::new(0.0, -GRAVITY, 0.0);
+            let (start, end, dir) = match geom {
+                Some(g) => (g.start[i], g.end[i], g.dir[i]),
+                None => (s.start, s.end, s.dir),
+            };
+            let mid = (start + end) * 0.5;
             let fw = down * (s.mass + p.extra[i]);
             let mut f = fw;
-            let mut q = s.mid.cross(fw);
+            let mut q = mid.cross(fw);
             if p.leaf_mass[i] > 0.0 {
                 let fl = down * p.leaf_mass[i];
                 f += fl;
-                q += s.end.cross(fl);
-            }
-            if u > 0.0 {
-                let um = u * p.prof_mid[i];
-                let reconf = if p.wood_bends[i] { p.wood_reconf.at(um, ub_wood, p.prof_mid_b[i]) } else { 1.0 };
-                let fwood = p.wood_k[i] * reconf * um * um;
-                if fwood > 0.0 {
-                    let v = p.wind * fwood;
-                    f += v;
-                    q += s.mid.cross(v);
-                    drag += fwood;
-                    drag_h += fwood * s.mid.y;
-                }
-                if p.crown_k[i] > 0.0 {
-                    let ue = u * p.prof_end[i];
-                    let fc = p.crown_k[i] * cd_ref * p.crown_reconf.at(ue, ub_crown, p.prof_end_b[i]) * ue * ue;
-                    let v = p.wind * fc;
-                    f += v;
-                    q += s.end.cross(v);
-                    drag += fc;
-                    drag_h += fc * s.end.y;
-                }
+                q += end.cross(fl);
             }
             fsum[i] = f;
             qsum[i] = q;
+            if u > 0.0 {
+                let (km, ke, kmb, keb, wood_k, sail) = match geom {
+                    None => (p.prof_mid[i], p.prof_end[i], p.prof_mid_b[i], p.prof_end_b[i], p.wood_k[i], 1.0),
+                    Some(g) => {
+                        let (km, kmw, _) = p.table.at(mid.y);
+                        let (ke, _, kec) = p.table.at(end.y);
+                        let c = dir.dot(p.wind);
+                        let kmb = if p.wood_bends[i] { kmw } else { 1.0 };
+                        let keb = if p.crown_k[i] > 0.0 { kec } else { 1.0 };
+                        (km, ke, kmb, keb, p.wood_base[i] * (1.0 - c * c).max(0.0), g.sail[i])
+                    }
+                };
+                let um = u * km;
+                let reconf = if p.wood_bends[i] { p.wood_reconf.at(um, ub_wood, kmb) } else { 1.0 };
+                let fwood = wood_k * reconf * um * um;
+                let (mut vf, mut vq) = (Vec3::ZERO, Vec3::ZERO);
+                if fwood > 0.0 {
+                    let v = p.wind * fwood;
+                    vf += v;
+                    vq += mid.cross(v);
+                    drag += fwood;
+                    drag_h += fwood * mid.y;
+                    s1 += fwood * p.shape_mid[i] * p.shape_mid[i];
+                }
+                if p.crown_k[i] > 0.0 {
+                    let ue = u * ke;
+                    let fc = p.crown_k[i] * cd_ref * p.crown_reconf.at(ue, ub_crown, keb) * ue * ue * sail;
+                    let v = p.wind * fc;
+                    vf += v;
+                    vq += end.cross(v);
+                    drag += fc;
+                    drag_h += fc * end.y;
+                    s1 += fc * p.shape_end[i] * p.shape_end[i];
+                }
+                wf[i] = vf;
+                wq[i] = vq;
+            }
+        }
+        let (dyn_f, damping) = if u > 0.0 { self.dynamic_at(p, u, s1) } else { (1.0, p.dynamics.damping_ratio) };
+        if u > 0.0 {
+            for ((f, q), (a, b)) in fsum.iter_mut().zip(qsum.iter_mut()).zip(wf.iter().zip(wq.iter())) {
+                *f += *a * dyn_f;
+                *q += *b * dyn_f;
+            }
         }
         for i in (1..n).rev() {
             let pi = self.segs[i].parent;
@@ -785,18 +1240,24 @@ impl MechanicsModel {
             }
         }
         let mor = self.traits.green_mor_mpa * 1e6;
-        let (mut stem, mut limb) = (f32::INFINITY, f32::INFINITY);
+        let (mut stem, mut limb, mut breakable) = (f32::INFINITY, f32::INFINITY, f32::INFINITY);
         let mut out = Vec::with_capacity(if detail { n } else { 0 });
+        let mut moments = Vec::with_capacity(if p.quasi_static { 0 } else { n });
         let mut base_moment = 0.0;
         for (i, s) in self.segs.iter().enumerate() {
-            let m = qsum[i] - s.start.cross(fsum[i]);
+            let start = geom.map_or(s.start, |g| g.start[i]);
+            let m = qsum[i] - start.cross(fsum[i]);
+            if !p.quasi_static {
+                moments.push(m);
+            }
             if i == 0 {
                 base_moment = (m.x * m.x + m.z * m.z).sqrt();
             }
-            if !(detail || s.stem_mode || s.limb_mode) {
+            if !(detail || s.stem_mode || s.limb_mode || s.breakable) {
                 continue;
             }
-            let mb = m - s.dir * m.dot(s.dir);
+            let dir = geom.map_or(s.dir, |g| g.dir[i]);
+            let mb = m - dir * m.dot(dir);
             let bend = mb.length();
             let sigma = bend / s.zmod;
             let sf = if sigma > 0.0 { mor / sigma } else { f32::INFINITY };
@@ -806,13 +1267,114 @@ impl MechanicsModel {
             if s.limb_mode {
                 limb = limb.min(sf);
             }
+            if s.breakable {
+                breakable = breakable.min(sf);
+            }
             if detail {
                 out.push((bend, sigma, sf));
             }
         }
         let mcrit = self.critical_turning_moment_nm();
-        let anchorage = if base_moment > 0.0 { mcrit / base_moment } else { f32::INFINITY };
-        PassOut { stem, limb, anchorage, base_moment, drag, drag_height: drag_h, detail: out }
+        let anchorage = if base_moment > 0.0 && self.can_uproot() { mcrit / base_moment } else { f32::INFINITY };
+        let top_deflection = geom.map_or(0.0, |g| {
+            let t = self.trunk_top.min(n.saturating_sub(1));
+            let d = g.end[t] - self.segs[t].end;
+            (d.x * d.x + d.z * d.z).sqrt()
+        });
+        PassOut { stem, limb, breakable, anchorage, base_moment, drag, drag_height: drag_h, dynamic_factor: dyn_f, damping, moments, detail: out, top_deflection, deformed: geom.is_some() }
+    }
+
+    /// Deformed geometry for the bending moments of a pass: every flexible
+    /// segment turns by `(M − M_rest)_bending L / (E I)` (the wind's share
+    /// of its curvature), rotations compose from the collar outwards,
+    /// rigidly carrying everything beyond. Under-relaxed against the
+    /// previous iteration's rotations (`theta`, updated). Returns the
+    /// geometry, the largest change of rotation (rad) and the largest
+    /// accumulated rotation (rad).
+    fn deform(&self, p: &Prepared, moments: &[Vec3], theta: &mut [Vec3]) -> (Geom, f32, f32) {
+        let n = self.segs.len();
+        let mut g = Geom { start: Vec::with_capacity(n), end: Vec::with_capacity(n), dir: Vec::with_capacity(n), sail: Vec::with_capacity(n) };
+        let mut rot = vec![Quat::IDENTITY; n];
+        let (mut change, mut total) = (0.0f32, 0.0f32);
+        for (i, s) in self.segs.iter().enumerate() {
+            let mut th = Vec3::ZERO;
+            if s.bows {
+                let dm = moments[i] - p.m0[i];
+                let mb = dm - s.dir * dm.dot(s.dir);
+                th = mb * (s.len / s.ei);
+                let l = th.length();
+                if l > LARGE_DEFLECTION_MAX_SEG_RAD {
+                    th = th * (LARGE_DEFLECTION_MAX_SEG_RAD / l);
+                }
+            }
+            let new = theta[i] * (1.0 - LARGE_DEFLECTION_RELAX) + th * LARGE_DEFLECTION_RELAX;
+            change = change.max((new - theta[i]).length());
+            theta[i] = new;
+            let (rp, sp_new, sp_old) = if s.parent == NO_PARENT { (Quat::IDENTITY, s.start, s.start) } else { (rot[s.parent], g.start[s.parent], self.segs[s.parent].start) };
+            let q = if new.dot(new) > 1e-18 { small_rotation(new).mul(rp) } else { rp };
+            let start = sp_new + rp.rotate(s.start - sp_old);
+            let end = start + q.rotate(s.end - s.start);
+            let nw = q.rotate(p.wind);
+            // Rotation from the rest orientation: 2 |sin(angle/2)| ~ angle.
+            total = total.max(2.0 * (q.x * q.x + q.y * q.y + q.z * q.z).sqrt());
+            rot[i] = q;
+            g.start.push(start);
+            g.end.push(end);
+            g.dir.push(q.rotate(s.dir));
+            g.sail.push(nw.dot(p.wind).abs());
+        }
+        (g, change, total)
+    }
+
+    /// The pass at `u` with large deflections: the rest-geometry pass, then,
+    /// when the axes turn by more than [`LARGE_DEFLECTION_MIN_RAD`], a few
+    /// fixed-point iterations "loads → bending → deformed geometry →
+    /// loads" (geometrically nonlinear statics). A flexible young stem
+    /// bows: its crown drops into slower air, its lever arm shortens and
+    /// its leafy sail turns away from the wind (the drag reduction of
+    /// flexible bodies by reconfiguration: de Langre 2008, "Effects of wind
+    /// on plants", Annu Rev Fluid Mech 40:141-168; Alben, Shelley & Zhang
+    /// 2002, Nature 420:479-481), while the weight of the displaced crown
+    /// adds its own moment (P-Δ). The net gain is large only when the top
+    /// moves by a large part of the height (a 6 m, 4 cm pole: base moment
+    /// halved); for moderate deflections the two effects nearly cancel
+    /// (tests). Stiff adult stems hardly move and keep the rest-geometry
+    /// result.
+    fn pass(&self, p: &Prepared, u: f32, detail: bool) -> PassOut {
+        let first = self.pass_on(p, u, None, detail);
+        if p.quasi_static || u <= 0.0 {
+            return first;
+        }
+        // Cheap check along the stem path only (small rotations): the
+        // accumulated rotation and the top displacement.
+        let (mut rot, mut disp, mut total) = (Vec3::ZERO, Vec3::ZERO, 0.0f32);
+        for &i in &self.trunk {
+            let s = &self.segs[i];
+            if s.bows {
+                let dm = first.moments[i] - p.m0[i];
+                rot += (dm - s.dir * dm.dot(s.dir)) * (s.len / s.ei);
+            }
+            disp += rot.cross(s.end - s.start);
+            total = total.max(rot.length());
+        }
+        if total < LARGE_DEFLECTION_MIN_RAD {
+            // Small deflection: rest geometry.
+            let mut out = first;
+            out.top_deflection = (disp.x * disp.x + disp.z * disp.z).sqrt();
+            return out;
+        }
+        let mut theta = vec![Vec3::ZERO; self.segs.len()];
+        let (mut g, _, _) = self.deform(p, &first.moments, &mut theta);
+        let mut out = first;
+        for _ in 0..LARGE_DEFLECTION_ITERATIONS {
+            out = self.pass_on(p, u, Some(&g), detail);
+            let (g2, change, _) = self.deform(p, &out.moments, &mut theta);
+            g = g2;
+            if change < LARGE_DEFLECTION_TOL_RAD {
+                break;
+            }
+        }
+        out
     }
 
     /// Safety factors, moments and masses for one load case (the critical
@@ -838,6 +1400,10 @@ impl MechanicsModel {
             centre_of_pressure_m: if o.drag > 0.0 { o.drag_height / o.drag } else { 0.0 },
             crown_frontal_area_m2: p.crown_area,
             crown_drag_coefficient: self.crown_cd(u * profile(self.crown_mid_y)),
+            natural_frequency_hz: p.dynamics.natural_frequency_hz,
+            damping_ratio: o.damping,
+            dynamic_factor: o.dynamic_factor,
+            top_deflection_m: o.top_deflection,
             ..Default::default()
         };
         snap.above_ground_mass_kg = snap.wood_mass_kg + snap.leaf_mass_kg + snap.extra_mass_kg;
@@ -853,6 +1419,7 @@ impl MechanicsModel {
             snap.segment_stress_mpa.push(sigma * 1e-6);
             snap.segment_role.push(s.role);
             snap.segment_ids.push(s.id);
+            snap.segment_breakable.push(s.breakable);
             let wp = WeakPoint { index: i, node_id: s.id, role: s.role, safety: cap(sf), height_m: s.start.y, diameter_cm: 100.0 * s.d, decayed: s.di > 0.0 };
             if (s.stem_mode || s.limb_mode) && weak.is_none_or(|w| sf < w.safety) {
                 weak = Some(wp);
@@ -870,6 +1437,159 @@ impl MechanicsModel {
             snap.buckling_safety = cap(h_crit / self.height.max(1e-3));
         }
         snap
+    }
+
+    /// Whether uprooting is checked for this tree (collar of at least
+    /// [`BREAK_MIN_DIAMETER_M`]).
+    pub fn can_uproot(&self) -> bool {
+        self.site.dbh_m >= UPROOT_MIN_DBH_M
+    }
+
+    /// Calm and reference-wind passes for one foliage state (`load`, its
+    /// speed being the reference speed `U_ref`):
+    /// * per segment of the stem path or of a limb (0 elsewhere), the
+    ///   bending stress at `U_ref` (Pa; weight + wind, with dynamics and
+    ///   large deflections), the load case of the wind acclimation of
+    ///   growth.rs;
+    /// * a lower bound of the gust speed at which any breakable section
+    ///   (or the anchorage) fails: with `M0` the calm bending moment and
+    ///   `ΔM` the wind's share at `U_ref`, failure needs `|M0| + K ΔM
+    ///   (U/U_ref)^e >= MOR Z` with e = 2 above `U_ref` and 1 below (crown
+    ///   drag grows as U^(2+B), B in [-1, 0]); see [`SCREEN_SLACK`]. `None`
+    ///   when nothing can fail.
+    ///
+    /// Also returns, per segment, whether it lies on the stem path.
+    pub fn screen(&self, load: &WindLoad) -> (Vec<f32>, Vec<bool>, Option<f32>) {
+        self.screen_with(load, true)
+    }
+
+    /// [`Self::screen`]; without `stress`, only the bound is computed (one
+    /// pass less) and the stress vector is empty.
+    pub fn screen_with(&self, load: &WindLoad, stress_wanted: bool) -> (Vec<f32>, Vec<bool>, Option<f32>) {
+        let p = self.prepare(&WindLoad { quasi_static: false, ..load.clone() });
+        let u = load.speed_10m_ms.max(1.0);
+        // Acclimation stress: the full model. Bound: the rest-geometry pass
+        // (large deflections shed load non-linearly at high speed, which a
+        // power-law extrapolation down to lower speeds would overestimate;
+        // without them the load grows at least as fast, and the slack covers
+        // the weight's P-Δ moment).
+        let o1 = if stress_wanted { Some(self.pass(&p, u, false)) } else { None };
+        let ob = match &o1 {
+            Some(o) if !o.deformed => None,
+            _ => Some(self.pass_on(&p, u, None, false)),
+        };
+        let ob = ob.as_ref().or(o1.as_ref()).expect("a pass");
+        let mor = self.traits.green_mor_mpa * 1e6;
+        let bound = |cap: f32, m0: f32, dm: f32| -> f32 {
+            if dm <= 0.0 {
+                return f32::INFINITY;
+            }
+            let r = (cap - m0) / (SCREEN_SLACK * dm);
+            if r <= 0.0 {
+                0.0
+            } else if r >= 1.0 {
+                u * r.sqrt()
+            } else {
+                u * r
+            }
+        };
+        let mut lb = f32::INFINITY;
+        let mut stress = Vec::with_capacity(self.segs.len());
+        // Calm moments: those of `prepare` (the rest state).
+        let m0s = &p.m0;
+        for (i, s) in self.segs.iter().enumerate() {
+            let (m0, mb) = (m0s[i], ob.moments[i]);
+            let bend = |m: Vec3| (m - s.dir * m.dot(s.dir)).length();
+            if let Some(o1) = &o1 {
+                // Living woody axes that bend (from FLEX_MIN_DIAMETER_M):
+                // the load case of the wind acclimation.
+                stress.push(if s.ei > 0.0 { bend(o1.moments[i]) / s.zmod } else { 0.0 });
+            }
+            if s.breakable {
+                lb = lb.min(bound(mor * s.zmod, bend(m0), bend(mb - m0)));
+            }
+        }
+        if self.can_uproot() {
+            let h = |m: Vec3| (m.x * m.x + m.z * m.z).sqrt();
+            let (b0, b1) = (m0s[0], ob.moments[0]);
+            lb = lb.min(bound(self.critical_turning_moment_nm(), h(b0), h(b1 - b0)));
+        }
+        let trunk = self.segs.iter().map(|s| s.role == SegmentRole::Trunk).collect();
+        (stress, trunk, lb.is_finite().then_some(lb))
+    }
+
+    /// Lowest safety factor over the three modes at speed `u` (one pass).
+    pub fn min_safety_at(&self, load: &WindLoad) -> f32 {
+        let p = self.prepare(load);
+        let o = self.pass(&p, load.speed_10m_ms.max(0.0), false);
+        o.stem.min(o.limb).min(o.anchorage)
+    }
+
+    /// Lowest 10 m gust speed (m/s) at which any mode fails, to `tol` m/s,
+    /// for the direction, foliage and extra masses of `load`: a scan in
+    /// steps of 4 m/s then a bisection (≈ 15 passes instead of the ≈ 80 of
+    /// [`Self::critical_speeds`]). `None` beyond [`MAX_SEARCH_SPEED_MS`].
+    pub fn first_critical_speed(&self, load: &WindLoad, tol: f32) -> Option<f32> {
+        let p = self.prepare(load);
+        let eval = |u: f32| {
+            let o = self.pass(&p, u, false);
+            o.stem.min(o.limb).min(o.anchorage)
+        };
+        if eval(0.0) < 1.0 {
+            return Some(0.0);
+        }
+        let mut u0 = 0.0f32;
+        while u0 < MAX_SEARCH_SPEED_MS {
+            let u1 = (u0 + 4.0).min(MAX_SEARCH_SPEED_MS);
+            if eval(u1) < 1.0 {
+                let (mut lo, mut hi) = (u0, u1);
+                while hi - lo > tol.max(0.01) {
+                    let mid = 0.5 * (lo + hi);
+                    if eval(mid) < 1.0 {
+                        hi = mid;
+                    } else {
+                        lo = mid;
+                    }
+                }
+                return Some(hi);
+            }
+            u0 = u1;
+        }
+        None
+    }
+
+    /// Highest 10 m gust speed (m/s) known to break nothing, to `tol` m/s:
+    /// the lower end of the bracket of [`Self::first_critical_speed`]
+    /// (0 when the tree fails under its own weight,
+    /// [`MAX_SEARCH_SPEED_MS`] when nothing fails up to it). Breakable
+    /// sections and uprooting only (the modes of the simulation).
+    pub fn first_safe_speed(&self, load: &WindLoad, tol: f32) -> f32 {
+        let p = self.prepare(load);
+        let eval = |u: f32| {
+            let o = self.pass(&p, u, false);
+            o.breakable.min(o.anchorage)
+        };
+        if eval(0.0) < 1.0 {
+            return 0.0;
+        }
+        let mut u0 = 0.0f32;
+        while u0 < MAX_SEARCH_SPEED_MS {
+            let u1 = (u0 + 4.0).min(MAX_SEARCH_SPEED_MS);
+            if eval(u1) < 1.0 {
+                let (mut lo, mut hi) = (u0, u1);
+                while hi - lo > tol.max(0.01) {
+                    let mid = 0.5 * (lo + hi);
+                    if eval(mid) < 1.0 {
+                        hi = mid;
+                    } else {
+                        lo = mid;
+                    }
+                }
+                return lo;
+            }
+            u0 = u1;
+        }
+        MAX_SEARCH_SPEED_MS
     }
 
     /// Critical 10 m gust speed of each failure mode for the direction,
@@ -967,8 +1687,13 @@ impl Simulation {
     /// tools and tests can alter them (e.g. inject decay) and rebuild a
     /// model with [`MechanicsModel::from_segments`].
     pub fn mechanics_inputs(&self) -> (Vec<MechSegment>, MechSite) {
+        self.mechanics_inputs_at(self.shoots.ext)
+    }
+
+    /// [`Self::mechanics_inputs`] with the year's new shoots drawn at
+    /// extension `ext` (0..1) instead of today's.
+    pub(crate) fn mechanics_inputs_at(&self, ext: f32) -> (Vec<MechSegment>, MechSite) {
         let nodes = &self.shoots.nodes;
-        let ext = self.shoots.ext;
         let decay = self.decay_radius_by_node();
         let unit_len = 0.75 * self.shoots.voxel - 0.06;
         let segments: Vec<MechSegment> = nodes

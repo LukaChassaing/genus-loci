@@ -52,6 +52,8 @@ pub(crate) const S_YEAR: u64 = 1;
 pub(crate) const S_TEMP: u64 = 2;
 pub(crate) const S_RAIN: u64 = 3;
 pub(crate) const S_RAIN_AMT: u64 = 4;
+/// Daily wind (`climate.rs`).
+pub(crate) const S_WIND: u64 = 5;
 pub(crate) const S_SHOOT: u64 = 10;
 pub(crate) const S_BUD: u64 = 11;
 pub(crate) const S_RETRENCH: u64 = 12;

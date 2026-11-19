@@ -22,10 +22,12 @@ pub trait DMath: Sized {
     /// Puissance entière par multiplications dans un ordre fixe (exponentiation par carrés).
     fn dpowi(self, n: i32) -> Self;
     fn dsin_cos(self) -> (Self, Self);
+    /// Complementary error function (normal tail: `Phi(-z) = erfc(z / sqrt 2) / 2`).
+    fn derfc(self) -> Self;
 }
 
 macro_rules! impl_dmath {
-    ($t:ty, $sin:ident, $cos:ident, $tan:ident, $acos:ident, $atan2:ident, $exp:ident, $ln:ident, $pow:ident) => {
+    ($t:ty, $sin:ident, $cos:ident, $tan:ident, $acos:ident, $atan2:ident, $exp:ident, $ln:ident, $pow:ident, $erfc:ident) => {
         impl DMath for $t {
             #[inline]
             fn dsin(self) -> Self {
@@ -83,12 +85,16 @@ macro_rules! impl_dmath {
             fn dsin_cos(self) -> (Self, Self) {
                 (libm::$sin(self), libm::$cos(self))
             }
+            #[inline]
+            fn derfc(self) -> Self {
+                libm::$erfc(self)
+            }
         }
     };
 }
 
-impl_dmath!(f32, sinf, cosf, tanf, acosf, atan2f, expf, logf, powf);
-impl_dmath!(f64, sin, cos, tan, acos, atan2, exp, log, pow);
+impl_dmath!(f32, sinf, cosf, tanf, acosf, atan2f, expf, logf, powf, erfcf);
+impl_dmath!(f64, sin, cos, tan, acos, atan2, exp, log, pow, erfc);
 
 #[cfg(test)]
 mod tests {

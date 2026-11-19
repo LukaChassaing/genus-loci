@@ -120,6 +120,9 @@ pub enum DeathCause {
     Decline,
     /// Reserves exhausted for several years.
     Starvation,
+    /// The root plate turned over in a gale (« chablis », `crate::wind`):
+    /// the only death the wind causes outright.
+    Uprooted,
 }
 
 impl DeathCause {
@@ -131,6 +134,7 @@ impl DeathCause {
             DeathCause::None => "",
             DeathCause::Decline => "dépérissement",
             DeathCause::Starvation => "réserves épuisées",
+            DeathCause::Uprooted => "déracinement",
         }
     }
 }
@@ -167,6 +171,8 @@ pub(crate) struct Vitality {
     pub collapsed: bool,
     /// The stump / roots resprouted after the trunk died.
     pub resprouted: bool,
+    /// The trunk was uprooted and lies on the ground (not a standing snag).
+    pub uprooted: bool,
 }
 
 impl Default for Vitality {
@@ -188,6 +194,7 @@ impl Default for Vitality {
             collapse_year: NONE,
             collapsed: false,
             resprouted: false,
+            uprooted: false,
         }
     }
 }
@@ -313,6 +320,33 @@ impl Simulation {
         v.vigour = 0.0;
     }
 
+    /// The stem below 1.3 m was cut or broken (coppice cut, wind break near
+    /// the collar): the stems that grow next are new stems, measured from
+    /// scratch, as for a stool resprouting after the trunk died
+    /// (`trunk_dies`). Without this, the collapse of the collar increment
+    /// after the cut read as a loss of vigour (hazard up to ~5 %/year for a
+    /// few years, measured on a coppiced 60-year oak).
+    pub(crate) fn stem_replaced(&mut self) {
+        let v = &mut self.vit;
+        v.bai = [0.0; 5];
+        v.bai_n = 0;
+        v.bai_peak = 0.0;
+    }
+
+    /// The root plate turns over in a gale (`crate::wind`): the trunk dies
+    /// at once (cause [`DeathCause::Uprooted`], whether or not the carbon
+    /// balance is modelled) and lies on the ground towards `azimuth_deg`
+    /// (direction the wind blows towards). The stump may still resprout,
+    /// with the species' probability (drawn as for any trunk death). The
+    /// lying stem decays with the ground-contact rule of
+    /// [`collapse_years`], then disappears.
+    pub(crate) fn uproot(&mut self, year: u32, azimuth_deg: f32) {
+        self.trunk_dies(year, DeathCause::Uprooted);
+        self.vit.uprooted = true;
+        self.shoots.lay_down(azimuth_deg);
+        self.root_version += 1;
+    }
+
     /// The stem dies: it becomes a standing snag; the stump may resprout.
     fn trunk_dies(&mut self, year: u32, cause: DeathCause) {
         let first = self.vit.death_year == NONE;
@@ -384,6 +418,8 @@ pub struct VitalityInfo {
     pub collapsed: bool,
     /// The stump or the roots resprouted after the trunk died.
     pub resprouted: bool,
+    /// The trunk was uprooted by the wind and lies on the ground.
+    pub uprooted: bool,
 }
 
 impl Simulation {
@@ -392,7 +428,7 @@ impl Simulation {
         let v = &self.vit;
         let dead = v.death_year != NONE;
         let year = self.year();
-        let standing = v.collapse_year != NONE && !v.collapsed;
+        let standing = v.collapse_year != NONE && !v.collapsed && !v.uprooted;
         VitalityInfo {
             modelled: self.ageing(),
             reserve: v.reserve,
@@ -409,6 +445,7 @@ impl Simulation {
             collapse_in_years: standing.then(|| v.collapse_year.saturating_sub(year)),
             collapsed: v.collapsed,
             resprouted: v.resprouted,
+            uprooted: v.uprooted,
         }
     }
 

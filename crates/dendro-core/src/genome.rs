@@ -1007,6 +1007,14 @@ pub struct MechanicsTraits {
     /// rooting on a freely draining soil (`Creg` of Gardiner et al. 2000
     /// and ForestGALES; Nicoll et al. 2006, Can J For Res 36:1871-1883).
     pub anchorage_nm_per_kg: f32,
+    /// Damping ratio of the fundamental sway in still air, leafless
+    /// (structural damping: wood, roots, branch interactions) and the share
+    /// added by a full summer crown (leaf drag). Jackson et al. 2019, J R Soc
+    /// Interface 16:20190116 (pull-and-release, four broadleaves, article
+    /// read): 3.9 +- 1.3 % in winter, 8.6 +- 2.2 % in summer. The same values
+    /// for every species (estimated: no measurement for these species).
+    pub damping_leafless: f32,
+    pub damping_leaves: f32,
 }
 
 impl Default for MechanicsTraits {
@@ -1018,6 +1026,8 @@ impl Default for MechanicsTraits {
             crown_drag_coefficient: 0.2,
             vogel_exponent: -1.0,
             anchorage_nm_per_kg: 178.1,
+            damping_leafless: 0.039,
+            damping_leaves: 0.047,
         }
     }
 }

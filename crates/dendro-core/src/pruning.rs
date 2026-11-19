@@ -187,6 +187,10 @@ pub enum CutKind {
     Coppice,
     /// Not a cut: a decayed part broke off, or a pathogen killed it.
     Natural,
+    /// Not a cut: torn off by the wind (`crate::wind`). A ragged break: the
+    /// wound is wider than the section (bark and wood torn down the
+    /// parent) and decays more readily than a clean cut.
+    WindBreak,
 }
 
 impl CutKind {
@@ -207,6 +211,7 @@ impl CutKind {
             CutKind::Pollard => "Têtard",
             CutKind::Coppice => "Recépage",
             CutKind::Natural => "Rupture",
+            CutKind::WindBreak => "Cassure (vent)",
         }
     }
 
@@ -223,6 +228,8 @@ impl CutKind {
             CutKind::Stub => 1.0, // once the stub is gone (until then: none)
             CutKind::Heading => 0.5,
             CutKind::Natural => 0.4,
+            // Torn wound: same slow closure as a natural break.
+            CutKind::WindBreak => 0.4,
             CutKind::Topping => 0.35,
             CutKind::Coppice => 0.3,
         }
@@ -241,6 +248,10 @@ impl CutKind {
             CutKind::Flush => 1.8,
             CutKind::Topping => 2.0,
             CutKind::Natural => 2.0,
+            // Ragged storm breaks: the most exposed wound type (estimated,
+            // above topping; Shigo's ranking puts stubs and torn wounds
+            // last, no number).
+            CutKind::WindBreak => 2.5,
         }
     }
 
@@ -255,7 +266,8 @@ impl CutKind {
             CutKind::Pollard,
             CutKind::Coppice,
             CutKind::Natural,
-        ][(c as usize).min(8)]
+            CutKind::WindBreak,
+        ][(c as usize).min(9)]
     }
 }
 
@@ -274,6 +286,9 @@ pub enum Action {
     Cut(CutSpec),
     /// Forced drought switched on / off.
     Drought(bool),
+    /// A storm asked for by the player: a gust of this speed (m/s at 10 m)
+    /// tests the tree at the start of the day (`crate::wind`).
+    Storm(f32),
 }
 
 /// A logged intervention, applied at the start of day `day` (days since
@@ -395,9 +410,9 @@ pub(crate) struct CutRecord {
 /// effect on growth) until the first cut.
 #[derive(Clone, Debug, Default)]
 pub struct PruneState {
-    log: Vec<LogEvent>,
+    pub(crate) log: Vec<LogEvent>,
     /// Events before this index have been applied.
-    cursor: usize,
+    pub(crate) cursor: usize,
     /// Light / foliage must be recomputed before the next simulated day.
     pub(crate) light_dirty: bool,
     pub(crate) active: bool,
@@ -644,7 +659,14 @@ struct CutPlan {
     host: usize,
     point: Vec3,
     dir: Vec3,
+    /// The stem itself is cut or broken (wind breaks: sprout like topping).
+    stem: bool,
 }
+
+/// A stem cut (or broken by the wind) below this height (m) is a coppice
+/// cut: the stool resprouts from the collar (calibration of the cut
+/// classification, unchanged).
+pub(crate) const COPPICE_MAX_HEIGHT_M: f32 = 0.6;
 
 impl Simulation {
     // ------------------------------------------------------------------
@@ -671,6 +693,7 @@ impl Simulation {
     pub fn checkpoint(&self) -> Simulation {
         let mut c = self.clone();
         c.shoots.strip_scratch();
+        c.wind_cache.debris.clear();
         c
     }
 
@@ -700,6 +723,7 @@ impl Simulation {
                     self.apply_cut(c, false);
                 }
                 Action::Drought(on) => self.drought = on,
+                Action::Storm(gust) => self.apply_storm(gust),
             }
         }
         if self.prune.light_dirty {
@@ -758,7 +782,7 @@ impl Simulation {
         let kind = if stem {
             cut_len = cut_len.max(if idx == 0 { 0.02 } else { 0.005 }).min(vis);
             let y = n.start.y + n.dir.y * cut_len;
-            if y < 0.6 {
+            if y < COPPICE_MAX_HEIGHT_M {
                 CutKind::Coppice
             } else if (1.2..=4.0).contains(&y) {
                 CutKind::Pollard
@@ -793,17 +817,18 @@ impl Simulation {
             }
         };
         let point = n.start + n.dir * cut_len;
-        Some(CutPlan { idx, kind, at_base, cut_len, r, host: if at_base { p } else { idx }, point, dir: n.dir })
+        Some(CutPlan { idx, kind, at_base, cut_len, r, host: if at_base { p } else { idx }, point, dir: n.dir, stem })
     }
 
     /// Latent buds released by a cut and their vigour boost.
     fn release(&self, plan: &CutPlan, severity: f32, key: u64) -> (u8, f32) {
         let tr = &self.genome.pruning;
         let u = rng::unit(rng::hash(self.seed, S_PRUNE, key, 7));
-        let mut potential = match plan.kind {
-            CutKind::Coppice => (tr.stump_sprouting + 0.5 * tr.root_suckering).min(1.0),
-            _ => tr.epicormic_potential,
-        };
+        // A stem snapped by the wind near the ground resprouts like a
+        // coppice stool (same height rule as `plan`: below 0.6 m); higher
+        // up like a topped stem (`per` below).
+        let stool = plan.kind == CutKind::Coppice || (plan.kind == CutKind::WindBreak && plan.stem && plan.point.y < COPPICE_MAX_HEIGHT_M);
+        let mut potential = if stool { (tr.stump_sprouting + 0.5 * tr.root_suckering).min(1.0) } else { tr.epicormic_potential };
         // The latent bud bank of a host is used up by repeated releases (lost
         // buds are not replaced: Fontaine et al. 2001); pollard heads keep
         // forming new buds in their callus.
@@ -818,6 +843,16 @@ impl Simulation {
             CutKind::Topping | CutKind::Pollard => 14.0,
             CutKind::Heading => 8.0,
             CutKind::Reduction | CutKind::Stub => 2.0,
+            // A stem snapped by the wind is a brutal topping: the latent
+            // (preventitious) buds of the bark below the break (Fink 1983,
+            // Am J Bot 70:532-542, record seen; Meier, Saunders & Michler
+            // 2012, Tree Physiol 32:565-584) break into epicormic shoots
+            // that rebuild a crown by reiteration (Hallé, Oldeman &
+            // Tomlinson 1978): the tree becomes a « chandelle », a pollard-
+            // like head. Near the ground it resprouts like a coppice stool.
+            // Same counts as those cuts (calibration, as above).
+            CutKind::WindBreak if plan.stem && plan.point.y < COPPICE_MAX_HEIGHT_M => 16.0,
+            CutKind::WindBreak if plan.stem => 14.0,
             _ => 1.5,
         };
         // Light reaching the wound region helps latent buds break.
@@ -840,7 +875,13 @@ impl Simulation {
     fn execute(&mut self, plan: CutPlan, natural: bool) -> CutKind {
         let year = self.year();
         let doy = self.day_of_year();
-        let kind = if natural { CutKind::Natural } else { plan.kind };
+        let kind = if natural && plan.kind != CutKind::WindBreak { CutKind::Natural } else { plan.kind };
+        // The structure changes: the wind screen must be recomputed.
+        self.wind_cache.guard = None;
+        // A stem cut or broken below breast height: new stems follow.
+        if plan.stem && plan.point.y < crate::wind::ACCLIMATION_REFERENCE_HEIGHT_M {
+            self.stem_replaced();
+        }
         let total_leaf = self.shoots.leaf_area_proxy().max(1e-6);
         let total_wood = self.shoots.wood_volume().max(1e-9);
         if !self.prune.active {
@@ -909,7 +950,9 @@ impl Simulation {
         {
             let key = (node_id as u64) << 20 ^ self.day;
             let (mut buds, boost) = self.release(&CutPlan { host, ..plan }, severity, key);
-            if natural {
+            // A decayed part falling off releases fewer buds; a sound stem
+            // or limb torn by the wind releases them as a cut would.
+            if natural && kind != CutKind::WindBreak {
                 buds /= 2;
             }
             let h = &mut self.shoots.nodes[host];
@@ -936,6 +979,12 @@ impl Simulation {
             // Flush cuts expose much more wood than the branch section
             // (Neely 1988).
             radius *= 1.35;
+        }
+        if kind == CutKind::WindBreak {
+            // A torn break strips bark and splinters wood beyond the
+            // section (estimated factor: no measurement of storm wound
+            // sizes was found).
+            radius *= crate::wind::TORN_WOUND_FACTOR;
         }
         let core_r = match kind {
             CutKind::Collar | CutKind::Pollard if plan.at_base => 0.5 * plan.r,
@@ -997,6 +1046,64 @@ impl Simulation {
         self.leaf_version += 1;
         self.flower_version += 1;
         kind
+    }
+
+    /// Wind breakage of shoot node `idx` at its base (the collar node: 10 cm
+    /// above the ground), through the cut machinery: the part beyond is
+    /// removed, the host gets a torn wound (`CutKind::WindBreak`), latent
+    /// buds may sprout. Returns (height of the break, diameter in cm).
+    pub(crate) fn wind_break(&mut self, idx: usize) -> (f32, f32) {
+        let nodes = &self.shoots.nodes;
+        let n = &nodes[idx];
+        let (at_base, cut_len, host) = if idx == 0 { (false, (0.1f32).min(n.length.max(0.002)), 0) } else { (true, 0.0, n.parent as usize) };
+        let stem = n.order == 0;
+        let plan = CutPlan { idx, kind: CutKind::WindBreak, at_base, cut_len, r: n.radius(), host, point: n.start + n.dir * cut_len, dir: n.dir, stem };
+        let out = (plan.point.y, 200.0 * plan.r);
+        if self.wind_cache.record_debris {
+            self.capture_debris(&plan);
+        }
+        self.execute(plan, true);
+        out
+    }
+
+    /// The part a wind break removes, as a tube mesh kept for the front end
+    /// (a falling branch); see [`Simulation::take_wind_debris`].
+    fn capture_debris(&mut self, plan: &CutPlan) {
+        let nodes = &self.shoots.nodes;
+        let ext = self.shoots.ext;
+        let n = nodes.len();
+        let mut remap = vec![NONE; n];
+        let mut segs: Vec<TubeSeg> = Vec::new();
+        let bark = self.genome.bark.color;
+        for j in plan.idx..n {
+            let nd = &nodes[j];
+            let parent = if j == plan.idx {
+                NONE
+            } else {
+                let p = nd.parent as usize;
+                if p >= n || remap[p] == NONE {
+                    continue;
+                }
+                remap[p]
+            };
+            remap[j] = segs.len() as u32;
+            segs.push(TubeSeg {
+                parent,
+                start: if j == plan.idx { plan.point } else { nd.start },
+                end: nd.end(ext),
+                radius: self.draw_r(nd.radius()),
+                continues: parent != NONE && nd.terminal,
+                color: [bark[0], bark[1], bark[2], 1.0],
+                tip_taper: 0.6,
+                path0: 0.0,
+            });
+        }
+        let mesh = mesh::build_tubes(&segs, 40_000, 0.0, TubeStyle::default());
+        let leafy = nodes[plan.idx..].iter().filter(|nd| nd.leafy).count() as u32;
+        self.wind_cache.debris.push(crate::wind::WindDebris { day: self.day, pivot: plan.point.to_array(), mesh, leafy_shoots: leafy });
+        if self.wind_cache.debris.len() > 16 {
+            self.wind_cache.debris.remove(0);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1197,7 +1304,7 @@ impl Simulation {
                     continue;
                 }
                 let len = n.length;
-                let plan = CutPlan { idx: i, kind: CutKind::Natural, at_base: false, cut_len: len, r: n.radius(), host: i, point: n.start + n.dir * len, dir: n.dir };
+                let plan = CutPlan { idx: i, kind: CutKind::Natural, at_base: false, cut_len: len, r: n.radius(), host: i, point: n.start + n.dir * len, dir: n.dir, stem: false };
                 self.execute(plan, true);
             } else {
                 // A decayed cut end (topping, pollard head): the heaviest
@@ -1205,7 +1312,7 @@ impl Simulation {
                 let nodes = &self.shoots.nodes;
                 let Some((c, _)) = nodes.iter().enumerate().skip(i + 1).filter(|(_, c)| c.parent as usize == i && !c.is_snag()).max_by(|a, b| a.1.area.total_cmp(&b.1.area)) else { continue };
                 let n = &nodes[c];
-                let plan = CutPlan { idx: c, kind: CutKind::Natural, at_base: true, cut_len: 0.0, r: n.radius(), host: i, point: n.start, dir: n.dir };
+                let plan = CutPlan { idx: c, kind: CutKind::Natural, at_base: true, cut_len: 0.0, r: n.radius(), host: i, point: n.start, dir: n.dir, stem: false };
                 self.execute(plan, true);
             }
         }
