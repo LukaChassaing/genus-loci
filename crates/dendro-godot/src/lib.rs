@@ -4,6 +4,8 @@ mod backend;
 mod prune_api;
 /// Save / load (« Sauvegarder », « Charger ») functions of `TreeSim`.
 mod save_api;
+/// Wind (« Tempête », history, sway) functions of `TreeSim`.
+mod wind_api;
 /// Godot surfaces encoded in Rust; mesh worker thread.
 mod surface;
 
@@ -599,6 +601,11 @@ impl TreeSim {
         put("crown_area_m2", (s.crown_frontal_area_m2 as f64).to_variant());
         put("crown_cd", (s.crown_drag_coefficient as f64).to_variant());
         put("buckling_safety", (s.buckling_safety as f64).to_variant());
+        put("natural_frequency_hz", (s.natural_frequency_hz as f64).to_variant());
+        put("damping_ratio", (s.damping_ratio as f64).to_variant());
+        put("dynamic_factor", (s.dynamic_factor as f64).to_variant());
+        put("top_deflection_m", (s.top_deflection_m as f64).to_variant());
+        put("critical_pending", self.backend.mechanics_pending().to_variant());
         d
     }
     /// Safety factor of every shoot segment (node order) of the last `get_mechanics` speed.

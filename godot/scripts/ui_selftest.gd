@@ -270,7 +270,7 @@ static func _save_load_checks(tree: SceneTree, check: Callable) -> void:
 	var err: String = a.save_to(path, "Merisier d'essai", SaveFlow.now_unix())
 	check.call("save: written", err == "" and FileAccess.file_exists(path), err)
 	var text: String = FileAccess.get_file_as_string(path)
-	check.call("save: versioned RON recipe", text.contains("version: 1") and text.contains("Prunus avium") and text.contains("Drought(true)"),
+	check.call("save: versioned RON recipe", text.contains("version: 2") and text.contains("Prunus avium") and text.contains("Drought(true)"),
 		"%d bytes, %d cuts" % [text.length(), cuts])
 	var b: TreeSim = TreeSim.new()
 	var t0: int = Time.get_ticks_msec()
@@ -310,7 +310,7 @@ static func _save_load_checks(tree: SceneTree, check: Callable) -> void:
 	sb.queue_free()
 	var bad: String = dir.path_join("futur.ron")
 	var fw: FileAccess = FileAccess.open(bad, FileAccess.WRITE)
-	fw.store_string(text.replace("version: 1", "version: 99"))
+	fw.store_string(text.replace("version: 2", "version: 99"))
 	fw.close()
 	var c: TreeSim = TreeSim.new()
 	var e3: String = c.begin_load(bad)

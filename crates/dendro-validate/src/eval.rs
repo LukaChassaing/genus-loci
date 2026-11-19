@@ -29,7 +29,6 @@ pub struct Ctx {
     /// Every species simulated in this run (registry order).
     pub species: Vec<SpeciesCtx>,
     pub climate: Vec<ClimateStats>,
-    #[cfg(feature = "vent")]
     pub vent: crate::vent::Extra,
 }
 
@@ -907,22 +906,12 @@ fn r2_crown_dbh(ys: &[YearRec]) -> f64 {
     sxy * sxy / (sxx * syy).max(1e-12)
 }
 
-#[cfg(not(feature = "vent"))]
-fn storm_fraction(_sp: &SpeciesCtx) -> Measured {
-    Measured::not_modeled("pas de casse au vent dans le moteur (M1 statique) ; fraction de peuplement")
-}
 
-#[cfg(feature = "vent")]
 fn storm_fraction(sp: &SpeciesCtx) -> Measured {
     crate::vent::storm_fraction(sp)
 }
 
-#[cfg(not(feature = "vent"))]
-fn vent_or(_cx: &Ctx, _e: &Entry, reason: &str) -> Measured {
-    Measured::not_modeled(reason)
-}
 
-#[cfg(feature = "vent")]
 fn vent_or(cx: &Ctx, e: &Entry, _reason: &str) -> Measured {
     crate::vent::physics_entry(cx, e)
 }

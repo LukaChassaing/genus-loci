@@ -386,8 +386,6 @@ impl Simulation {
             vigour *= self.prune_flush_vigour();
         }
         let fs = self.shoots.flush(&self.genome, year, age, vigour, self.seed);
-        // New shoots: screen again (at full extension) on the next windy day.
-        self.wind_cache.guard = None;
         self.prune.last_new_shoots = fs.new_shoots as u32;
         self.stress_sum = 0.0;
         self.stress_days = 0.0;
@@ -445,10 +443,9 @@ impl Simulation {
         let max_dr = w.max_ring_width_mm * 0.001 * share * 1.5;
         let wind = self.wind_stress_now();
         let collar = self.shoots.thicken(&self.genome, factor, max_dr, &wind);
-        // The yearly wind screen of the new structure: next acclimation
-        // demand and this year's guard (crate::wind).
+        // The yearly wind acclimation demand of the new structure
+        // (crate::wind).
         self.wind_yearly_screen();
-        self.wind_structure_changed();
         self.pending_early_mm = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.pending_measure = mh;
         self.pending_collar = collar;
@@ -496,7 +493,6 @@ impl Simulation {
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
         self.shoots.sag(&self.genome);
-        self.wind_structure_changed();
         // Captured before this season's deaths (pruning starvation here,
         // ageing below): the ring of the season a trunk dies in is kept.
         let trunk_alive = self.vit.death_year == crate::growth::NONE;

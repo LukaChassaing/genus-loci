@@ -178,11 +178,6 @@ pub const UPROOT_MIN_DBH_M: f32 = 0.2;
 /// 50 years, 500 breaks in 200 years); kept at the limb threshold, 5 cm,
 /// until the load on young crowns is better known (docs/sources.md).
 pub const STEM_BREAK_MIN_DIAMETER_M: f32 = LIMB_MIN_DIAMETER_M;
-/// Slack of [`MechanicsModel::screen`]'s lower bound (estimated): the wind
-/// moment is taken to grow at most as `K U²` above the reference speed
-/// (drag grows at most as U², the Vogel exponents being <= 0), K covering
-/// the growth of the dynamic factor with speed and the weight's P-Δ moment.
-pub const SCREEN_SLACK: f32 = 1.05;
 /// Upper end of the critical speed search (m/s). Gusts beyond ~80 m/s are
 /// unknown in western Europe.
 pub const MAX_SEARCH_SPEED_MS: f32 = 80.0;
@@ -550,8 +545,6 @@ struct Geom {
 struct PassOut {
     stem: f32,
     limb: f32,
-    /// Lowest safety of the sections the simulation can break.
-    breakable: f32,
     anchorage: f32,
     base_moment: f32,
     drag: f32,
@@ -566,8 +559,6 @@ struct PassOut {
     detail: Vec<(f32, f32, f32)>,
     /// Horizontal displacement of the stem top (m), deformed geometry.
     top_deflection: f32,
-    /// Computed on a deformed geometry (large deflections).
-    deformed: bool,
 }
 
 
@@ -1240,7 +1231,7 @@ impl MechanicsModel {
             }
         }
         let mor = self.traits.green_mor_mpa * 1e6;
-        let (mut stem, mut limb, mut breakable) = (f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let (mut stem, mut limb) = (f32::INFINITY, f32::INFINITY);
         let mut out = Vec::with_capacity(if detail { n } else { 0 });
         let mut moments = Vec::with_capacity(if p.quasi_static { 0 } else { n });
         let mut base_moment = 0.0;
@@ -1253,7 +1244,7 @@ impl MechanicsModel {
             if i == 0 {
                 base_moment = (m.x * m.x + m.z * m.z).sqrt();
             }
-            if !(detail || s.stem_mode || s.limb_mode || s.breakable) {
+            if !(detail || s.stem_mode || s.limb_mode) {
                 continue;
             }
             let dir = geom.map_or(s.dir, |g| g.dir[i]);
@@ -1267,9 +1258,6 @@ impl MechanicsModel {
             if s.limb_mode {
                 limb = limb.min(sf);
             }
-            if s.breakable {
-                breakable = breakable.min(sf);
-            }
             if detail {
                 out.push((bend, sigma, sf));
             }
@@ -1281,7 +1269,7 @@ impl MechanicsModel {
             let d = g.end[t] - self.segs[t].end;
             (d.x * d.x + d.z * d.z).sqrt()
         });
-        PassOut { stem, limb, breakable, anchorage, base_moment, drag, drag_height: drag_h, dynamic_factor: dyn_f, damping, moments, detail: out, top_deflection, deformed: geom.is_some() }
+        PassOut { stem, limb, anchorage, base_moment, drag, drag_height: drag_h, dynamic_factor: dyn_f, damping, moments, detail: out, top_deflection }
     }
 
     /// Deformed geometry for the bending moments of a pass: every flexible
@@ -1445,77 +1433,17 @@ impl MechanicsModel {
         self.site.dbh_m >= UPROOT_MIN_DBH_M
     }
 
-    /// Calm and reference-wind passes for one foliage state (`load`, its
-    /// speed being the reference speed `U_ref`):
-    /// * per segment of the stem path or of a limb (0 elsewhere), the
-    ///   bending stress at `U_ref` (Pa; weight + wind, with dynamics and
-    ///   large deflections), the load case of the wind acclimation of
-    ///   growth.rs;
-    /// * a lower bound of the gust speed at which any breakable section
-    ///   (or the anchorage) fails: with `M0` the calm bending moment and
-    ///   `ΔM` the wind's share at `U_ref`, failure needs `|M0| + K ΔM
-    ///   (U/U_ref)^e >= MOR Z` with e = 2 above `U_ref` and 1 below (crown
-    ///   drag grows as U^(2+B), B in [-1, 0]); see [`SCREEN_SLACK`]. `None`
-    ///   when nothing can fail.
-    ///
-    /// Also returns, per segment, whether it lies on the stem path.
-    pub fn screen(&self, load: &WindLoad) -> (Vec<f32>, Vec<bool>, Option<f32>) {
-        self.screen_with(load, true)
-    }
-
-    /// [`Self::screen`]; without `stress`, only the bound is computed (one
-    /// pass less) and the stress vector is empty.
-    pub fn screen_with(&self, load: &WindLoad, stress_wanted: bool) -> (Vec<f32>, Vec<bool>, Option<f32>) {
-        let p = self.prepare(&WindLoad { quasi_static: false, ..load.clone() });
-        let u = load.speed_10m_ms.max(1.0);
-        // Acclimation stress: the full model. Bound: the rest-geometry pass
-        // (large deflections shed load non-linearly at high speed, which a
-        // power-law extrapolation down to lower speeds would overestimate;
-        // without them the load grows at least as fast, and the slack covers
-        // the weight's P-Δ moment).
-        let o1 = if stress_wanted { Some(self.pass(&p, u, false)) } else { None };
-        let ob = match &o1 {
-            Some(o) if !o.deformed => None,
-            _ => Some(self.pass_on(&p, u, None, false)),
-        };
-        let ob = ob.as_ref().or(o1.as_ref()).expect("a pass");
-        let mor = self.traits.green_mor_mpa * 1e6;
-        let bound = |cap: f32, m0: f32, dm: f32| -> f32 {
-            if dm <= 0.0 {
-                return f32::INFINITY;
-            }
-            let r = (cap - m0) / (SCREEN_SLACK * dm);
-            if r <= 0.0 {
-                0.0
-            } else if r >= 1.0 {
-                u * r.sqrt()
-            } else {
-                u * r
-            }
-        };
-        let mut lb = f32::INFINITY;
-        let mut stress = Vec::with_capacity(self.segs.len());
-        // Calm moments: those of `prepare` (the rest state).
-        let m0s = &p.m0;
-        for (i, s) in self.segs.iter().enumerate() {
-            let (m0, mb) = (m0s[i], ob.moments[i]);
-            let bend = |m: Vec3| (m - s.dir * m.dot(s.dir)).length();
-            if let Some(o1) = &o1 {
-                // Living woody axes that bend (from FLEX_MIN_DIAMETER_M):
-                // the load case of the wind acclimation.
-                stress.push(if s.ei > 0.0 { bend(o1.moments[i]) / s.zmod } else { 0.0 });
-            }
-            if s.breakable {
-                lb = lb.min(bound(mor * s.zmod, bend(m0), bend(mb - m0)));
-            }
-        }
-        if self.can_uproot() {
-            let h = |m: Vec3| (m.x * m.x + m.z * m.z).sqrt();
-            let (b0, b1) = (m0s[0], ob.moments[0]);
-            lb = lb.min(bound(self.critical_turning_moment_nm(), h(b0), h(b1 - b0)));
-        }
+    /// Bending stress (Pa) of every bending axis (from
+    /// [`FLEX_MIN_DIAMETER_M`]; 0 elsewhere) under `load` (weight + wind,
+    /// with dynamics and large deflections), and whether each segment lies
+    /// on the stem path: the load case of the wind acclimation of growth.rs
+    /// (`crate::wind`).
+    pub fn stem_stresses(&self, load: &WindLoad) -> (Vec<f32>, Vec<bool>) {
+        let p = self.prepare(load);
+        let o = self.pass(&p, load.speed_10m_ms.max(0.0), true);
+        let stress = self.segs.iter().zip(&o.detail).map(|(s, d)| if s.ei > 0.0 { d.1 } else { 0.0 }).collect();
         let trunk = self.segs.iter().map(|s| s.role == SegmentRole::Trunk).collect();
-        (stress, trunk, lb.is_finite().then_some(lb))
+        (stress, trunk)
     }
 
     /// Lowest safety factor over the three modes at speed `u` (one pass).
@@ -1556,40 +1484,6 @@ impl MechanicsModel {
             u0 = u1;
         }
         None
-    }
-
-    /// Highest 10 m gust speed (m/s) known to break nothing, to `tol` m/s:
-    /// the lower end of the bracket of [`Self::first_critical_speed`]
-    /// (0 when the tree fails under its own weight,
-    /// [`MAX_SEARCH_SPEED_MS`] when nothing fails up to it). Breakable
-    /// sections and uprooting only (the modes of the simulation).
-    pub fn first_safe_speed(&self, load: &WindLoad, tol: f32) -> f32 {
-        let p = self.prepare(load);
-        let eval = |u: f32| {
-            let o = self.pass(&p, u, false);
-            o.breakable.min(o.anchorage)
-        };
-        if eval(0.0) < 1.0 {
-            return 0.0;
-        }
-        let mut u0 = 0.0f32;
-        while u0 < MAX_SEARCH_SPEED_MS {
-            let u1 = (u0 + 4.0).min(MAX_SEARCH_SPEED_MS);
-            if eval(u1) < 1.0 {
-                let (mut lo, mut hi) = (u0, u1);
-                while hi - lo > tol.max(0.01) {
-                    let mid = 0.5 * (lo + hi);
-                    if eval(mid) < 1.0 {
-                        hi = mid;
-                    } else {
-                        lo = mid;
-                    }
-                }
-                return lo;
-            }
-            u0 = u1;
-        }
-        MAX_SEARCH_SPEED_MS
     }
 
     /// Critical 10 m gust speed of each failure mode for the direction,

@@ -118,6 +118,8 @@ impl Backend {
 
     fn adopt(&mut self, sim: Simulation) {
         self.sim = sim;
+        self.sim.set_record_wind_debris(true);
+        self.sim.take_wind_debris();
         self.mechanics_stale();
         self.carry_days = 0.0;
         self.drought = self.sim.drought();
@@ -132,6 +134,12 @@ impl Backend {
         self.drop_future_checkpoints();
         self.mechanics_stale();
         self.sim.cut(node_id, t, flush).map_or(-1, |k| k.code() as i32)
+    }
+
+    /// Before a logged event other than a cut (a storm): checkpoint, later checkpoints dropped.
+    pub(crate) fn checkpoint_before_event(&mut self) {
+        self.checkpoint_today();
+        self.drop_future_checkpoints();
     }
 
     /// A rewind left later events in the log: a new cut discards them, and the checkpoints after today.

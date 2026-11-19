@@ -11,7 +11,7 @@ fn main() {
     let age: u32 = a[1].parse().unwrap();
     let seed: u64 = a.get(2).map(|s| s.parse().unwrap()).unwrap_or(42);
     let gust: f32 = a.get(3).map(|s| s.parse().unwrap()).unwrap_or(20.0);
-    let mut sim = Simulation::new(g.clone(), seed).without_wind_damage();
+    let mut sim = Simulation::new(g.clone(), seed);
     if std::env::var("NOACCL").is_ok() {
         sim.set_wind_acclimation_enabled(false);
     }

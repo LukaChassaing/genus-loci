@@ -82,12 +82,9 @@ func setup(main: Node3D) -> void:
 	cam = main.get("cam") as OrbitCamera
 	hud = main.get("hud") as Hud
 	wound_mi = MeshInstance3D.new()
-	var wm: StandardMaterial3D = StandardMaterial3D.new()
-	wm.vertex_color_use_as_albedo = true
-	wm.vertex_color_is_srgb = true  # the core's wound colours are display colours
-	wm.roughness = 0.92
-	wm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	wound_mi.material_override = wm
+	# Display colours (sRGB), double-sided, swaying with the wood (wind_sway.gd).
+	WindSway.setup()
+	wound_mi.material_override = WindSway.make_vertex_color_shader(0.92, true, true)
 	add_child(wound_mi)
 	preview_mi = MeshInstance3D.new()
 	preview_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -509,6 +506,11 @@ func jump_years(y: int) -> void:
 	_show_toast("+%d an%s (%d ms)" % [y, "s" if y > 1 else "", Time.get_ticks_msec() - t0])
 
 
+## The tree changed outside the pruning tool (a storm): wounds, journal and panel follow.
+func on_external_change() -> void:
+	_after_change(false)
+
+
 ## The tree changed outside the normal stepping: make the host rebuild everything.
 func _after_change(replaced: bool) -> void:
 	_clear_hover()
@@ -670,6 +672,8 @@ func _refresh_panel() -> void:
 #   DENDRO_PRUNE="year:doy:op:arg;..."  scripted cuts (doy 1-based like DENDRO_DOY); op = raise (m), top (m),
 #                 coppice, pollard (recut the heads), thin (fraction), reduce (fraction), limb (radius m: collar
 #                 cut of the stem limb closest to that radius), flushlimb, stublimb, headlimb (t 0.5 of it)
+#   DENDRO_STORM="year:doy:speed;..."  scripted storms (gust m/s at 10 m), merged in date order with DENDRO_PRUNE
+#                 (also accepted there as op `storm`, e.g. DENDRO_PRUNE="40:300:storm:42")
 #   DENDRO_TAILLE=1  tool active (panel shown);  DENDRO_GHOST=1  control ghost shown
 #   DENDRO_PRUNE_HOVER=auto[:radius_m[:frac]]|x,y   hover (highlight + tooltip) at a screen point, or on the stem
 #                 limb closest to that radius (default 3 cm), `frac` along it
@@ -678,6 +682,11 @@ func _refresh_panel() -> void:
 ## present (the log replays deterministically). Called from main's _apply_view_env.
 func apply_env_script() -> void:
 	var spec: String = OS.get_environment("DENDRO_PRUNE")
+	var storms: String = OS.get_environment("DENDRO_STORM")
+	for part: String in storms.split(";", false):
+		var f: PackedStringArray = part.split(":")
+		if f.size() >= 3:
+			spec += ";%s:%s:storm:%s" % [f[0], f[1], f[2]]
 	if spec != "":
 		var now: int = sim.get_days_elapsed()
 		var events: Array = []
@@ -715,6 +724,12 @@ func apply_env_script() -> void:
 
 func _script_op(op: String, arg: float) -> int:
 	match op:
+		"storm":
+			var n: int = int(host.call("storm", arg))
+			var hist: Array = sim.get_wind_history()
+			for e: Dictionary in (hist.slice(hist.size() - n) if n > 0 else []):
+				print("[dendro][storm]   %s at %.1f m, Ø %.1f cm (gust %.1f m/s)" % [e["label"], e["height_m"], e["diameter_cm"], e["gust_ms"]])
+			return n
 		"limb", "flushlimb", "stublimb", "headlimb":
 			var hp: PackedFloat32Array = sim.prune_hint_point(arg, 0.0)
 			if hp[3] < 0.0:

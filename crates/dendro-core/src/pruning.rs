@@ -876,8 +876,6 @@ impl Simulation {
         let year = self.year();
         let doy = self.day_of_year();
         let kind = if natural && plan.kind != CutKind::WindBreak { CutKind::Natural } else { plan.kind };
-        // The structure changes: the wind screen must be recomputed.
-        self.wind_cache.guard = None;
         // A stem cut or broken below breast height: new stems follow.
         if plan.stem && plan.point.y < crate::wind::ACCLIMATION_REFERENCE_HEIGHT_M {
             self.stem_replaced();

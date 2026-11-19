@@ -359,7 +359,9 @@ uniform float tl_on = 0.0;
 uniform float tl_keep = 1.0;
 uniform vec3 tl_tint = vec3(1.0);
 uniform float tl_sen = 0.0;
+""" + WindSway.GLSL + """
 void vertex() {
+	VERTEX = wind_sway(VERTEX);
 	if (tl_on > 0.5) {
 		uint h = uint(VERTEX_ID) / 4u;  // 4 vertices per card (mesh.rs build_leaves)
 		h ^= h >> 16u;
@@ -691,7 +693,9 @@ uniform float flower_keep = 1.0;
 uniform float fruit_keep = 1.0;
 varying flat float card_hash;
 varying flat float is_fruit;
+""" + WindSway.GLSL + """
 void vertex() {
+	VERTEX = wind_sway(VERTEX);
 	card_hash = fract(sin(dot(NORMAL, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 	is_fruit = COLOR.a < 0.75 ? 1.0 : 0.0;
 }

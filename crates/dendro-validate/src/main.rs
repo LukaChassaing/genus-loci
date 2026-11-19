@@ -10,7 +10,6 @@
 //! `--cherry-years N` kept), `--climate-years N` (400 per seed),
 //! `--compare-with TSV` (append a verdict diff against an earlier run),
 //! `--title TEXT`, `--check` (only load and check the reference files),
-//! `--no-wind-damage` (feature `vent` only: sound trees, no breakage).
 
 use dendro_core::{Genome, Simulation, SoilProfile};
 use dendro_validate::data;
@@ -72,8 +71,6 @@ fn main() {
             }
             "--title" => title = val(),
             "--check" => check_only = true,
-            #[cfg(feature = "vent")]
-            "--no-wind-damage" => dendro_validate::vent::NO_DAMAGE.store(true, std::sync::atomic::Ordering::Relaxed),
             _ => panic!("unknown argument {a}"),
         }
     }
@@ -228,7 +225,6 @@ fn main() {
     let cx = Ctx {
         species: ctxs,
         climate,
-        #[cfg(feature = "vent")]
         vent: dendro_validate::vent::extra(&seeds),
     };
     let mut rows: Vec<Row> = Vec::new();
@@ -244,7 +240,6 @@ fn main() {
 
     #[allow(unused_mut)]
     let mut extra = vec![dendro_validate::summary::climate_section(&cx), dendro_validate::summary::trees_section(&cx)];
-    #[cfg(feature = "vent")]
     extra.push(dendro_validate::vent::section(&cx));
     let tsv = report::tsv(&rows);
     if let Some((p, name)) = &compare {
@@ -271,10 +266,7 @@ fn main() {
         duration_s: t0.elapsed().as_secs_f64(),
         determinism,
         extra_sections: extra,
-        #[cfg(not(feature = "vent"))]
         notes: dendro_validate::notes::MAIN.to_string(),
-        #[cfg(feature = "vent")]
-        notes: dendro_validate::notes::VENT.to_string(),
     };
     let md = report::markdown(&rows, &meta);
     if let Some(dir) = out.parent() {

@@ -1,11 +1,10 @@
 //! Sway frequencies and critical gusts of simulated trees, median over
 //! seeds (the table of docs/sources.md, « Vent dynamique »).
 //!
-//! cargo run -p dendro-core --release --example wind_table -- [--species a,b] [--seeds 42,1,1234] [--ages 20,60,150] [--static] [--damage]
+//! cargo run -p dendro-core --release --example wind_table -- [--species a,b] [--seeds 42,1,1234] [--ages 20,60,150] [--static] [--no-accl]
 //!
-//! By default the trees grow without wind damage (sound trees; the wind
-//! still acclimates their growth), as in the growth calibration tests.
-//! `--damage`: the trees of the simulation (natural wind damage on).
+//! The daily wind never breaks anything (only storms asked for do): the
+//! trees are sound, their stem acclimated to the wind.
 //! `--no-accl`: without the stem acclimation to the wind.
 //! `--static`: the quasi-static small-deflection model (no dynamic factor,
 //! no large deflections) for the critical gusts.
@@ -36,8 +35,8 @@ fn fmt(v: f32) -> String {
 }
 
 fn crit(c: &CriticalSpeeds) -> [f32; 3] {
-    let f = |o: Option<f32>, exists: bool| if exists { o.unwrap_or(80.0) } else { f32::NAN };
-    [f(c.stem_break, true), f(c.limb_break, c.limb_break.is_some() || true), f(c.uprooting, true)]
+    let f = |o: Option<f32>| o.unwrap_or(80.0);
+    [f(c.stem_break), f(c.limb_break), f(c.uprooting)]
 }
 
 fn main() {
@@ -45,7 +44,6 @@ fn main() {
     let mut seeds: Vec<u64> = vec![42, 1, 1234];
     let mut ages: Vec<u32> = vec![20, 60, 150];
     let mut quasi = false;
-    let mut damage = false;
     let mut accl = true;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -54,7 +52,6 @@ fn main() {
             "--seeds" => seeds = args.next().expect("--seeds a,b").split(',').map(|s| s.parse().expect("seed")).collect(),
             "--ages" => ages = args.next().expect("--ages a,b").split(',').map(|s| s.parse().expect("age")).collect(),
             "--static" => quasi = true,
-            "--damage" => damage = true,
             "--no-accl" => accl = false,
             _ => panic!("unknown argument {a}"),
         }
@@ -66,7 +63,6 @@ fn main() {
         let mut rows: Vec<Vec<[f32; 10]>> = vec![Vec::new(); ages.len()];
         for &seed in &seeds {
             let mut sim = Simulation::new(g.clone(), seed);
-            sim.set_wind_damage_enabled(damage);
             sim.set_wind_acclimation_enabled(accl);
             let mut done = 0u32;
             for (k, &age) in ages.iter().enumerate() {

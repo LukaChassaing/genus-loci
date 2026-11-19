@@ -1438,18 +1438,30 @@ impl ShootSystem {
         let mut k = self.area_per_foliage(g.wood.growth_coefficient) * factor;
         let extra = self.adaptive_demand(g, k, max_dr, wind);
         if !extra.is_empty() {
-            // Zero-sum: the mechanical wood comes out of the phase's budget
-            // `k x sum F L` (Pressler's share shrinks in proportion).
+            // Self-weight response, zero-sum: the mechanical wood comes out
+            // of the phase's budget `k x sum F L` (Pressler's share shrinks
+            // in proportion).
             let budget = k * self.foliage_path;
-            let want: f32 = extra.iter().map(|&(i, da)| da * self.nodes[i].length).sum();
             let cap = budget * g.wood.adaptive_max_budget_share.clamp(0.0, 1.0);
+            let want: f32 = extra.iter().map(|&(i, da, _)| da * self.nodes[i].length).sum();
             let scale = if want > cap && want > 0.0 { cap / want } else { 1.0 };
             let used = want * scale;
             if budget > 0.0 {
                 k *= ((budget - used) / budget).max(0.0);
             }
-            for &(i, da) in &extra {
-                self.nodes[i].area += da * scale;
+            // Wind response, on top of the budget: stems strained like the
+            // strongest winds grow more secondary wood, not the same wood
+            // elsewhere (Bonnesoeur et al. 2016: at least +80 %, abstract),
+            // up to the same share of the budget. Not a carbon balance (the
+            // extra wood is not paid by height growth or the roots:
+            // docs/sources.md, « Écarts connus »). Taking it from the budget
+            // instead lowered the DBH and moved three calibrated growth
+            // tests out of their bands (oak height at 200 y 34.05 m for
+            // 28-34, 11 scaffold limbs for 3-10, cherry rings at 105-115 y).
+            let want_w: f32 = extra.iter().map(|&(i, _, dw)| dw * self.nodes[i].length).sum();
+            let scale_w = if want_w > cap && want_w > 0.0 { cap / want_w } else { 1.0 };
+            for &(i, da, dw) in &extra {
+                self.nodes[i].area += da * scale + dw * scale_w;
             }
         }
         let mut collar = 0.0;
@@ -1509,7 +1521,7 @@ impl ShootSystem {
     ///
     /// Cost: one O(n) pass (a few vector operations per segment, one
     /// `dpowf` per overstressed segment).
-    fn adaptive_demand(&self, g: &Genome, k: f32, max_dr: f32, wind: &[f32]) -> Vec<(usize, f32)> {
+    fn adaptive_demand(&self, g: &Genome, k: f32, max_dr: f32, wind: &[f32]) -> Vec<(usize, f32, f32)> {
         let w = &g.wood;
         let wind_on = wind.len() == self.nodes.len();
         if (w.adaptive_stress_mpa <= 0.0 && !wind_on) || w.adaptive_max_budget_share <= 0.0 || k <= 0.0 {
@@ -1566,20 +1578,24 @@ impl ShootSystem {
                 let d = 2.0 * r;
                 ratio = 32.0 * mb / (PI * d * d * d) / sigma_t;
             }
-            if windy {
-                ratio = ratio.max(wind[i]);
-            }
-            if ratio <= 1.0 {
+            let ratio_w = if windy { ratio.max(wind[i]) } else { ratio };
+            if ratio_w <= 1.0 {
                 continue;
             }
-            let r_req = r * ratio.dpowf(1.0 / 3.0);
             let a_pressler = nd.area + k * nd.foliage;
-            let a_req = PI * r_req * r_req;
-            let cap = if windy { max_dr * WIND_RING_BOOST } else { max_dr };
-            let a_cap = PI * (r + cap) * (r + cap);
-            let da = a_req.min(a_cap) - a_pressler;
-            if da > 0.0 {
-                out.push((i, da));
+            let need = |x: f32, cap: f32| {
+                if x <= 1.0 {
+                    return 0.0;
+                }
+                let r_req = r * x.dpowf(1.0 / 3.0);
+                let a_cap = PI * (r + cap) * (r + cap);
+                ((PI * r_req * r_req).min(a_cap) - a_pressler).max(0.0)
+            };
+            // Self-weight part, then what the wind adds beyond it.
+            let da = need(ratio, max_dr);
+            let dw = if windy { (need(ratio_w, max_dr * WIND_RING_BOOST) - da).max(0.0) } else { 0.0 };
+            if da > 0.0 || dw > 0.0 {
+                out.push((i, da, dw));
             }
         }
         out
@@ -1797,21 +1813,28 @@ impl ShootSystem {
         if self.nodes[0].end(self.ext).y >= y {
             return Some(0);
         }
-        for i in 1..self.nodes.len() {
-            let n = &self.nodes[i];
-            if n.parent as usize == cur && n.terminal {
-                cur = i;
-                if n.end(self.ext).y >= y {
-                    return Some(i);
+        // A cut stem end below `y` (coppice cut, wind break): its sprouts
+        // are laterals, not a terminal continuation.
+        if !self.nodes[0].cut_end {
+            for i in 1..self.nodes.len() {
+                let n = &self.nodes[i];
+                if n.parent as usize == cur && n.terminal {
+                    cur = i;
+                    if n.end(self.ext).y >= y {
+                        return Some(i);
+                    }
+                    if n.cut_end {
+                        break;
+                    }
                 }
             }
         }
         // The stem was cut or broken below `y` (coppice cut, wind break,
         // stump sprouts) or its leader died: the stem is now the thickest
         // living shoot growing from what is left, as a forester measures a
-        // coppice stool. Before,
-        // the walk stopped at the stump and returned None (DBH 0) or ran up
-        // a thin terminal sprout (DBH 1.4 cm on a 16 m coppice shoot).
+        // coppice stool. Before, the walk stopped at the stump and returned
+        // None (DBH 0) or ran up a thin sprout flagged terminal (DBH 1.4 cm
+        // on a 16 m coppice shoot).
         let n = self.nodes.len();
         let mut thickest = vec![NONE; n];
         for i in 1..n {
