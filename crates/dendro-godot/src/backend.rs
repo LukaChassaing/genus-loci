@@ -323,6 +323,21 @@ impl Backend {
         self.sim.height_m() as f64
     }
 
+    /// Carbon status and fate of the tree (`dendro_core::vitality`).
+    pub fn vitality(&self) -> dendro_core::VitalityInfo {
+        self.sim.vitality()
+    }
+
+    /// The first trunk is alive (false once dead, even if the stump resprouted).
+    pub fn trunk_alive(&self) -> bool {
+        self.sim.trunk_alive()
+    }
+
+    /// Something is alive (leaves or buds on living wood, stump sprouts included).
+    pub fn is_alive(&self) -> bool {
+        self.sim.is_alive()
+    }
+
     pub fn trunk_diameter_cm(&self) -> f64 {
         self.sim.dbh_cm() as f64
     }

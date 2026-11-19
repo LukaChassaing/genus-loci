@@ -435,7 +435,7 @@ impl Simulation {
         // sub-systems without widening their visibility.
         let _ = write!(
             h,
-            "{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            "{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
             self.day,
             self.seed,
             self.drought,
@@ -447,6 +447,7 @@ impl Simulation {
             self.phen,
             self.p_prev.to_bits(),
             self.stress_prev.to_bits(),
+            self.vit,
         );
         h.0
     }

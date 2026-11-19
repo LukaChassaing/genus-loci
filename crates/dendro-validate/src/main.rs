@@ -258,7 +258,7 @@ fn main() {
     let years = cx
         .species
         .iter()
-        .map(|s| format!("{} {} ans (adulte : {} ans)", s.genome.common_name_fr.to_lowercase(), s.runs[0].years.len(), s.mature_age))
+        .map(|s| format!("{} {} ans (adulte : {} ans)", s.genome.common_name_fr.to_lowercase(), s.last_age(), s.mature_age))
         .chain(cx.species.iter().filter(|s| !s.gley.is_empty()).map(|s| format!("+ 30 ans sur argile à gley ({})", s.genome.common_name_fr.to_lowercase())))
         .chain(std::iter::once(format!("climat {clim_years} ans par graine")))
         .collect::<Vec<_>>()

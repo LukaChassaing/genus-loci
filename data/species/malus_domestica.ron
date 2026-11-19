@@ -244,6 +244,14 @@
         decline_onset_years: 65.0,
         decline_years: 35.0,
         decline_min_vigour: 0.3,
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 80-100 y (EUFORGEN, wild form) (data/validation/malus_domestica.ron).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.015,
     ),
     // Rosaceae: arbuscular mycorrhiza (Wang & Qiu 2006, Mycorrhiza
     // 16:299-363; no apple source read [absence_mycorrhiza_apple]); shares

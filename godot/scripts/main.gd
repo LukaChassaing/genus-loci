@@ -75,6 +75,7 @@ var _envelope_pending: bool = false
 var _envelope_age: float = 10.0
 
 var playing: bool = true
+var benching: bool = false     # DENDRO_BENCH time-lapse: the death of the trunk does not pause it
 var speed_dps: float = 30.0
 var accumulator: float = 0.0
 var mesh_dirty: bool = true
@@ -849,12 +850,22 @@ func _update_soil_layers() -> void:
 ## Steps the simulation in chunks, bounded by a per-frame time budget.
 func _simulate() -> void:
 	var t0: int = Time.get_ticks_usec()
+	var trunk_alive: bool = sim.get_trunk_alive()
 	while accumulator > 0.0:
 		var chunk: float = minf(accumulator, 30.0)
 		accumulator -= chunk
 		_stats_dirty = true
 		if sim.advance_days(chunk):
 			mesh_dirty = true
+		# The trunk just died (dendro_core::vitality): the time-lapse pauses on the event, so that an
+		# accelerated run does not race past it; « Lecture » resumes (the dead stem stands, sheds its twigs
+		# and limbs, then collapses; a resprouting stump grows on).
+		if trunk_alive and not sim.get_trunk_alive() and not benching:
+			accumulator = 0.0
+			hud.set_playing(false)
+			var d: Dictionary = sim.get_vitality()
+			print("[dendro] trunk died at %d years (%s)" % [int(d.get("death_age", -1)), String(d.get("cause", ""))])
+			break
 		if float(Time.get_ticks_usec() - t0) / 1000.0 > FRAME_BUDGET_MS:
 			break
 
@@ -1094,6 +1105,7 @@ func _apply_camera_preset() -> void:
 
 ## Fast-forward at max speed (10 years/s) through the normal _process path and report frame times.
 func _run_bench(seconds: float, shot: String) -> void:
+	benching = true
 	hud.set_rings_visible(true)
 	var static_bench: bool = OS.get_environment("DENDRO_STATIC") == "1"
 	if static_bench:
@@ -1496,6 +1508,45 @@ func _run_selftest() -> void:
 	_check("soil reset on new seed", soil.radius < 1.0 and soil.depth < 0.6)
 	_check("wedge opens 110 degrees", is_equal_approx(rad_to_deg(soil.wedge_width), 110.0))
 
+	# 7b. Ageing and death (dendro_core::vitality): a plum (short-lived) declines and dies at its own pace, the
+	# time-lapse pauses on the death, the HUD « État » line says so, the dead stem stands, then collapses.
+	var age_sp_keep: int = sim.get_species()
+	var age_speed_keep: float = hud.speed_slider.value
+	var age_play_keep: bool = hud.is_playing()
+	sim.set_species(sim.find_species("prunus_domestica"))
+	_apply_seed(3)
+	var age_vd: Dictionary = sim.get_vitality()
+	_check("vitality: modelled, trunk alive at the start", bool(age_vd["modelled"]) and bool(age_vd["trunk_alive"]) and int(age_vd["death_age"]) == -1, str(age_vd))
+	_check("HUD state: vigorous young tree", Hud.vitality_text(age_vd).begins_with("État : vigoureux"), Hud.vitality_text(age_vd))
+	_advance_days_direct(25.0 * 365.0)
+	hud.speed_slider.value = hud.speed_slider.max_value
+	hud.set_playing(true)
+	var death_frames: int = 0
+	while sim.get_trunk_alive() and sim.get_age_years() < 150.0 and death_frames < 30000:
+		await get_tree().process_frame
+		death_frames += 1
+	age_vd = sim.get_vitality()
+	_check("vitality: the plum trunk dies (emergent decline) after 25 and before 150 y", not sim.get_trunk_alive() and int(age_vd["death_age"]) > 25
+		and int(age_vd["death_age"]) < 150, "age %.1f, %s" % [sim.get_age_years(), str(age_vd)])
+	_check("time-lapse pauses when the trunk dies", not playing and not hud.is_playing())
+	var age_st: String = Hud.vitality_text(age_vd)
+	_check("HUD state: dead trunk, age and cause", age_st.begins_with("État : tronc mort à %d ans" % int(age_vd["death_age"])) and String(age_vd["cause"]) != "", age_st)
+	_check("dead stem stands (snag) with a collapse ahead", bool(age_vd["standing_dead"]) and int(age_vd["collapse_in"]) > 0 and age_st.contains("Mort sur pied"), age_st)
+	_check("dead stem: no leafy shoot left", not bool(age_vd["alive"]) or bool(age_vd["resprouted"]), str(age_vd))
+	var age_h_dead: float = sim.get_height_m()
+	_advance_days_direct((float(age_vd["collapse_in"]) + 1.0) * 365.0)
+	age_vd = sim.get_vitality()
+	_check("dead stem collapses", bool(age_vd["collapsed"]) and not bool(age_vd["standing_dead"]) and Hud.vitality_text(age_vd).contains("Tronc effondré"),
+		"%s ; height %.1f -> %.1f m" % [str(age_vd), age_h_dead, sim.get_height_m()])
+	# (Stump sprouts, when the plum resprouted, may already be a few metres tall.)
+	_check("collapsed stem: height drops (dead stem gone)", sim.get_height_m() < (0.8 if bool(age_vd["resprouted"]) else 0.3) * age_h_dead,
+		"%.1f -> %.1f m, resprouted %s" % [age_h_dead, sim.get_height_m(), str(age_vd["resprouted"])])
+	_rebuild_meshes(true)
+	hud.speed_slider.value = age_speed_keep
+	hud.set_playing(age_play_keep)
+	sim.set_species(age_sp_keep)
+	_apply_seed(5)
+
 	hud.flux_button.button_pressed = true
 
 	# 8. Camera: free 360-degree orbit (no yaw limit), pitch below the horizon, screen-space pan, zoom.
@@ -1543,7 +1594,8 @@ func _run_selftest() -> void:
 	cam.reframe()
 	_frame_camera(0.0)
 	cam.snap()
-	_check("camera position sane after re-frame", cam.get_camera().global_position.distance_to(cam_before) < 1.0)
+	_check("camera position sane after re-frame", cam.get_camera().global_position.distance_to(cam_before) < 1.0,
+		"%.2f m from %s" % [cam.get_camera().global_position.distance_to(cam_before), str(cam_before)])
 	# Never inside the trunk or the ground, even at maximum zoom, with a low pitch, or aimed at the trunk.
 	var blocked: String = ""
 	for pitch_t: float in [OrbitCamera.MIN_PITCH, 0.0, 0.5]:

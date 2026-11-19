@@ -865,11 +865,20 @@ pub struct LongevityTraits {
     /// Remaining fraction of shoot, cambial and root growth at the end of
     /// the decline.
     pub decline_min_vigour: f32,
+    /// Maintenance cost of the living wood that supplies the foliage, per
+    /// metre of collar-to-leaf distance, relative to the wood production of
+    /// the same foliage (1/m; see [`crate::vitality`]). The yearly cost /
+    /// production ratio is `maintenance_per_m x sum(leaf x distance) /
+    /// sum(leaf x light x hydraulic efficiency)`. 0 (default) = no carbon
+    /// balance, no reserves, no emergent death (genomes written before it).
+    /// Calibrated (no measured value: see docs/sources.md).
+    #[serde(default)]
+    pub maintenance_per_m: f32,
 }
 
 impl Default for LongevityTraits {
     fn default() -> Self {
-        LongevityTraits { decline_onset_years: 0.0, decline_years: 50.0, decline_min_vigour: 0.3 }
+        LongevityTraits { decline_onset_years: 0.0, decline_years: 50.0, decline_min_vigour: 0.3, maintenance_per_m: 0.0 }
     }
 }
 

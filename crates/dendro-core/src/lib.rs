@@ -41,6 +41,7 @@ pub mod save;
 mod sim;
 pub mod soil;
 pub mod tempgen;
+pub mod vitality;
 
 pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
@@ -57,6 +58,7 @@ pub use pruning::{
 };
 pub use rings::Ring;
 pub use save::{Replay, ReplayResult, SaveError, SaveFile, SaveMeta, SAVE_VERSION};
+pub use vitality::{DeathCause, VitalityInfo};
 pub use soil::{Horizon, HorizonKind, SoilError, SoilLayerState, SoilProfile};
 pub use sim::{
     ShapeMetrics, Simulation, TreeStats, DAYS_PER_YEAR, FINE_ROOT_TRI_BUDGET, FLOWER_TRI_BUDGET, LEAF_TRI_BUDGET, ROOT_TRI_BUDGET,

@@ -213,7 +213,7 @@ fn oak_200() -> &'static Growth {
 
 fn cherry_100() -> &'static Growth {
     static G: OnceLock<Growth> = OnceLock::new();
-    G.get_or_init(|| grow_open(Genome::prunus_avium(), 42, 100, &[60, 100]))
+    G.get_or_init(|| grow_open(Genome::prunus_avium(), 42, 100, &[60, 75]))
 }
 
 /// Seeds for the limb-proportion checks (the metrics of one tree are
@@ -227,7 +227,9 @@ fn limb_runs() -> (&'static [Growth], &'static [Growth]) {
     assert_eq!(MEDIAN_SEEDS[..LIMB_SEEDS.len()], LIMB_SEEDS);
     let cherries = G.get_or_init(|| {
         let h: Vec<_> =
-            LIMB_SEEDS.iter().map(|&s| std::thread::spawn(move || grow_open(Genome::prunus_avium(), s, 100, &[60, 100]))).collect();
+            // Updated (was 60 and 100 y): the cherry now dies of emergent
+            // decline (crate::vitality) at 79-94 y on these seeds.
+            LIMB_SEEDS.iter().map(|&s| std::thread::spawn(move || grow_open(Genome::prunus_avium(), s, 100, &[60, 75]))).collect();
         h.into_iter().map(|h| h.join().unwrap()).collect()
     });
     (&oak_runs()[..LIMB_SEEDS.len()], cherries)
@@ -302,6 +304,10 @@ fn open_grown_cherry_dbh_follows_free_growth() {
     // 2016, European Atlas of Forest Tree Species).
     let g = cherry_100();
     for (age, lo, hi) in [(15, 10.0, 20.0), (30, 22.0, 36.0), (40, 28.0, 46.0), (60, 44.0, 64.0), (100, 60.0, 100.0)] {
+        // Updated: the old-tree band is read at 100 y or at the last ring
+        // when the trunk died earlier (crate::vitality; seed 42 dies at
+        // 82 y); bands unchanged.
+        let age = age.min(g.rings.len());
         let d = g.dbh[age];
         assert!((lo..=hi).contains(&d), "cherry DBH at {age} y = {d:.1} cm, expected {lo}-{hi}");
     }
@@ -363,7 +369,7 @@ fn ring_view_matches_stem_diameter() {
     // The ring panel draws the recorded ring widths: twice their sum must
     // give the stem diameter (rings of the first years are measured at the
     // collar until the stem passes 1.3 m, hence the 10 % tolerance).
-    for (g, species, ages) in [(oak_200(), "oak", [100usize, 200]), (cherry_100(), "cherry", [60, 100])] {
+    for (g, species, ages) in [(oak_200(), "oak", [100usize, 200]), (cherry_100(), "cherry", [60, 75])] {
         for age in ages {
             let d_rings = 2.0 * g.rings[..age].iter().sum::<f32>() * 0.1;
             let d = g.dbh[age];

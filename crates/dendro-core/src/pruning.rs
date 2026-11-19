@@ -399,7 +399,7 @@ pub struct PruneState {
     /// Events before this index have been applied.
     cursor: usize,
     /// Light / foliage must be recomputed before the next simulated day.
-    light_dirty: bool,
+    pub(crate) light_dirty: bool,
     pub(crate) active: bool,
     wounds: Vec<Wound>,
     records: Vec<CutRecord>,
@@ -1059,6 +1059,7 @@ impl Simulation {
             }
             if self.prune.starving_years >= 4 && self.prune.reserve <= 0.0 {
                 self.prune.dead = true;
+                self.record_starvation_death(year);
                 for n in self.shoots.nodes.iter_mut() {
                     if !n.is_snag() {
                         n.snag_since = year;
@@ -1577,6 +1578,10 @@ impl Simulation {
     pub fn life_expectancy_years(&self) -> f32 {
         let tr = &self.genome.pruning;
         let age = self.age_years();
+        // A trunk that died (`crate::vitality`): its age at death.
+        if let Some(d) = self.vitality().death_age_years {
+            return d as f32;
+        }
         if !self.is_alive() {
             return age;
         }

@@ -155,6 +155,36 @@ impl TreeSim {
     fn get_trunk_diameter_cm(&self) -> f64 {
         self.backend.trunk_diameter_cm()
     }
+    /// Vitality (« État » of the HUD, see `dendro_core::vitality`): `modelled` (bool), `reserve`,
+    /// `vigour`, `death_probability` (per year), `cost_ratio`, `dieback` (branches killed last season),
+    /// `trunk_alive`, `alive` (stump sprouts count), `death_age` (years, -1 while alive), `cause` (French
+    /// label, "" while alive), `standing_dead`, `collapse_in` (years, -1), `collapsed`, `resprouted`.
+    #[func]
+    fn get_vitality(&self) -> VarDictionary {
+        let v = self.backend.vitality();
+        let mut d = VarDictionary::new();
+        let mut put = |k: &str, x: Variant| d.set(&k.to_variant(), &x);
+        put("modelled", v.modelled.to_variant());
+        put("reserve", (v.reserve as f64).to_variant());
+        put("vigour", (v.vigour as f64).to_variant());
+        put("death_probability", (v.death_probability as f64).to_variant());
+        put("cost_ratio", (v.cost_ratio as f64).to_variant());
+        put("dieback", (v.dieback_branches as i64).to_variant());
+        put("trunk_alive", self.backend.trunk_alive().to_variant());
+        put("alive", self.backend.is_alive().to_variant());
+        put("death_age", v.death_age_years.map_or(-1i64, |a| a as i64).to_variant());
+        put("cause", v.cause.label_fr().to_variant());
+        put("standing_dead", v.standing_dead.to_variant());
+        put("collapse_in", v.collapse_in_years.map_or(-1i64, |a| a as i64).to_variant());
+        put("collapsed", v.collapsed.to_variant());
+        put("resprouted", v.resprouted.to_variant());
+        d
+    }
+    /// The first trunk is alive (cheap check for the time-lapse: it pauses when the trunk dies).
+    #[func]
+    fn get_trunk_alive(&self) -> bool {
+        self.backend.trunk_alive()
+    }
     #[func]
     fn get_crown_radius_m(&self) -> f64 {
         self.backend.crown_radius_m()

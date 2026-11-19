@@ -269,6 +269,14 @@
         decline_onset_years: 200.0,
         decline_years: 100.0,
         decline_min_vigour: 0.4,
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 200-300 y (Atlas) (data/validation/picea_abies.ron).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.0025,
     ),
     // Pinaceae are ectomycorrhizal (Wang & Qiu 2006, Mycorrhiza
     // 16:299-363); shares and costs: the oak's calibrations (estimated).

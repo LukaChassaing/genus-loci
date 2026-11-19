@@ -71,7 +71,7 @@
 use crate::fmath::DMath;
 use crate::genome::Genome;
 use crate::math::{Quat, Vec3};
-use crate::rng::{self, S_BUD, S_RETRENCH, S_SHOOT};
+use crate::rng::{self, S_BUD, S_MORTALITY, S_RETRENCH, S_SHOOT};
 use std::f32::consts::PI;
 
 pub(crate) const NONE: u32 = u32::MAX;
@@ -332,6 +332,12 @@ pub(crate) struct ShootSystem {
     /// pass; the denominator of the Pressler distribution of the annual
     /// wood budget (see [`ShootSystem::area_per_foliage`]).
     foliage_path: f32,
+    /// Leaf area times collar-to-leaf distance, `sum_i A_i d_i` (m3-like),
+    /// NOT weighted by light or hydraulic efficiency, from the last foliage
+    /// pass: under the pipe model (Shinozaki et al. 1964) the living
+    /// sapwood that supplies the foliage scales with it. Numerator of the
+    /// maintenance cost (see `crate::vitality`).
+    pub sap_demand: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -383,7 +389,7 @@ impl ShootSystem {
             dead: false,
             old_leaf: 0.0,
         };
-        ShootSystem { nodes: vec![seedling], next_id: 1, ext: 1.0, voxel: 0.1, break_boost: 1.0, tree_h: 0.03, grid: Vec::new(), foliage_path: 0.0 }
+        ShootSystem { nodes: vec![seedling], next_id: 1, ext: 1.0, voxel: 0.1, break_boost: 1.0, tree_h: 0.03, grid: Vec::new(), foliage_path: 0.0, sap_demand: 0.0 }
     }
 
     /// Basipetal sums of bud light (main/lateral) and of leafy-shoot light.
@@ -662,6 +668,121 @@ impl ShootSystem {
             }
         }
         killed
+    }
+
+    /// Carbon-starvation dieback (see `crate::vitality`), run at the end of
+    /// a season while the tree's reserves are low. Uses the foliage of the
+    /// last light pass (`foliage`, light- and hydraulics-weighted).
+    ///
+    /// Each branch's own balance is `cost x D_sub / F_sub`: `D_sub` = leaf
+    /// area x collar distance of its foliage (the sapwood it needs, as
+    /// `sap_demand`), `F_sub` = the production of that foliage. Branches
+    /// (1-15 cm radius, at most half the parent's area) whose ratio exceeds
+    /// `threshold` (the whole tree's ratio: branches that drag the balance
+    /// down; above 1 they cost more than they return) each die with
+    /// probability `p_kill`
+    /// and becomes standing dead wood (branch autonomy: a branch is not
+    /// fed by the rest of the tree for long, Sprugel, Hinckley & Schaap
+    /// 1991, Annu Rev Ecol Syst 22:309-334). The far, poorly supplied outer
+    /// crown goes first: the crown "retrenches" (Fay 2002; Lonsdale 2013;
+    /// see `retrench`). Survivors with good light in the lower crown form
+    /// epicormic buds (`epicormic_rate`, reiteration). Returns the number
+    /// of branches killed.
+    pub fn starve_dieback(&mut self, g: &Genome, cost: f32, threshold: f32, p_kill: f32, year: u32, seed: u64) -> usize {
+        let n = self.nodes.len();
+        let face = self.voxel * self.voxel;
+        let mut d = vec![0.0f32; n];
+        for (i, nd) in self.nodes.iter().enumerate() {
+            let w = nd.leaf_w();
+            if w > 0.0 {
+                d[i] = face * w * nd.end(1.0).length();
+            }
+        }
+        for i in (1..n).rev() {
+            let p = self.nodes[i].parent as usize;
+            let v = d[i];
+            d[p] += v;
+        }
+        let h = self.height().max(1.0);
+        let mut kill = vec![false; n];
+        let mut killed = 0usize;
+        for i in 1..n {
+            let p = self.nodes[i].parent as usize;
+            if kill[p] {
+                kill[i] = true;
+                continue;
+            }
+            let nd = &self.nodes[i];
+            if nd.is_snag() || nd.order == 0 || d[i] <= 0.0 {
+                continue;
+            }
+            let r = nd.radius();
+            if !(0.01..0.15).contains(&r) || self.nodes[p].area < 2.0 * nd.area {
+                continue;
+            }
+            let ratio = cost * d[i] / nd.foliage.max(1e-9);
+            if ratio > threshold && rng::unit(rng::hash(seed, S_MORTALITY, nd.id as u64, (year as u64) << 4 | 1)) < p_kill {
+                kill[i] = true;
+                killed += 1;
+            }
+        }
+        let epi = g.architecture.epicormic_rate;
+        for (nd, &k) in self.nodes.iter_mut().zip(&kill).skip(1) {
+            if k {
+                nd.snag_since = year;
+                nd.leafy = false;
+                nd.old_leaf = 0.0;
+                nd.term_bud = false;
+                nd.lat_buds = 0;
+            } else if killed > 0
+                && epi > 0.0
+                && !nd.is_snag()
+                && nd.order > 0
+                && nd.lat_buds == 0
+                && nd.radius() >= 0.05
+                && nd.end(1.0).y < 0.65 * h
+                && nd.light >= 0.25
+                && rng::unit(rng::hash(seed, S_MORTALITY, nd.id as u64, (year as u64) << 4 | 2)) < epi
+            {
+                nd.lat_buds = 2;
+                nd.bud_year = year;
+            }
+        }
+        killed
+    }
+
+    /// The whole shoot system dies (trunk death, see `crate::vitality`):
+    /// every live node becomes standing dead wood this year, leaves and buds
+    /// are lost. With `keep_stump`, the collar node stays alive (it carries
+    /// the stump's latent buds).
+    pub fn kill_all(&mut self, year: u32, keep_stump: bool) {
+        for (i, nd) in self.nodes.iter_mut().enumerate() {
+            if i == 0 && keep_stump {
+                nd.leafy = false;
+                nd.old_leaf = 0.0;
+                nd.term_bud = false;
+                continue;
+            }
+            if !nd.is_snag() {
+                nd.snag_since = year;
+            }
+            nd.leafy = false;
+            nd.old_leaf = 0.0;
+            nd.term_bud = false;
+            nd.lat_buds = 0;
+            nd.sprout = 0.0;
+        }
+    }
+
+    /// Collapse of the dead stem: remove every standing-dead child subtree
+    /// of the collar (live stump sprouts stay). Returns the wood volume
+    /// removed (m3).
+    pub fn collapse_dead_stem(&mut self) -> f32 {
+        let mut wood = 0.0;
+        while let Some(i) = self.nodes.iter().skip(1).position(|nd| nd.parent == 0 && nd.is_snag()) {
+            wood += self.remove_subtree(i + 1, false).1;
+        }
+        wood
     }
 
     /// Spring flush: shed, allocate vigour, break buds, create the new
@@ -1201,15 +1322,19 @@ impl ShootSystem {
     /// the age-related decline of basal area increment.
     pub fn compute_foliage(&mut self, hydraulic_path_max: f32, exponent: f32) -> f32 {
         let face = self.voxel * self.voxel;
+        let mut sap = 0.0f32;
         for n in self.nodes.iter_mut() {
             let w = n.leaf_w();
             n.foliage = if w > 0.0 {
-                let eff = (1.0 - (n.end(1.0).length() / hydraulic_path_max).dpowf(exponent)).max(0.08);
+                let d = n.end(1.0).length();
+                sap += face * w * d;
+                let eff = (1.0 - (d / hydraulic_path_max).dpowf(exponent)).max(0.08);
                 n.light * face * eff * w
             } else {
                 0.0
             };
         }
+        self.sap_demand = sap;
         for i in (1..self.nodes.len()).rev() {
             let (p, f) = (self.nodes[i].parent as usize, self.nodes[i].foliage);
             self.nodes[p].foliage += f;

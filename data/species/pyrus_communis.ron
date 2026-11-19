@@ -237,6 +237,14 @@
         decline_onset_years: 90.0,
         decline_years: 70.0,
         decline_min_vigour: 0.3, // proxy Malus domestica pilot, estimated
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 80-150 y (EUFORGEN, wild form) (data/validation/pyrus_communis.ron).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.0079,
     ),
     symbiosis: (
         // Rosaceae: arbuscular (Wang & Qiu 2006); no pear source [absence_pyrus_3_mycorrhizatype].

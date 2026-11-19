@@ -142,6 +142,10 @@ pub struct Simulation {
     repro: Reproduction,
     /// Pruning state: intervention log, wounds, reserves (see `crate::pruning`).
     pub(crate) prune: crate::pruning::PruneState,
+    /// Carbon status, ageing and death (see `crate::vitality`).
+    pub(crate) vit: crate::vitality::Vitality,
+    /// Collar area increment (m2) of this season's earlywood.
+    pending_collar: f32,
 }
 
 impl Simulation {
@@ -204,6 +208,8 @@ impl Simulation {
             flower_key: 0,
             repro: Reproduction::new(first_age, seed),
             prune: crate::pruning::PruneState::default(),
+            vit: crate::vitality::Vitality::default(),
+            pending_collar: 0.0,
             genome,
             seed,
         }
@@ -381,8 +387,13 @@ impl Simulation {
     /// Whole-tree growth capacity (0..1]: age-related decline (longevity
     /// traits) x root health after a year in poorly aerated soil
     /// (`hypoxia_sensitivity`). Exactly 1.0 when neither applies.
+    ///
+    /// With the carbon balance on (`LongevityTraits::maintenance_per_m >
+    /// 0`, see `crate::vitality`), the age-scheduled decline is replaced by
+    /// the reserve status: ageing then follows from the tree's state, not
+    /// from its age.
     fn growth_capacity(&self, age: f32) -> f32 {
-        let mut f = self.genome.longevity.vigour(age);
+        let mut f = if self.ageing() { self.vit.capacity() } else { self.genome.longevity.vigour(age) };
         let hs = self.genome.roots.hypoxia_sensitivity;
         if hs > 0.0 && self.hyp_prev > 0.0 {
             f *= (1.0 - hs.min(1.0) * self.hyp_prev).max(0.3);
@@ -407,6 +418,7 @@ impl Simulation {
         self.shoots.compute_light();
         let a = &self.genome.architecture;
         self.shoots.compute_foliage(a.hydraulic_path_max_m, a.hydraulic_foliage_exponent);
+        self.update_cost_ratio();
         // Earlywood from reserves (last year's productivity): ring-porous
         // oak builds earlywood from stored starch (Barbaroux & Breda 2002,
         // Tree Physiol 22:1201-1210); the 0.4..1.3 clamp is a calibration.
@@ -422,7 +434,13 @@ impl Simulation {
         let collar = self.shoots.thicken(&self.genome, factor, w.max_ring_width_mm * 0.001 * share * 1.5);
         self.pending_early_mm = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.pending_measure = mh;
+        self.pending_collar = collar;
         self.roots.thicken(collar);
+        if !self.is_alive() {
+            // A dead tree: no root growth.
+            self.wood_version += 1;
+            return;
+        }
         // Root growth.
         let cr = self.shoots.crown_radius();
         let age = self.age_years();
@@ -459,12 +477,23 @@ impl Simulation {
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
         self.shoots.sag(&self.genome);
+        // Captured before this season's deaths (pruning starvation here,
+        // ageing below): the ring of the season a trunk dies in is kept.
+        let trunk_alive = self.vit.death_year == crate::growth::NONE;
         if self.prune.active {
             self.prune_yearly(year);
         }
         let early = self.pending_early_mm;
         let total = early + late;
         self.stress_prev = if self.stress_days > 0.0 { self.stress_sum / self.stress_days } else { 0.0 };
+        self.vitality_yearly(year, p_summer, self.pending_collar + collar);
+        self.pending_collar = 0.0;
+        // A dead trunk lays no ring (sprouts of a stool are new stems).
+        if !trunk_alive {
+            self.wood_version += 1;
+            self.root_version += 1;
+            return;
+        }
         self.rings.push(Ring {
             year,
             width_mm: total,
@@ -627,7 +656,9 @@ impl Simulation {
     /// part of the bloom).
     pub fn flower_density(&self) -> f32 {
         let r = &self.genome.reproduction;
-        if r.flower_display <= 0.0 {
+        // A dead trunk does not flower (the flowering of stump sprouts is
+        // not modelled).
+        if r.flower_display <= 0.0 || !self.trunk_alive() {
             return 0.0;
         }
         self.repro.flower_amount() * r.flower_display.min(1.0)
@@ -637,7 +668,7 @@ impl Simulation {
     /// once ripe), scaled by `ReproductionTraits::fruit_display`.
     pub fn fruit_density(&self) -> f32 {
         let r = &self.genome.reproduction;
-        if r.fruit_display <= 0.0 {
+        if r.fruit_display <= 0.0 || !self.trunk_alive() {
             return 0.0;
         }
         self.repro.fruit_amount(r) * (1.0 - self.repro.frost_loss) * r.fruit_display.min(1.0)

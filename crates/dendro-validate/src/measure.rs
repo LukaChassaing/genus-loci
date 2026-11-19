@@ -78,9 +78,13 @@ pub struct TreeRun {
     pub ages: BTreeMap<u32, AgeRec>,
     pub at_dbh: BTreeMap<u32, AtDbh>,
     pub first_flowering_age: Option<u32>,
-    /// Age (years) at which the tree died (uprooted by the wind on the
-    /// `vent` branch); never set on main. Later years are not used.
+    /// Age (years) at which the trunk died: emergent ageing and
+    /// growth-dependent mortality (`dendro_core::vitality`), or uprooted by
+    /// the wind on the `vent` branch. The run stops there (stump sprouts
+    /// are new stems, not the measured tree); later years are not used.
     pub death_age: Option<u32>,
+    /// Length of the simulated run (years), `death_age` or the full run.
+    pub run_years: u32,
     #[cfg(feature = "vent")]
     pub vent: crate::vent::RunDyn,
 }
@@ -262,7 +266,14 @@ pub fn run_tree_on(genome: &Genome, seed: u64, years: u32, soil: SoilProfile, de
         #[cfg(feature = "vent")]
         crate::vent::year_end(&sim, &mut run, age);
         run.years.push(y);
+        if run.death_age.is_none() && !sim.trunk_alive() {
+            run.death_age = Some(age);
+        }
+        if run.death_age.is_some() {
+            break;
+        }
     }
+    run.run_years = years;
     for (a, (sum, n)) in july_acc {
         if let Some(r) = run.ages.get_mut(&a) {
             r.july_transp_l_day = sum / n as f64;

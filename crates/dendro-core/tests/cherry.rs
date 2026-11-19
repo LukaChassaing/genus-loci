@@ -242,14 +242,19 @@ fn cherry_architecture() {
     // must not be wider than the oak (tolerance 0.02).
     let d40 = med(&|c, o| wh(c, 0) - wh(o, 0));
     assert!(d40 < 0.02, "median crown W/H at 40 y, cherry - oak = {d40:.3}");
-    let d100 = med(&|c, o| wh(c, 3) - wh(o, 3));
-    assert!(d100 < -0.2, "median crown W/H at 100 y, cherry - oak = {d100:.3}");
+    // Updated (was at 100 y, now 70 y, band unchanged): the cherry now dies
+    // of emergent decline (crate::vitality) at 79-139 y on these seeds
+    // (median 94), so at 100 y most cherries are standing dead stems.
+    let d70 = med(&|c, o| wh(c, 2) - wh(o, 2));
+    assert!(d70 < -0.2, "median crown W/H at 70 y, cherry - oak = {d70:.3}");
     let r60 = med(&|c, o| c.yearly[60].crown_radius_m - o.yearly[60].crown_radius_m);
     assert!(r60 < 0.0, "median crown radius at 60 y, cherry - oak = {r60:.2} m");
     // Conical/ovoid when young, broader (rounded) later.
-    let g = med(&|c, _| wh(c, 3) - wh(c, 0));
-    assert!(g > 0.1, "median crown W/H gain 40 -> 100 y {g:.3}");
-    for k in 0..4 {
+    // Updated (was 40 -> 100 y, same threshold): see above.
+    let g = med(&|c, _| wh(c, 2) - wh(c, 0));
+    assert!(g > 0.1, "median crown W/H gain 40 -> 70 y {g:.3}");
+    // Living crowns only (40, 60, 70 y; 100 y is past most deaths).
+    for k in 0..3 {
         let age = pairs[0].0.shape[k].0;
         // The stem stays dominant: no limb approaches its diameter.
         let lr = med(&|c, _| c.shape[k].1.max_limb_ratio);
@@ -261,7 +266,14 @@ fn cherry_architecture() {
 }
 
 /// Short life: by 110 y the cherry is in decline (crown dieback with dead
-/// wood, narrow rings, no more height growth) while the oak is in its prime.
+/// wood, narrow rings, no more height growth) or dead, while the oak is in
+/// its prime.
+///
+/// Updated: the cherry now dies of emergent decline (`crate::vitality`,
+/// 79-139 y on the test seeds), so a seed whose trunk died before 115 y
+/// passes the decline checks by its death, after 60 y (an earlier death
+/// would be a young tree's, not old age); the checks on a living cherry and
+/// on the oak are unchanged.
 #[test]
 fn cherry_declines_while_oak_grows() {
     // The oak's 10-year height gain at 100 y is a small difference of two
@@ -271,8 +283,14 @@ fn cherry_declines_while_oak_grows() {
     for (i, seed) in SEEDS.iter().enumerate() {
         let (c, o) = (cherry(i), oak(i));
         let ring = |r: &Run, a: usize, b: usize| mean(&r.ring_widths[a..b]);
-        let (c_prime, c_old) = (ring(c, 20, 60), ring(c, 105, 115));
-        assert!(c_old < 0.6 * c_prime, "seed {seed}: cherry rings {c_prime:.2} -> {c_old:.2} mm");
+        // Rings stop when the trunk dies.
+        let died = c.ring_widths.len() < 115;
+        if died {
+            assert!(c.ring_widths.len() > 60, "seed {seed}: cherry died at {} y", c.ring_widths.len());
+        } else {
+            let (c_prime, c_old) = (ring(c, 20, 60), ring(c, 105, 115));
+            assert!(c_old < 0.6 * c_prime, "seed {seed}: cherry rings {c_prime:.2} -> {c_old:.2} mm");
+        }
         // The oak in its prime keeps (or raises) its basal-area increment;
         // its rings, spread over a growing girth, slowly narrow (White 1998,
         // FC Information Note 12: constant "mature state" CAI). Updated:
@@ -286,15 +304,16 @@ fn cherry_declines_while_oak_grows() {
         assert!(o_old > 0.9 * o_prime, "seed {seed}: oak BAI {o_prime:.1} -> {o_old:.1} cm2/y");
         let c_gain = c.yearly[110].height_m - c.yearly[100].height_m;
         let o_gain = o.yearly[110].height_m - o.yearly[100].height_m;
-        assert!(c_gain < 0.4, "seed {seed}: cherry still gains {c_gain:.2} m in 100-110 y");
+        assert!(died || c_gain < 0.4, "seed {seed}: cherry still gains {c_gain:.2} m in 100-110 y");
         assert!(o_gain > 0.25, "seed {seed}: oak gains only {o_gain:.2} m in 100-110 y");
         o_gains.push(o_gain);
         let dead = c.yearly[90..=115].iter().map(|s| s.dead_wood_nodes).max().unwrap();
-        assert!(dead > 0, "seed {seed}: no dead wood in the old cherry");
+        assert!(died || dead > 0, "seed {seed}: no dead wood in the old cherry");
         assert!(o.yearly[110].dead_wood_nodes == 0, "seed {seed}: oak retrenching at 110 y");
         // Fewer leaves than at its peak (crown dieback).
         let peak = c.yearly[60..=100].iter().map(|s| s.leafy_shoots).max().unwrap();
-        assert!((c.yearly[125].leafy_shoots as f32) < 0.8 * peak as f32, "seed {seed}: no crown dieback");
+        // (A dead trunk's stump sprouts are a new crown, not checked here.)
+        assert!(died || (c.yearly[125].leafy_shoots as f32) < 0.8 * peak as f32, "seed {seed}: no crown dieback");
     }
     o_gains.sort_by(|a, b| a.total_cmp(b));
     assert!(o_gains[o_gains.len() / 2] > 0.5, "oak 100-110 y height gains {o_gains:?}");
@@ -309,7 +328,9 @@ fn cherry_rings() {
     let med = |f: &dyn Fn(&Run, &Run) -> f32| median(pairs.iter().map(|(c, o)| f(c, o)).collect());
     {
         let ratio = med(&|c, o| mean(&c.ring_widths[8..30]) / mean(&o.ring_widths[8..30]));
-        let young_minus_old = med(&|c, _| mean(&c.ring_widths[8..30]) - mean(&c.ring_widths[60..90]));
+        // Updated: old rings over 60-90 y, or 60 y to the trunk's death when
+        // it died earlier (crate::vitality).
+        let young_minus_old = med(&|c, _| mean(&c.ring_widths[8..30]) - mean(&c.ring_widths[60..90.min(c.ring_widths.len())]));
         println!("cherry/oak juvenile ring ratio, median over {MEDIAN_SEEDS:?}: {ratio:.3}");
         // Open-grown oak lays even rings of ~4-5 mm in youth (White 1998,
         // Table 1a: 4 mm "good site, open grown", 5 mm "champion"); free-

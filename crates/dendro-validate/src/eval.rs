@@ -125,8 +125,15 @@ impl SpeciesCtx {
     fn lifetime_max(&self, f: impl Fn(&YearRec) -> f64) -> Vec<f64> {
         self.runs.iter().map(|r| living(r).iter().map(&f).fold(f64::MIN, f64::max)).collect()
     }
-    fn last_age(&self) -> u32 {
-        self.runs.first().map(|r| r.years.len() as u32).unwrap_or(0)
+    pub fn last_age(&self) -> u32 {
+        self.runs.iter().map(|r| r.run_years.max(r.years.len() as u32)).max().unwrap_or(0)
+    }
+    /// Emergent longevity: age of trunk death per seed (`dendro_core::
+    /// vitality`); a seed still alive at the end of the run is censored.
+    /// `(death ages, censored seeds, run length)`.
+    pub fn death_ages(&self) -> (Vec<u32>, usize, u32) {
+        let dead: Vec<u32> = self.runs.iter().filter_map(|r| r.death_age).collect();
+        (dead.clone(), self.runs.len() - dead.len(), self.last_age())
     }
     /// Mean of a yearly date over the years from `from_age` on (1-based DOY).
     fn mean_date(&self, from_age: u32, f: impl Fn(&YearRec) -> Option<u32>) -> Vec<f64> {
@@ -165,6 +172,34 @@ impl SpeciesCtx {
     }
     fn first_flowering(&self) -> Vec<f64> {
         self.runs.iter().map(|r| r.first_flowering_age.map(|a| a as f64).unwrap_or(f64::NAN)).collect()
+    }
+}
+
+/// Emergent longevity (median age of trunk death over the seeds) against a
+/// longevity entry. Censoring: seeds alive at the end of the run count as
+/// "dies later than the run"; with at most half of them censored the
+/// median is still a death age (censored seeds are put at the run length,
+/// above every death age). Otherwise the median is only known to exceed
+/// the run: the entry is judged only when that bound already settles it
+/// (beyond the top of the published band or record: out), else it is not
+/// measurable. Calibration: `LongevityTraits::maintenance_per_m` was tuned
+/// per species so that trees die within the published ranges, so every
+/// comparable longevity verdict is a calibration check.
+fn longevity(sp: &SpeciesCtx, e: &Entry) -> Measured {
+    let (dead, censored, n) = sp.death_ages();
+    let total = dead.len() + censored;
+    let what = format!("âge médian de mort du tronc, émergent ({}/{} graines mortes en {n} ans)", dead.len(), total);
+    if dead.len() * 2 > total {
+        let mut v: Vec<f64> = dead.iter().map(|&a| a as f64).collect();
+        v.extend(std::iter::repeat_n(n as f64, censored));
+        let m = Measured::values(v, what, Nature::Emergent).calib();
+        return if censored > 0 { m.warn(format!("{censored} graine(s) encore vivante(s) à {n} ans, comptée(s) à {n} ans")) } else { m };
+    }
+    let top = e.max.or(e.value).or(e.min);
+    let m = Measured::one(n as f64, format!("{what} : médiane > {n} ans (censurée)"), Nature::Emergent).calib();
+    match top {
+        Some(t) if (n as f64) > t * if e.spread_kind == "max_record" { crate::verdict::RECORD_EXCEED } else { 1.0 } => m.warn("borne inférieure : la médiane dépasse déjà la borne haute publiée"),
+        _ => Measured::not_measurable(format!("{what} : médiane > {n} ans (censurée), sous la longévité publiée : run trop court pour conclure")),
     }
 }
 
@@ -209,7 +244,7 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
     let life_h = || Measured::values(sp.lifetime_max(|y| y.height_m), format!("hauteur maximale sur {} ans simulés", sp.last_age()), Nature::Emergent);
     let life_d = || Measured::values(sp.lifetime_max(|y| y.dbh_cm), format!("DBH maximal sur {} ans simulés", sp.last_age()), Nature::Emergent);
     let individual = "arbre remarquable individuel, pas une valeur typique";
-    let lifespan = || Measured::one(g.pruning.typical_lifespan_years as f64, "paramètre typical_lifespan_years (le moteur ne fait pas mourir l'arbre de vieillesse)", Nature::Param);
+    let lifespan = || longevity(sp, e);
 
     match q {
         "height_m" => {
@@ -432,9 +467,7 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             if ind.iter().any(|k| id.contains(k)) {
                 return lifespan().nc(individual);
             }
-            if id == "atlas_longevity_a" || id == "atlas_longevity_b" {
-                return lifespan().calib();
-            }
+
             // Age found in a stand or a sample of trees, not a longevity of the species.
             if conditions_text(e).contains("stand") && !conditions_text(e).contains("free-standing") {
                 return lifespan().nc("âge observé dans un peuplement ou un échantillon, pas la longévité de l'espèce");
@@ -442,8 +475,10 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
             lifespan()
         }
         "girth_cm" => {
-            let a = sp.last_age();
-            Measured::values(sp.year(a, |y| y.dbh_cm * std::f64::consts::PI), format!("circonférence à {a} ans (fin de la simulation)"), Nature::Emergent).nc(individual)
+            // Last living year of each run: end of the simulation, or the
+            // year before the trunk died (dendro_core::vitality).
+            let v: Vec<f64> = sp.runs.iter().filter_map(|r| living(r).last().map(|y| y.dbh_cm * std::f64::consts::PI)).collect();
+            Measured::values(v, format!("circonférence en fin de vie simulée (≤ {} ans, ou dernière année avant la mort du tronc)", sp.last_age()), Nature::Emergent).nc(individual)
         }
         "lma_g_m2" => {
             let m = Measured::values(sp.at(mat, |a| a.lma_g_m2), "masse surfacique foliaire (constante flux::LMA, la même pour toutes les feuilles)", Nature::Constant);
@@ -591,10 +626,10 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
         }
         "dbh_increment_mm_yr" => {
             if id == "stoj_dbh_increment" {
-                let v: Vec<f64> = sp.runs.iter().map(|r| (r.years[58].dbh_cm - r.years[52].dbh_cm) / 6.0 * 10.0).collect();
+                let v: Vec<f64> = sp.runs.iter().filter_map(|r| Some((living(r).get(58)?.dbh_cm - living(r).get(52)?.dbh_cm) / 6.0 * 10.0)).collect();
                 return Measured::values(v, "accroissement du DBH de 53 à 59 ans (mm/an)", Nature::Emergent).nc(STAND);
             }
-            let v: Vec<f64> = sp.runs.iter().map(|r| r.years.windows(2).map(|w| (w[1].dbh_cm - w[0].dbh_cm) * 10.0).fold(0.0, f64::max)).collect();
+            let v: Vec<f64> = sp.runs.iter().map(|r| living(r).windows(2).map(|w| (w[1].dbh_cm - w[0].dbh_cm) * 10.0).fold(0.0, f64::max)).collect();
             Measured::values(v, "accroissement annuel maximal du DBH (mm/an)", Nature::Emergent)
         }
         "slenderness_hd" => Measured::values(sp.year(59, |y| 100.0 * y.height_m / y.dbh_cm.max(1e-6)), "H/D à 59 ans", Nature::Emergent).nc(STAND),

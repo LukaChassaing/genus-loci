@@ -301,6 +301,14 @@
         decline_onset_years: 0.0,
         decline_years: 50.0,
         decline_min_vigour: 0.3,
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 100-150 y (wikipedia FR/DE) (data/validation/carpinus_betulus.ron).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.0048,
     ),
     // Ectomycorrhizal (about 25 basidiomycetes) [docs/species/carpinus_betulus.md]. Calibrations as
     // the oak pilot (flux view only).

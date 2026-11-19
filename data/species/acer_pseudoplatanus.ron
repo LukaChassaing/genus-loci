@@ -302,6 +302,14 @@
         decline_onset_years: 0.0,
         decline_years: 50.0,
         decline_min_vigour: 0.3,
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 350-400 y (Atlas) (data/validation/acer_pseudoplatanus.ron).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.0018,
     ),
     // Arbuscular mycorrhizal (Wang & Qiu 2006, as cited in ADDING_A_SPECIES.md, not read); no
     // mycorrhiza entry in the reference file. Calibrations are estimates (flux view only).

@@ -420,6 +420,16 @@
         decline_onset_years: 0.0,
         decline_years: 50.0,
         decline_min_vigour: 0.3,
+        // Carbon balance of ageing (crates/dendro-core/src/vitality.rs):
+        // maintenance of the living wood per metre of collar-to-leaf
+        // distance, relative to the production of the same foliage.
+        // Calibrated: no measured value exists; tuned (seeds 1-5) so that
+        // the trunk dies, emergently, within the published longevity,
+        // 500-1000 y (wikipedia DE): beyond the 400-year bench run (data/validation/quercus_robur.ron).
+        // Set low enough that the cost stays below ~75 % of production
+        // within 400 years (only censored runs can be checked).
+        // While > 0 the age-scheduled decline_* values above are ignored.
+        maintenance_per_m: 0.0014,
     ),
     // Oaks are ectomycorrhizal (mantle + Hartig net; Smith & Read 2008,
     // "Mycorrhizal Symbiosis", 3rd ed., Academic Press). Carbon cost: Hobbie

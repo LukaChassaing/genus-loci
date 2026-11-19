@@ -36,12 +36,32 @@ pub fn climate_section(cx: &Ctx) -> String {
 
 fn species_block(o: &mut String, name: &str, sp: &SpeciesCtx) {
     let _ = writeln!(o, "### {name}\n");
+    let n = sp.last_age();
+    // Trunks dead before the end of the run (dendro_core::vitality): living
+    // years only, as in the verdicts.
+    let (dead, censored, _) = sp.death_ages();
+    let max_dbh: Vec<f64> = sp.runs.iter().map(|r| crate::eval::living(r).iter().map(|y| y.dbh_cm).fold(0.0, f64::max)).collect();
+    let mut ages: Vec<u32> = dead.clone();
+    ages.sort_unstable();
+    let _ = writeln!(
+        o,
+        "Mort du tronc (émergente) : {}/{} graines mortes en {n} ans, âges {:?}{} ; DBH maximal sur la vie {} cm.\n",
+        dead.len(),
+        dead.len() + censored,
+        ages,
+        if censored > 0 { format!(", {censored} vivante(s) à {n} ans") } else { String::new() },
+        mm(&max_dbh)
+    );
     let _ = writeln!(
         o,
         "| âge | H m | DBH cm | houppier m | cerne mm (5 ans) | prof. racines m | 1re rafale critique défeuillé m/s | feuillé m/s | transpiration juillet L/j | biomasse ligneuse sèche t |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
     );
-    for &a in crate::measure::sample_ages(sp.runs[0].years.len() as u32).iter().filter(|&&a| a as usize <= sp.runs[0].years.len()) {
-        let col = |f: &dyn Fn(&crate::measure::YearRec) -> f64| -> String { mm(&sp.runs.iter().map(|r| f(&r.years[a as usize - 1])).collect::<Vec<_>>()) };
+    for &a in crate::measure::sample_ages(n).iter() {
+        let living: Vec<&crate::measure::YearRec> = sp.runs.iter().filter_map(|r| crate::eval::living(r).get(a as usize - 1)).collect();
+        if living.is_empty() {
+            continue;
+        }
+        let col = |f: &dyn Fn(&crate::measure::YearRec) -> f64| -> String { mm(&living.iter().map(|y| f(y)).collect::<Vec<_>>()) };
         let ring: Vec<f64> = sp
             .runs
             .iter()

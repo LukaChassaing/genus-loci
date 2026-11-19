@@ -32,6 +32,8 @@ var _phase: Label
 var _name_lbl: RichTextLabel
 var _height: Label
 var _diam: Label
+var _state: Label   # « État » : vigour, reserves, death of the trunk (dendro_core::vitality)
+var _state_key: int = -1
 var _temp: Label
 var _root_depth: Label
 var _root_spread: Label
@@ -107,6 +109,8 @@ func _build_info_panel(root: Control) -> void:
 	_phase = _row(v)
 	_height = _row(v)
 	_diam = _row(v)
+	_state = _row(v)
+	_state.clip_text = true  # its changing width (reserves %) must not resize the panel (camera free area)
 	_temp = _row(v)
 	_root_depth = _row(v)
 	_root_spread = _row(v)
@@ -571,9 +575,19 @@ func update_from(sim: TreeSim) -> void:
 	_age.text = "Âge : %s ans" % ("%.1f" % age).replace(".", ",")
 	var year: int = sim.get_year()
 	_date.text = "Date : %s — année %d" % [date_text(sim.get_day_of_year()), year]
-	_phase.text = "Saison : " + (PHASES_EVERGREEN if sim.get_evergreen() else PHASES)[clampi(sim.get_phase(), 0, 5)]
+	if sim.get_trunk_alive():
+		_phase.text = "Saison : " + (PHASES_EVERGREEN if sim.get_evergreen() else PHASES)[clampi(sim.get_phase(), 0, 5)]
+	else:
+		_phase.text = "Saison : — (tronc mort)"
 	_height.text = "Hauteur : %s m" % ("%.1f" % sim.get_height_m()).replace(".", ",")
 	_diam.text = "Diamètre du tronc : %s cm" % ("%.1f" % sim.get_trunk_diameter_cm()).replace(".", ",")
+	# Refreshed once a simulated year, or when the trunk dies or the stem falls (the vitality changes only at
+	# the end of a season; `get_vitality` builds a dictionary, not worth doing every frame).
+	var vkey: int = sim.get_year() * 4 + (2 if sim.get_trunk_alive() else 0) + (1 if sim.get_height_m() > 0.5 else 0)
+	if vkey != _state_key:
+		_state_key = vkey
+		var st: String = vitality_text(sim.get_vitality())
+		_state.text = st if st != "" else "État : —"
 	_root_depth.text = "Profondeur des racines : %s m" % ("%.1f" % sim.get_root_depth_m()).replace(".", ",")
 	_root_spread.text = "Étalement des racines : %s m" % ("%.1f" % sim.get_root_spread_m()).replace(".", ",")
 	_temp.text = "Température : %s °C" % ("%.1f" % sim.get_temperature_c()).replace(".", ",")
@@ -585,8 +599,40 @@ func update_from(sim: TreeSim) -> void:
 				sim.get_ring_earlywood_fraction(), sim.get_ring_forced_drought())
 
 
+## « État » line from `TreeSim.get_vitality()`: vigour class and reserves while the trunk lives; once it is dead,
+## age and cause of death, the standing dead stem (snag) and its expected collapse, stump sprouts. "" when the
+## species has no carbon balance (genome without `maintenance_per_m`). The vigour classes are display
+## conventions (thresholds of the vigour index and reserves), not published categories.
+static func vitality_text(d: Dictionary) -> String:
+	if not bool(d.get("modelled", false)):
+		return ""
+	var death: int = int(d.get("death_age", -1))
+	if death < 0:
+		var r: float = float(d.get("reserve", 1.0))
+		var v: float = float(d.get("vigour", 1.0))
+		var cls: String = "vigoureux"
+		if v < 0.35 or r < 0.25:
+			cls = "dépérissant"
+		elif v < 0.7 or r < 0.6:
+			cls = "en déclin"
+		return "État : %s — réserves %d %%" % [cls, roundi(100.0 * r)]
+	var cause: String = String(d.get("cause", ""))
+	var txt: String = "État : tronc mort à %d ans" % death
+	if cause != "":
+		txt += "\nCause : " + cause
+	if bool(d.get("standing_dead", false)):
+		var left: int = int(d.get("collapse_in", -1))
+		txt += "\nMort sur pied" + (", chute dans ~%d ans" % left if left > 0 else "")
+	elif bool(d.get("collapsed", false)):
+		txt += "\nTronc effondré"
+	if bool(d.get("resprouted", false)):
+		txt += "\nRejets de souche" + (" vivants" if bool(d.get("alive", false)) else " morts")
+	return txt
+
+
 func force_ring_refresh() -> void:
 	_last_ring_year = -1
+	_state_key = -1
 	_ring_view.reset_view()
 
 
