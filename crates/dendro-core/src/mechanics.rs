@@ -861,9 +861,9 @@ impl MechanicsModel {
     /// green MOE), and `ω² = g Σ m u / Σ m u²` (Rayleigh 1877, "The Theory
     /// of Sound"; e.g. Clough & Penzien, "Dynamics of Structures"; for a
     /// uniform cantilever this shape gives a frequency 0.4 % above the exact
-    /// one, checked in the tests). Only the structural axes bend in this
-    /// shape (the stem and limb sections of the failure modes, at least
-    /// max(5 cm, 20 % of the DBH) across): the root-soil plate, crown
+    /// one, checked in the tests). Only the stem (its whole path, from
+    /// 2.5 cm) and the structural limbs (at least max(5 cm, 20 % of the DBH)
+    /// across) bend in this shape: the root-soil plate, crown
     /// branches, twigs, leafy shoots and dead wood are rigid bodies carried
     /// by them, which makes the estimate an upper bound. Why: with every
     /// axis from 2.5 cm flexible, the static shape is dominated by the tips
@@ -908,7 +908,7 @@ impl MechanicsModel {
             let (tp, up, sp) = if s.parent == NO_PARENT { (Vec3::ZERO, Vec3::ZERO, s.start) } else { (theta[s.parent], ustart[s.parent], self.segs[s.parent].start) };
             let u0 = up + tp.cross(s.start - sp);
             let mut t = tp;
-            if s.ei > 0.0 && (s.stem_mode || s.limb_mode) {
+            if s.ei > 0.0 && (s.role == SegmentRole::Trunk || s.limb_mode) {
                 let m = qsum[i] - s.start.cross(fsum[i]);
                 let mb = m - s.dir * m.dot(s.dir);
                 t += mb * (s.len / s.ei);

@@ -162,6 +162,16 @@ struct MechCache {
     last: Option<(f32, dendro_core::MechanicsSnapshot)>,
 }
 
+impl Drop for MechCache {
+    /// A critical speed search still running is waited for: a detached worker could still be running
+    /// Rust code when Godot unloads the library at exit.
+    fn drop(&mut self) {
+        if let Some(w) = self.worker.take() {
+            let _ = w.join();
+        }
+    }
+}
+
 /// Sway parameters for the shader, cached per (year, leaves on/off) (see `Backend::sway`).
 #[derive(Clone, Copy, Default)]
 pub struct Sway {
