@@ -209,7 +209,7 @@ pub(crate) struct WindCache {
     /// Diagnostics: the daily test is skipped (no natural damage; storms
     /// and acclimation still act). Not part of the state: tools only.
     pub(crate) damage_off: bool,
-    /// Diagnostics: no stem acclimation to the wind.
+    /// Diagnostics: no acclimation to the wind.
     pub(crate) acclimation_off: bool,
 }
 
@@ -487,15 +487,18 @@ impl Simulation {
         let (ref_leaf, ref_bare) = (reference(&s_leaf), reference(&s_bare));
         let have_leaf = self.wind.ref_leaf > 0.0 && ref_leaf > 0.0;
         let have_bare = self.wind.ref_bare > 0.0 && ref_bare > 0.0;
-        // Every living woody axis that bends (stem, limbs and crown branches
-        // from 2.5 cm, `mechanics::FLEX_MIN_DIAMETER_M`), except the stem
-        // below the reference height (butt swell).
+        // The stem path above the reference height (butt swell below).
+        // Tried on every bending axis from 2.5 cm (limbs and crown
+        // branches too, no source for that extension): the wood taken from
+        // the stem lowered the anchorage (Creg x stem mass) and 9 oaks out
+        // of 10 were uprooted within 100 years, against 4 with the stem
+        // only (docs/sources.md).
         let ratio: Vec<f32> = trunk
             .iter()
             .zip(&heights)
             .zip(s_leaf.iter().zip(&s_bare))
             .map(|((&t, &h), (&a, &b))| {
-                if t && h <= ACCLIMATION_REFERENCE_HEIGHT_M {
+                if !t || h <= ACCLIMATION_REFERENCE_HEIGHT_M {
                     return 0.0;
                 }
                 let x = if have_leaf { a / ref_leaf } else { 0.0 };

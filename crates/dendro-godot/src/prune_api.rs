@@ -137,7 +137,7 @@ impl TreeSim {
     /// French label of a cut type code.
     #[func]
     fn prune_kind_label(&self, kind: i64) -> GString {
-        GString::from(CutKind::from(kind.clamp(0, 8) as u8).label_fr())
+        GString::from(CutKind::from(kind.clamp(0, 9) as u8).label_fr())
     }
 
     /// Cut journal, oldest first: `[{day, year, doy (1-based), kind, label, diameter_cm,

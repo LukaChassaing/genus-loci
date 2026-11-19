@@ -9,12 +9,14 @@ fn main() {
     let mut species: Vec<String> = ["quercus_robur", "prunus_avium", "fagus_sylvatica", "picea_abies", "pinus_sylvestris", "malus_domestica"].iter().map(|s| s.to_string()).collect();
     let mut seeds = 20u64;
     let mut years = 100u32;
+    let mut accl = true;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--species" => species = args.next().unwrap().split(',').map(|s| s.to_string()).collect(),
             "--seeds" => seeds = args.next().unwrap().parse().unwrap(),
             "--years" => years = args.next().unwrap().parse().unwrap(),
+            "--no-accl" => accl = false,
             _ => panic!("unknown argument {a}"),
         }
     }
@@ -26,6 +28,7 @@ fn main() {
         let (mut hs, mut ds) = (Vec::new(), Vec::new());
         for seed in 1..=seeds {
             let mut s = Simulation::new(g.clone(), seed);
+            s.set_wind_acclimation_enabled(accl);
             s.advance_years(years);
             let h = s.wind_history();
             let stem_breaks: Vec<_> = h.iter().filter(|d| matches!(d.kind, DamageKind::Stem | DamageKind::Top)).collect();
