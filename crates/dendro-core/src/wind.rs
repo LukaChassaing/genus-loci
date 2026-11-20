@@ -326,7 +326,21 @@ impl Simulation {
         // is crown wood: acclimating them as the stem kept the stem path
         // dominant higher up (12-13 scaffold limbs on the 100- and 200-year
         // oak of `oak_architecture`, band 3-10; 9-10 without).
-        let dmin = crate::mechanics::LIMB_MIN_DIAMETER_M.max(crate::mechanics::LIMB_DBH_FRACTION * 0.01 * self.dbh_cm());
+        // A monopodial, whorled stem (Picea, Pinus, Abies...: the models of
+        // Rauh and Massart, `Architecture::whorled`) is the stem up to its
+        // leader: there every order-0 section that bends responds (from
+        // `mechanics::FLEX_MIN_DIAMETER_M`). Checked against a published
+        // taper: Kozak (1997) model fitted to 477 Norway spruces (Pukkala,
+        // Hanssen & Andreassen 2019, Silva Fennica 53:10187, Table 2, read)
+        // gives 18.0, 16.3 and 7.7 cm at 20.7, 21.9 and 26.6 m for a spruce
+        // of 44.4 cm DBH and 29.6 m; the simulated 60-year spruce (seed 42)
+        // followed it up to 19 m (18.4 cm) but had 12.3, 6.4 and 3.1 cm above
+        // 20 m, where the 20 %-of-DBH threshold stopped the response.
+        let dmin = if self.genome.architecture.whorled {
+            crate::mechanics::FLEX_MIN_DIAMETER_M
+        } else {
+            crate::mechanics::LIMB_MIN_DIAMETER_M.max(crate::mechanics::LIMB_DBH_FRACTION * 0.01 * self.dbh_cm())
+        };
         let order0: Vec<bool> = self.shoots.nodes.iter().map(|n| n.order == 0 && 2.0 * n.radius() >= dmin).collect();
         trunk
             .iter()

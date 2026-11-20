@@ -1452,14 +1452,15 @@ impl ShootSystem {
             // Wind response, on top of the budget: stems strained like the
             // strongest winds grow more secondary wood, not the same wood
             // elsewhere (Bonnesoeur et al. 2016: at least +80 %, abstract),
-            // up to the same share of the budget. Not a carbon balance (the
+            // up to 80 % of the phase's budget (the same figure). Not a carbon balance (the
             // extra wood is not paid by height growth or the roots:
             // docs/sources.md, « Écarts connus »). Taking it from the budget
             // instead lowered the DBH and moved three calibrated growth
             // tests out of their bands (oak height at 200 y 34.05 m for
             // 28-34, 11 scaffold limbs for 3-10, cherry rings at 105-115 y).
             let want_w: f32 = extra.iter().map(|&(i, _, dw)| dw * self.nodes[i].length).sum();
-            let scale_w = if want_w > cap && want_w > 0.0 { cap / want_w } else { 1.0 };
+            let cap_w = budget * (WIND_RING_BOOST - 1.0);
+            let scale_w = if want_w > cap_w && want_w > 0.0 { cap_w / want_w } else { 1.0 };
             for &(i, da, dw) in &extra {
                 self.nodes[i].area += da * scale + dw * scale_w;
             }
@@ -1562,17 +1563,20 @@ impl ShootSystem {
         let min_r = 0.5 * w.adaptive_min_diameter_cm * 0.01;
         let mut out = Vec::new();
         for (i, nd) in self.nodes.iter().enumerate() {
-            if nd.leafy || nd.is_snag() {
+            // The wind case reaches the leader shoots of the stem that carry
+            // needles (`crate::wind`: order-0 stem of a whorled conifer);
+            // the self-weight case leaves leafy shoots alone.
+            let windy = wind_on && wind[i] > 1.0;
+            if nd.is_snag() || (nd.leafy && !windy) {
                 continue;
             }
             let r = nd.radius();
-            let windy = wind_on && wind[i] > 1.0;
             if r < min_r && !windy {
                 continue;
             }
             // Stress / set-point of the weight case and of the wind case.
             let mut ratio = 0.0f32;
-            if sigma_t > 0.0 && r >= min_r {
+            if sigma_t > 0.0 && r >= min_r && !nd.leafy {
                 let m = qsum[i] - nd.start.cross(fsum[i]);
                 let mb = (m - nd.dir * m.dot(nd.dir)).length();
                 let d = 2.0 * r;
