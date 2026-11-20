@@ -346,6 +346,8 @@ Recalibrations liées au budget de bois (diamètres) : `growth_coefficient` chan
 
 Recalibrations faites lors de l'alignement sur la littérature (le climat de Rennes, plus sec l'été avec l'ETP de Hargreaves, ralentissait la croissance) : chêne `growth_coefficient` 1,80e-5 → 2,00e-5, `hydraulic_path_max_m` 36,5 → 37,0, `leaf_fall_days` 28 → 21, `senescence_photoperiod_h` 11,6 → 12,0, `frost_c` −2,5 → −3,0 ; merisier `growth_coefficient` 3,10e-5 → 3,30e-5, `vigour_per_light` 7,0 → 7,5, `leaf_fall_days` 14 → 12.
 
+Recalibration liée à l'acclimatation de la tige au vent (M1, deuxième étape ; validée par l'utilisateur le 2026-11-20) : noisetier `maintenance_per_m` 0,0145 → 0,0147. L'acclimatation perturbe les trajectoires (la graine 4 mourait à 99 ans au lieu de 90) et faisait passer la médiane des graines 1-5 de 90 ans (borne haute de la plage publiée 80-90 ans) à 97 ans ; avec 0,0147 : 80, 97, 85, 99, 71 ans, médiane 85 ans. Bande du test inchangée. La réponse est raide (0,0150 : médiane 80 ans, 0,0155 : 65 ans).
+
 Recalibrations liées au générateur de température WGEN (même méthode : retrouver les dates moyennes déjà calées) : chêne `gdd_budburst` 270 → 308, `bloom_gdd` 260 → 298 ; merisier `gdd_budburst` 185 → 233, `bloom_gdd` 172 → 218 (voir « Phénologie » et « Écarts connus »).
 
 ## Écarts connus
