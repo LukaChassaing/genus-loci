@@ -157,10 +157,10 @@ quercus_robur	germ008_ring_60_80	ring_width_mm	non comparable	4.000325500965118	
 quercus_robur	germ008_ring_80_100	ring_width_mm	non comparable	3.671717631816864	1.000	2.1116
 quercus_robur	germ008_ring_all	ring_width_mm	non comparable	3.713417886410441	1.000	1.2782
 quercus_robur	wp_nl_ring_range	ring_width_mm	conforme	2.3961401985634483	0.240	-0.6868
-quercus_robur	cienciala_agb_sample_mean	aboveground_biomass_t	non comparable	0.2796593017578125	1.000	-0.4782
-quercus_robur	cienciala_agb_D30	aboveground_biomass_t	non comparable	0.4395526123046875	1.000	-0.1596
-quercus_robur	cienciala_agb_D40	aboveground_biomass_t	non comparable	0.90544287109375	1.000	-0.1678
-quercus_robur	cienciala_agb_D50	aboveground_biomass_t	non comparable	1.6064752197265626	1.000	-0.1642
+quercus_robur	cienciala_agb_sample_mean	aboveground_biomass_t	non comparable	0.27028521728515625	1.000	-0.4957
+quercus_robur	cienciala_agb_D30	aboveground_biomass_t	non comparable	0.4323848876953125	1.000	-0.1733
+quercus_robur	cienciala_agb_D40	aboveground_biomass_t	non comparable	0.9027648315429687	1.000	-0.1703
+quercus_robur	cienciala_agb_D50	aboveground_biomass_t	non comparable	1.60511328125	1.000	-0.1649
 quercus_robur	wp_pl_root_depth	root_depth_m	indicatif	1.9810599088668823	0.240	-0.6038
 quercus_robur	atlas_roots_qual	root_depth_m	non mesurable		0.900	
 quercus_robur	lucot_bruckert_surface_root	root_depth_m	non comparable	2.1174641847610474	0.500	2.5291
@@ -202,10 +202,10 @@ quercus_robur	catoni_lma_sun	lma_g_m2	indicatif	74.99917558467152	1.000	-0.0209
 quercus_robur	catoni_lma_shade	lma_g_m2	indicatif	74.99917558467152	1.000	0.4451
 quercus_robur	catoni_leaf_thickness_sun	leaf_thickness_um	non modélisé		1.000	
 quercus_robur	vincke_oak_lai	lai	non comparable	4.00000013856895	1.000	0.7021
-quercus_robur	vincke_transpiration_daily	transpiration_mm_day	non comparable	2.0978293230234657	1.000	1.0978
+quercus_robur	vincke_transpiration_daily	transpiration_mm_day	non comparable	2.09782928987961	1.000	1.0978
 quercus_robur	vincke_basal_area	basal_area_m2_ha	non modélisé		1.000	
-quercus_robur	quick_tree_water_use	transpiration_l_day	non comparable	975.7806441768523	1.000	-0.1478
-quercus_robur	quick_canopy_water_use_july	transpiration_l_day_per_m2_canopy	non comparable	2.0978293230234657	1.000	-0.5804
+quercus_robur	quick_tree_water_use	transpiration_l_day	non comparable	975.7806355137978	1.000	-0.1478
+quercus_robur	quick_canopy_water_use_july	transpiration_l_day_per_m2_canopy	non comparable	2.09782928987961	1.000	-0.5804
 quercus_robur	niinemets_shade	shade_tolerance	non comparable	1.5000000596046448	1.000	-0.3878
 quercus_robur	niinemets_drought	drought_tolerance	non comparable	2.2499999403953552	1.000	-0.2373
 quercus_robur	niinemets_waterlogging	waterlogging_tolerance	non comparable	2.0000000298023224	1.000	0.0582
@@ -239,7 +239,7 @@ quercus_robur	lanvin_mor_lumber	mor_mpa	non comparable	57	0.300	0.1633
 quercus_robur	absence_green_wood_properties	mor_mpa	entrée d'absence	57	0.300	
 quercus_robur	schmidt_lothar_oak_beech	storm_damage_fraction	non comparable	0	1.000	-1.0000
 quercus_robur	schmidt_lothar_spruce_ref	storm_damage_fraction	non comparable	0	1.000	-1.0000
-quercus_robur	virot_critical_wind	critical_wind_ms	indicatif	45.19752502441406	0.500	0.0761
+quercus_robur	virot_critical_wind	critical_wind_ms	indicatif	45.128875732421875	0.500	0.0745
 quercus_robur	absence_natural_frequency	natural_frequency_hz	entrée d'absence		1.000	
 quercus_robur	read_dormant_buds	dormant_bud_longevity_years	non modélisé		0.800	
 quercus_robur	read_adventitious_poor	epicormic_response	non mesurable		0.800	
@@ -539,8 +539,8 @@ prunus_avium	nocetti_sapwood_rings	sapwood_rings	non modélisé		1.000
 prunus_avium	pryor_bark_20	bark_thickness_mm	non modélisé		1.000	
 prunus_avium	pryor_bark_40	bark_thickness_mm	non modélisé		1.000	
 prunus_avium	pryor_bark_share_40	bark_area_fraction	non modélisé		1.000	
-prunus_avium	pryor_stem_vol_30_12	stem_volume_m3	indicatif	0.4675907197407272	1.000	-0.3021
-prunus_avium	pryor_stem_vol_40_14	stem_volume_m3	indicatif	0.9893581112988349	1.000	-0.2561
+prunus_avium	pryor_stem_vol_30_12	stem_volume_m3	indicatif	0.4640745842257672	1.000	-0.3074
+prunus_avium	pryor_stem_vol_40_14	stem_volume_m3	indicatif	0.9749215537788297	1.000	-0.2670
 prunus_avium	pryor_standvol_good_60	stand_volume_m3_ha	non modélisé		1.000	
 prunus_avium	pryor_ba_good_60	basal_area_m2_ha	non modélisé		1.000	
 prunus_avium	stoj_rootdepth_erlbeck	root_depth_m	limite	1.2740020751953125	0.600	-0.5753
@@ -589,8 +589,8 @@ prunus_avium	albrecht_shoot	shoot_length_cm	conforme	72.00000286102295	0.600	0.1
 prunus_avium	albrecht_ring	ring_width_mm	conforme	4.494962577025095	0.900	-0.0011
 prunus_avium	pryor_ring_veneer	ring_width_mm	non comparable	4.494962577025095	1.000	1.9966
 prunus_avium	nocetti_ring_decline	ring_width_trend	hors plage		1.000	
-prunus_avium	heatpulse_transp	transpiration_l_day	non comparable	57.479337698413474	1.000	12.3984
-tilia_cordata	atlas_height	height_m	conforme	33.26445388793945	0.900	-0.0496
+prunus_avium	heatpulse_transp	transpiration_l_day	non comparable	57.47918187418291	1.000	12.3984
+tilia_cordata	atlas_height	height_m	conforme	33.30557632446289	0.900	-0.0484
 tilia_cordata	atlas_longevity	longevity_years	non mesurable		0.900	
 tilia_cordata	atlas_coppice_stool	longevity_years	non mesurable		0.900	
 tilia_cordata	atlas_seed_age	age_first_flowering_years	conforme	31	0.900	-0.1143
@@ -602,8 +602,8 @@ tilia_cordata	atlas_shade	shade_tolerance	non mesurable		0.900
 tilia_cordata	atlas_warmth	fruit_set	non modélisé		0.900	
 tilia_cordata	atlas_resprout	stump_sprouting	non mesurable		0.900	
 tilia_cordata	atlas_altitude	max_altitude_m	non modélisé		0.900	
-tilia_cordata	ra_height	height_m	hors plage	33.26445388793945	0.900	-0.1129
-tilia_cordata	ra_bialowieza	height_m	indicatif	33.67610168457031	0.900	-0.1982
+tilia_cordata	ra_height	height_m	hors plage	33.30557632446289	0.900	-0.1119
+tilia_cordata	ra_bialowieza	height_m	indicatif	33.76232147216797	0.900	-0.1961
 tilia_cordata	ra_bialowieza_dbh	dbh_cm	indicatif	129.91302490234375	0.900	-0.3504
 tilia_cordata	ra_dbh_50	dbh_cm	indicatif	33.29179763793945	0.900	1.2195
 tilia_cordata	ra_dbh_75	dbh_cm	indicatif	50.2985725402832	0.900	1.0119
@@ -627,16 +627,16 @@ tilia_cordata	ra_crown_open	crown_width_m	hors plage	33.3884391784668	0.900	0.66
 tilia_cordata	ra_sprout	stump_sprouting	non mesurable		0.900	
 tilia_cordata	ra_sucker	sucker_distance_m	non modélisé		0.900	
 tilia_cordata	ra_beech	yield_comparison	non modélisé		0.900	
-tilia_cordata	wpf_height	height_m	hors plage	33.26445388793945	0.240	0.3306
+tilia_cordata	wpf_height	height_m	hors plage	33.30557632446289	0.240	0.3322
 tilia_cordata	wpf_growth	height_m	indicatif	10.500751495361328	0.240	0.0501
 tilia_cordata	wpf_longevity	longevity_years	non mesurable		0.240	
-tilia_cordata	wpe_height	height_m	conforme	33.26445388793945	0.240	0.1088
+tilia_cordata	wpe_height	height_m	conforme	33.30557632446289	0.240	0.1102
 tilia_cordata	wpe_frost	record_low_c	non mesurable		0.240	
 tilia_cordata	wpe_girth	girth_cm	non comparable	454.36544493002424	0.240	-0.4558
 tilia_cordata	wpd_dbh	dbh_cm	conforme	144.62901306152344	0.240	-0.2769
 tilia_cordata	wpd_longevity	longevity_years	non mesurable		0.240	
 tilia_cordata	wpd_ellenberg_l	shade_tolerance	non comparable	0.8399999737739563	0.240	-0.5800
-tilia_cordata	wpp_height	height_m	conforme	34.60000228881836	0.240	-0.0649
+tilia_cordata	wpp_height	height_m	conforme	34.84223175048828	0.240	-0.0583
 tilia_cordata	wdb_density	dry_density_kg_m3	non comparable	535	0.600	0.0000
 tilia_cordata	wdb_mor	mor_mpa	non comparable	47.599998474121094	0.600	-0.4426
 tilia_cordata	wdb_moe	moe_gpa	non comparable	7.199999809265137	0.600	-0.3851
@@ -1273,8 +1273,8 @@ physics	broadleaf_f0_not_cantilever	f0_vs_d_over_h2	non mesurable		0.700
 physics	leaves_lower_f0_damping	damping_ratio	conforme		0.700	
 physics	jackson_damping_summer	damping_ratio	conforme	0.085999995470047	0.300	-0.0000
 physics	jackson_damping_winter	damping_ratio	conforme	0.039000000804662704	0.300	0.0000
-physics	jackson_f0_winter_gain	f0_winter_gain_pct	conforme	18.53941298343129	0.300	0.0021
-physics	virot_critical_wind	critical_wind_ms	indicatif	45.19752502441406	0.700	0.0761
+physics	jackson_f0_winter_gain	f0_winter_gain_pct	conforme	18.528157247989686	0.300	0.0015
+physics	virot_critical_wind	critical_wind_ms	indicatif	45.128875732421875	0.700	0.0745
 physics	albrecht_comment_virot	critical_wind_ms	non mesurable		0.700	
 physics	rigid_model_tree_cd	drag_coefficient	hors plage	0.4000000059604645	0.700	-0.6000
 physics	anchorage_root_depth_gain	anchorage_moment_gain_deep_roots_pct	hors plage	16.25326852004294	0.420	0.3003
@@ -1289,7 +1289,7 @@ physics	bock_storm_acid_soils	storm_damage_predictors	non modélisé		0.700
 physics	black_forest_lothar_area	storm_damaged_forest_fraction	non modélisé		0.700	
 physics	lothar_wood_volume_france	windthrown_volume_m3	non modélisé		0.240	
 physics	great_storm_1987_brittany	forest_destroyed_fraction	non modélisé		0.240	
-physics	leaf_on_effect_1987	leaf_on_damage_effect	non comparable	0.6501786338247135	0.240	
+physics	leaf_on_effect_1987	leaf_on_damage_effect	non comparable	0.6511598557732947	0.240	
 physics	thigmo_jaffe1973	thigmomorphogenesis_effect	hors plage		0.240	
 physics	thigmo_beech_guyed	radial_growth_mechanical_control	hors plage		0.700	
 physics	thigmo_beech_stem_vs_roots	stem_vs_anchorage_strengthening	non mesurable		0.700	
