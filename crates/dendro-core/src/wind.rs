@@ -155,9 +155,9 @@ pub(crate) struct WindState {
 /// acclimation demand, the debris of the last breaks.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct WindCache {
-    /// Acclimation: (node id, stress / set-point, radius m when computed),
-    /// by id.
-    accl: Vec<(u32, f32, f32)>,
+    /// Acclimation: (node id, stress / set-point, radius m when computed,
+    /// node index then), for the sections in deficit only.
+    accl: Vec<(u32, f32, f32, usize)>,
     /// Year of the last acclimation demand computed (None: never).
     accl_year: Option<u32>,
     /// Keep the meshes of broken parts (front end only).
@@ -281,7 +281,7 @@ impl Simulation {
     /// foliage states; 0 off the stem and below 1.3 m).
     fn acclimation_demand(&mut self) -> Vec<f32> {
         self.wind_cache.screens += 1;
-        let (segments, site) = self.mechanics_inputs_at(1.0);
+        let (segments, site) = self.mechanics_inputs_with(1.0, false);
         let heights: Vec<f32> = segments.iter().map(|s| s.start[1]).collect();
         let model = crate::mechanics::MechanicsModel::from_segments(&segments, self.genome.mechanics.clone(), site);
         let az = self.climate_params().wind_towards_deg;
@@ -379,9 +379,7 @@ impl Simulation {
         }
         self.wind_cache.accl_year = Some(year);
         let demand = self.acclimation_demand();
-        let mut accl: Vec<(u32, f32, f32)> = self.shoots.nodes.iter().zip(&demand).filter(|(_, &s)| s > 1.0).map(|(n, &s)| (n.id, s, n.radius())).collect();
-        accl.sort_unstable_by_key(|a| a.0);
-        self.wind_cache.accl = accl;
+        self.wind_cache.accl = self.shoots.nodes.iter().zip(&demand).enumerate().filter(|(_, (_, &s))| s > 1.0).map(|(i, (n, &s))| (n.id, s, n.radius(), i)).collect();
     }
 
     /// The acclimation demand (stress / set-point) of the last update, mapped
@@ -392,18 +390,19 @@ impl Simulation {
         if a.is_empty() {
             return Vec::new();
         }
-        self.shoots
-            .nodes
-            .iter()
-            .map(|n| match a.binary_search_by_key(&n.id, |e| e.0) {
-                Ok(k) => {
-                    let (_, s, r0) = a[k];
-                    let q = r0 / n.radius().max(1e-6);
-                    s * q * q * q
-                }
-                Err(_) => 0.0,
-            })
-            .collect()
+        // Each entry is found at its former index unless nodes were removed
+        // or inserted before it since (then by id): O(entries), not a search
+        // per node.
+        let nodes = &self.shoots.nodes;
+        let mut out = vec![0.0f32; nodes.len()];
+        for &(id, s, r0, hint) in a {
+            let idx = if nodes.get(hint).is_some_and(|n| n.id == id) { Some(hint) } else { self.shoots.index_of(id) };
+            if let Some(i) = idx {
+                let q = r0 / nodes[i].radius().max(1e-6);
+                out[i] = s * q * q * q;
+            }
+        }
+        out
     }
 
     /// Test the tree against a storm's gust and apply what fails (module

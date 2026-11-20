@@ -1125,8 +1125,18 @@ impl MechanicsModel {
             // Exact profile for the quasi-static model (hand-checked tests),
             // the interpolated table otherwise (cost).
             let (km, kmw, ke, kec) = if load.quasi_static {
-                let (km, ke) = (profile(s.mid.y), profile(s.end.y));
-                (km, km.dpowf(BARE_WOOD_VOGEL_EXPONENT), ke, ke.dpowf(self.traits.vogel_exponent))
+                // Exact profile; the powers only where they are read
+                // (`prof_mid_b`: bending wood, `prof_end`/`prof_end_b`: leafy
+                // tips).
+                let km = profile(s.mid.y);
+                let kmw = if s.role != SegmentRole::Trunk { km.dpowf(BARE_WOOD_VOGEL_EXPONENT) } else { 1.0 };
+                let (ke, kec) = if s.leaf_share > 0.0 {
+                    let ke = profile(s.end.y);
+                    (ke, ke.dpowf(self.traits.vogel_exponent))
+                } else {
+                    (1.0, 1.0)
+                };
+                (km, kmw, ke, kec)
             } else {
                 let (km, kmw, _) = p.table.at(s.mid.y);
                 let (ke, _, kec) = p.table.at(s.end.y);
@@ -1696,6 +1706,14 @@ impl Simulation {
     /// [`Self::mechanics_inputs`] with the year's new shoots drawn at
     /// extension `ext` (0..1) instead of today's.
     pub(crate) fn mechanics_inputs_at(&self, ext: f32) -> (Vec<MechSegment>, MechSite) {
+        self.mechanics_inputs_with(ext, true)
+    }
+
+    /// [`Self::mechanics_inputs_at`]; without `soil`, the saturated share of
+    /// the roots (anchorage only) is left at 0 and the flux view (the costly
+    /// part of the inputs) is not built: for load cases that do not read the
+    /// anchorage (the stem stresses of the wind acclimation).
+    pub(crate) fn mechanics_inputs_with(&self, ext: f32, soil: bool) -> (Vec<MechSegment>, MechSite) {
         let nodes = &self.shoots.nodes;
         let decay = self.decay_radius_by_node();
         let unit_len = 0.75 * self.shoots.voxel - 0.06;
@@ -1716,12 +1734,13 @@ impl Simulation {
         // Leaf area: crown projection x LAI of a full open-grown crown, as
         // in the flux view (flux.rs, `LAI_FULL`).
         let cr = self.crown_radius_m().max(0.05);
-        let soil = self.flux_view().soil;
         let (mut wet, mut tot) = (0.0f32, 0.0f32);
-        for l in &soil.layers {
-            tot += l.root_len;
-            if l.saturated() {
-                wet += l.root_len;
+        if soil {
+            for l in &self.flux_view().soil.layers {
+                tot += l.root_len;
+                if l.saturated() {
+                    wet += l.root_len;
+                }
             }
         }
         let site = MechSite {
