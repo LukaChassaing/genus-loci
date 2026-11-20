@@ -157,10 +157,10 @@ quercus_robur	germ008_ring_60_80	ring_width_mm	non comparable	4.000325500965118	
 quercus_robur	germ008_ring_80_100	ring_width_mm	non comparable	3.671717631816864	1.000	2.1116
 quercus_robur	germ008_ring_all	ring_width_mm	non comparable	3.713417886410441	1.000	1.2782
 quercus_robur	wp_nl_ring_range	ring_width_mm	conforme	2.3961401985634483	0.240	-0.6868
-quercus_robur	cienciala_agb_sample_mean	aboveground_biomass_t	non comparable	0.27028521728515625	1.000	-0.4957
-quercus_robur	cienciala_agb_D30	aboveground_biomass_t	non comparable	0.4323848876953125	1.000	-0.1733
-quercus_robur	cienciala_agb_D40	aboveground_biomass_t	non comparable	0.9027648315429687	1.000	-0.1703
-quercus_robur	cienciala_agb_D50	aboveground_biomass_t	non comparable	1.60511328125	1.000	-0.1649
+quercus_robur	cienciala_agb_sample_mean	aboveground_biomass_t	non comparable	0.2796593017578125	1.000	-0.4782
+quercus_robur	cienciala_agb_D30	aboveground_biomass_t	non comparable	0.4395526123046875	1.000	-0.1596
+quercus_robur	cienciala_agb_D40	aboveground_biomass_t	non comparable	0.90544287109375	1.000	-0.1678
+quercus_robur	cienciala_agb_D50	aboveground_biomass_t	non comparable	1.6064752197265626	1.000	-0.1642
 quercus_robur	wp_pl_root_depth	root_depth_m	indicatif	1.9810599088668823	0.240	-0.6038
 quercus_robur	atlas_roots_qual	root_depth_m	non mesurable		0.900	
 quercus_robur	lucot_bruckert_surface_root	root_depth_m	non comparable	2.1174641847610474	0.500	2.5291
@@ -202,10 +202,10 @@ quercus_robur	catoni_lma_sun	lma_g_m2	indicatif	74.99917558467152	1.000	-0.0209
 quercus_robur	catoni_lma_shade	lma_g_m2	indicatif	74.99917558467152	1.000	0.4451
 quercus_robur	catoni_leaf_thickness_sun	leaf_thickness_um	non modélisé		1.000	
 quercus_robur	vincke_oak_lai	lai	non comparable	4.00000013856895	1.000	0.7021
-quercus_robur	vincke_transpiration_daily	transpiration_mm_day	non comparable	2.09782928987961	1.000	1.0978
+quercus_robur	vincke_transpiration_daily	transpiration_mm_day	non comparable	2.0978293230234657	1.000	1.0978
 quercus_robur	vincke_basal_area	basal_area_m2_ha	non modélisé		1.000	
-quercus_robur	quick_tree_water_use	transpiration_l_day	non comparable	975.7806355137978	1.000	-0.1478
-quercus_robur	quick_canopy_water_use_july	transpiration_l_day_per_m2_canopy	non comparable	2.09782928987961	1.000	-0.5804
+quercus_robur	quick_tree_water_use	transpiration_l_day	non comparable	975.7806441768523	1.000	-0.1478
+quercus_robur	quick_canopy_water_use_july	transpiration_l_day_per_m2_canopy	non comparable	2.0978293230234657	1.000	-0.5804
 quercus_robur	niinemets_shade	shade_tolerance	non comparable	1.5000000596046448	1.000	-0.3878
 quercus_robur	niinemets_drought	drought_tolerance	non comparable	2.2499999403953552	1.000	-0.2373
 quercus_robur	niinemets_waterlogging	waterlogging_tolerance	non comparable	2.0000000298023224	1.000	0.0582
@@ -239,7 +239,7 @@ quercus_robur	lanvin_mor_lumber	mor_mpa	non comparable	57	0.300	0.1633
 quercus_robur	absence_green_wood_properties	mor_mpa	entrée d'absence	57	0.300	
 quercus_robur	schmidt_lothar_oak_beech	storm_damage_fraction	non comparable	0	1.000	-1.0000
 quercus_robur	schmidt_lothar_spruce_ref	storm_damage_fraction	non comparable	0	1.000	-1.0000
-quercus_robur	virot_critical_wind	critical_wind_ms	indicatif	45.2083740234375	0.500	0.0764
+quercus_robur	virot_critical_wind	critical_wind_ms	indicatif	45.19752502441406	0.500	0.0761
 quercus_robur	absence_natural_frequency	natural_frequency_hz	entrée d'absence		1.000	
 quercus_robur	read_dormant_buds	dormant_bud_longevity_years	non modélisé		0.800	
 quercus_robur	read_adventitious_poor	epicormic_response	non mesurable		0.800	
@@ -539,8 +539,8 @@ prunus_avium	nocetti_sapwood_rings	sapwood_rings	non modélisé		1.000
 prunus_avium	pryor_bark_20	bark_thickness_mm	non modélisé		1.000	
 prunus_avium	pryor_bark_40	bark_thickness_mm	non modélisé		1.000	
 prunus_avium	pryor_bark_share_40	bark_area_fraction	non modélisé		1.000	
-prunus_avium	pryor_stem_vol_30_12	stem_volume_m3	indicatif	0.4640745842257672	1.000	-0.3074
-prunus_avium	pryor_stem_vol_40_14	stem_volume_m3	indicatif	0.9749215537788297	1.000	-0.2670
+prunus_avium	pryor_stem_vol_30_12	stem_volume_m3	indicatif	0.4675907197407272	1.000	-0.3021
+prunus_avium	pryor_stem_vol_40_14	stem_volume_m3	indicatif	0.9893581112988349	1.000	-0.2561
 prunus_avium	pryor_standvol_good_60	stand_volume_m3_ha	non modélisé		1.000	
 prunus_avium	pryor_ba_good_60	basal_area_m2_ha	non modélisé		1.000	
 prunus_avium	stoj_rootdepth_erlbeck	root_depth_m	limite	1.2740020751953125	0.600	-0.5753
@@ -589,8 +589,8 @@ prunus_avium	albrecht_shoot	shoot_length_cm	conforme	72.00000286102295	0.600	0.1
 prunus_avium	albrecht_ring	ring_width_mm	conforme	4.494962577025095	0.900	-0.0011
 prunus_avium	pryor_ring_veneer	ring_width_mm	non comparable	4.494962577025095	1.000	1.9966
 prunus_avium	nocetti_ring_decline	ring_width_trend	hors plage		1.000	
-prunus_avium	heatpulse_transp	transpiration_l_day	non comparable	57.47918187418291	1.000	12.3984
-tilia_cordata	atlas_height	height_m	conforme	33.30557632446289	0.900	-0.0484
+prunus_avium	heatpulse_transp	transpiration_l_day	non comparable	57.479337698413474	1.000	12.3984
+tilia_cordata	atlas_height	height_m	conforme	33.26445388793945	0.900	-0.0496
 tilia_cordata	atlas_longevity	longevity_years	non mesurable		0.900	
 tilia_cordata	atlas_coppice_stool	longevity_years	non mesurable		0.900	
 tilia_cordata	atlas_seed_age	age_first_flowering_years	conforme	31	0.900	-0.1143
@@ -602,8 +602,8 @@ tilia_cordata	atlas_shade	shade_tolerance	non mesurable		0.900
 tilia_cordata	atlas_warmth	fruit_set	non modélisé		0.900	
 tilia_cordata	atlas_resprout	stump_sprouting	non mesurable		0.900	
 tilia_cordata	atlas_altitude	max_altitude_m	non modélisé		0.900	
-tilia_cordata	ra_height	height_m	hors plage	33.30557632446289	0.900	-0.1119
-tilia_cordata	ra_bialowieza	height_m	indicatif	33.76232147216797	0.900	-0.1961
+tilia_cordata	ra_height	height_m	hors plage	33.26445388793945	0.900	-0.1129
+tilia_cordata	ra_bialowieza	height_m	indicatif	33.67610168457031	0.900	-0.1982
 tilia_cordata	ra_bialowieza_dbh	dbh_cm	indicatif	129.91302490234375	0.900	-0.3504
 tilia_cordata	ra_dbh_50	dbh_cm	indicatif	33.29179763793945	0.900	1.2195
 tilia_cordata	ra_dbh_75	dbh_cm	indicatif	50.2985725402832	0.900	1.0119
@@ -627,16 +627,16 @@ tilia_cordata	ra_crown_open	crown_width_m	hors plage	33.3884391784668	0.900	0.66
 tilia_cordata	ra_sprout	stump_sprouting	non mesurable		0.900	
 tilia_cordata	ra_sucker	sucker_distance_m	non modélisé		0.900	
 tilia_cordata	ra_beech	yield_comparison	non modélisé		0.900	
-tilia_cordata	wpf_height	height_m	hors plage	33.30557632446289	0.240	0.3322
+tilia_cordata	wpf_height	height_m	hors plage	33.26445388793945	0.240	0.3306
 tilia_cordata	wpf_growth	height_m	indicatif	10.500751495361328	0.240	0.0501
 tilia_cordata	wpf_longevity	longevity_years	non mesurable		0.240	
-tilia_cordata	wpe_height	height_m	conforme	33.30557632446289	0.240	0.1102
+tilia_cordata	wpe_height	height_m	conforme	33.26445388793945	0.240	0.1088
 tilia_cordata	wpe_frost	record_low_c	non mesurable		0.240	
 tilia_cordata	wpe_girth	girth_cm	non comparable	454.36544493002424	0.240	-0.4558
 tilia_cordata	wpd_dbh	dbh_cm	conforme	144.62901306152344	0.240	-0.2769
 tilia_cordata	wpd_longevity	longevity_years	non mesurable		0.240	
 tilia_cordata	wpd_ellenberg_l	shade_tolerance	non comparable	0.8399999737739563	0.240	-0.5800
-tilia_cordata	wpp_height	height_m	conforme	34.84223175048828	0.240	-0.0583
+tilia_cordata	wpp_height	height_m	conforme	34.60000228881836	0.240	-0.0649
 tilia_cordata	wdb_density	dry_density_kg_m3	non comparable	535	0.600	0.0000
 tilia_cordata	wdb_mor	mor_mpa	non comparable	47.599998474121094	0.600	-0.4426
 tilia_cordata	wdb_moe	moe_gpa	non comparable	7.199999809265137	0.600	-0.3851
@@ -644,8 +644,8 @@ tilia_cordata	niinemets_shade	shade_tolerance	non comparable	4.1999998688697815	
 tilia_cordata	niinemets_drought	drought_tolerance	non comparable	2.7500000596046448	1.000	0.0000
 tilia_cordata	niinemets_waterlogging	waterlogging_tolerance	non comparable	1.850000023841858	1.000	0.0109
 corylus_avellana	atlas_height	height_m	conforme	6.036987781524658	0.900	0.0062
-corylus_avellana	atlas_height_max	height_m	conforme	6.689830303192139	0.900	-0.3310
-corylus_avellana	atlas_lifespan	longevity_years	hors plage	97	0.900	0.1412
+corylus_avellana	atlas_height_max	height_m	conforme	6.63199520111084	0.900	-0.3368
+corylus_avellana	atlas_lifespan	longevity_years	conforme	85	0.900	0.0000
 corylus_avellana	atlas_catkin	catkin_length_cm	non modélisé		0.900	
 corylus_avellana	atlas_nut	nut_size_cm	non modélisé		0.900	
 corylus_avellana	atlas_leaf	leaf_length_cm	conforme	9	0.900	0.0000
@@ -655,7 +655,7 @@ corylus_avellana	fr_wiki_stool	stems_per_stool	non modélisé		0.240
 corylus_avellana	fr_wiki_height	height_m	hors plage	6.036987781524658	0.240	0.7249
 corylus_avellana	fr_wiki_flowering	flowering_doy	indicatif	56.41111111111111	0.240	
 corylus_avellana	fr_wiki_full_production	age_first_flowering_years	non comparable	7	0.240	-0.3000
-corylus_avellana	fr_wiki_cultivar_life	longevity_years	non comparable	97	0.240	0.6167
+corylus_avellana	fr_wiki_cultivar_life	longevity_years	non comparable	85	0.240	0.4167
 corylus_avellana	fr_wiki_altitude	max_altitude_m	non modélisé		0.240	
 corylus_avellana	de_wiki_height	height_m	limite	6.036987781524658	0.240	0.0976
 corylus_avellana	de_wiki_density	dry_density_kg_m3	non comparable	590	0.240	-0.0167
@@ -665,11 +665,11 @@ corylus_avellana	de_wiki_shift_2018	flowering_date_shift_days	non mesurable		0.2
 corylus_avellana	de_wiki_altitude	max_altitude_m	non modélisé		0.240	
 corylus_avellana	de_wiki_mycorrhiza	mycorrhiza_type	conforme		0.240	
 corylus_avellana	en_wiki_height	height_m	conforme	6.036987781524658	0.240	0.0976
-corylus_avellana	en_wiki_height_max	height_m	limite	6.689830303192139	0.240	-0.5540
+corylus_avellana	en_wiki_height_max	height_m	limite	6.63199520111084	0.240	-0.5579
 corylus_avellana	en_wiki_mycorrhiza	mycorrhiza_type	conforme		0.240	
-corylus_avellana	wt_height	height_m	conforme	6.689830303192139	0.600	-0.4425
-corylus_avellana	fls_lifespan	longevity_years	indicatif	97	0.600	0.3857
-corylus_avellana	fls_height	height_m	conforme	6.689830303192139	0.600	-0.0443
+corylus_avellana	wt_height	height_m	conforme	6.63199520111084	0.600	-0.4473
+corylus_avellana	fls_lifespan	longevity_years	indicatif	85	0.600	0.2143
+corylus_avellana	fls_height	height_m	conforme	6.63199520111084	0.600	-0.0526
 corylus_avellana	rhs_coppice_rotation	coppice_rotation_years	non modélisé		0.800	
 corylus_avellana	sk_flowering_1964	flowering_doy	indicatif	56.41111111111111	1.000	-0.2768
 corylus_avellana	sk_flowering_1994	flowering_doy	indicatif	56.41111111111111	1.000	-0.2272
@@ -896,8 +896,8 @@ prunus_domestica	absence_prunus_3_mycorrhiza	mycorrhiza_type	entrée d'absence		
 prunus_domestica	absence_prunus_4_budburst	budburst_doy	entrée d'absence	108.23684210526316	0.300	
 prunus_domestica	absence_prunus_5_fruit	fruit_mass_g	entrée d'absence		0.300	
 prunus_domestica	absence_prunus_6_longevity	longevity_years	entrée d'absence	43	0.300	
-pseudotsuga_menziesii	atlas_height_native	height_m	limite	59.47763442993164	0.900	-0.1503
-pseudotsuga_menziesii	atlas_dbh_native	dbh_cm	hors plage	246.1864013671875	0.900	0.2309
+pseudotsuga_menziesii	atlas_height_native	height_m	limite	59.477046966552734	0.900	-0.1503
+pseudotsuga_menziesii	atlas_dbh_native	dbh_cm	hors plage	246.6704864501953	0.900	0.2334
 pseudotsuga_menziesii	atlas_longevity	longevity_years	non mesurable		0.900	
 pseudotsuga_menziesii	atlas_first_cones	age_first_flowering_years	conforme	15	0.900	0.1111
 pseudotsuga_menziesii	atlas_needle_length	needle_length_cm	conforme	2.5999999046325684	0.900	-0.0545
@@ -906,9 +906,9 @@ pseudotsuga_menziesii	atlas_shade	shade_tolerance	non mesurable		0.900
 pseudotsuga_menziesii	atlas_precip	rain_mm_yr	non mesurable		0.900	
 pseudotsuga_menziesii	atlas_drought	drought_tolerance	non mesurable		0.900	
 pseudotsuga_menziesii	atlas_vs_spruce	mai_m3_ha_yr	non modélisé		0.900	
-pseudotsuga_menziesii	wfr_height_native	height_m	conforme	59.47763442993164	0.240	-0.0850
-pseudotsuga_menziesii	wfr_height_france	height_m	conforme	62.1775016784668	0.240	-0.0976
-pseudotsuga_menziesii	wfr_dbh	dbh_cm	indicatif	199.53482055664063	0.240	-0.0023
+pseudotsuga_menziesii	wfr_height_native	height_m	conforme	59.477046966552734	0.240	-0.0850
+pseudotsuga_menziesii	wfr_height_france	height_m	conforme	62.17668151855469	0.240	-0.0976
+pseudotsuga_menziesii	wfr_dbh	dbh_cm	indicatif	201.10621643066406	0.240	0.0055
 pseudotsuga_menziesii	wfr_longevity	longevity_years	non mesurable		0.240	
 pseudotsuga_menziesii	wfr_needle_length	needle_length_cm	conforme	2.5999999046325684	0.240	0.1556
 pseudotsuga_menziesii	wfr_needle_longevity	needle_longevity_years	conforme	5.5	0.240	0.0000
@@ -916,13 +916,13 @@ pseudotsuga_menziesii	wfr_cone_length	cone_length_cm	non modélisé		0.240
 pseudotsuga_menziesii	wfr_rotation	rotation_years	non modélisé		0.240	
 pseudotsuga_menziesii	wfr_root	root_architecture	conforme		0.240	
 pseudotsuga_menziesii	wfr_drought	drought_tolerance	non mesurable		0.240	
-pseudotsuga_menziesii	wen_height	height_m	conforme	59.47763442993164	0.240	-0.0087
-pseudotsuga_menziesii	wen_dbh	dbh_cm	indicatif	199.53482055664063	0.240	-0.1686
+pseudotsuga_menziesii	wen_height	height_m	conforme	59.477046966552734	0.240	-0.0087
+pseudotsuga_menziesii	wen_dbh	dbh_cm	indicatif	201.10621643066406	0.240	-0.1621
 pseudotsuga_menziesii	wen_longevity	longevity_years	non mesurable		0.240	
 pseudotsuga_menziesii	wen_needle_length	needle_length_cm	conforme	2.5999999046325684	0.240	-0.0545
 pseudotsuga_menziesii	wen_cone_length	cone_length_cm	non modélisé		0.240	
 pseudotsuga_menziesii	wen_bark	bark_thickness_cm	non modélisé		0.240	
-pseudotsuga_menziesii	wde_height_europe	height_m	indicatif	59.47763442993164	0.240	-0.0087
+pseudotsuga_menziesii	wde_height_europe	height_m	indicatif	59.477046966552734	0.240	-0.0087
 pseudotsuga_menziesii	wde_longevity	longevity_years	non mesurable		0.240	
 pseudotsuga_menziesii	wde_first_flowering	age_first_flowering_years	conforme	15	0.240	-0.4545
 pseudotsuga_menziesii	wde_needle_length	needle_length_cm	hors plage	2.5999999046325684	0.240	-0.2571
@@ -938,7 +938,7 @@ pseudotsuga_menziesii	wdb_moe	moe_gpa	non comparable	9.199999809265137	0.600	-0.
 pseudotsuga_menziesii	fruk_mai	mai_m3_ha_yr	non modélisé		0.400	
 pseudotsuga_menziesii	fruk_rotation	rotation_years	non modélisé		0.400	
 pseudotsuga_menziesii	fruk_coning	age_first_flowering_years	indicatif	15	0.400	-0.6250
-pseudotsuga_menziesii	fruk_height	height_m	limite	62.1775016784668	0.400	0.0363
+pseudotsuga_menziesii	fruk_height	height_m	limite	62.17668151855469	0.400	0.0363
 pseudotsuga_menziesii	fruk_rain	rain_mm_yr	non mesurable		0.400	
 pseudotsuga_menziesii	fruk_wind	wind_tolerance	non modélisé		0.400	
 pseudotsuga_menziesii	fc34_df_yc22_dbh_40	dbh_cm	indicatif	40.59273147583008	0.800	0.0408
@@ -948,14 +948,14 @@ pseudotsuga_menziesii	fc34_df_yc24_dbh_50	dbh_cm	indicatif	48.900840759277344	0.
 pseudotsuga_menziesii	fc34_df_yc20_dbh_40	dbh_cm	indicatif	40.59273147583008	0.800	0.1598
 pseudotsuga_menziesii	fc34_df_yc20_dbh_50	dbh_cm	indicatif	48.900840759277344	0.800	0.0867
 pseudotsuga_menziesii	fc34_df_maxmai_age	rotation_years	non modélisé		0.800	
-pseudotsuga_menziesii	fc34_df_maxmai_dbh	dbh_cm	non comparable	199.53482055664063	0.800	3.4839
+pseudotsuga_menziesii	fc34_df_maxmai_dbh	dbh_cm	non comparable	201.10621643066406	0.800	3.5192
 pseudotsuga_menziesii	cnpf_h50	height_m	non comparable	33.65150451660156	0.300	0.0197
 pseudotsuga_menziesii	cnpf_harvest	height_m	conforme	31.248477935791016	0.300	-0.0385
 pseudotsuga_menziesii	cnpf_mai	mai_m3_ha_yr	non modélisé		0.300	
 pseudotsuga_menziesii	cnpf_index	site_index	non modélisé		0.300	
-picea_abies	atlas_height_max	height_m	hors plage	39.12294960021973	0.900	-0.2887
-picea_abies	atlas_dbh_max	dbh_cm	conforme	132.7139434814453	0.900	-0.1152
-picea_abies	atlas_longevity_normal	longevity_years	conforme	248	0.900	-0.0080
+picea_abies	atlas_height_max	height_m	hors plage	39.12294578552246	0.900	-0.2887
+picea_abies	atlas_dbh_max	dbh_cm	limite	160.7728271484375	0.900	0.0718
+picea_abies	atlas_longevity_normal	longevity_years	hors plage	350	0.900	0.4000
 picea_abies	atlas_clonal_age	clonal_age_years	non modélisé		0.900	
 picea_abies	atlas_first_flowering	age_first_flowering_years	conforme	29	0.900	0.1600
 picea_abies	atlas_first_flowering_dense	age_first_flowering_years	non comparable	29	0.900	-0.2750
@@ -966,16 +966,16 @@ picea_abies	atlas_drought	drought_tolerance	non mesurable		0.900
 picea_abies	atlas_waterlogging	waterlogging_tolerance	non mesurable		0.900	
 picea_abies	atlas_root_arch	root_architecture	conforme		0.900	
 picea_abies	atlas_mycorrhiza	mycorrhiza_type	non mesurable		0.900	
-picea_abies	wfr_height	height_m	conforme	39.12294960021973	0.240	0.0433
-picea_abies	wfr_dbh	dbh_cm	conforme	132.7139434814453	0.240	-0.1152
-picea_abies	wfr_longevity	longevity_years	indicatif	248	0.240	-0.5040
+picea_abies	wfr_height	height_m	conforme	39.12294578552246	0.240	0.0433
+picea_abies	wfr_dbh	dbh_cm	limite	160.7728271484375	0.240	0.0718
+picea_abies	wfr_longevity	longevity_years	non mesurable		0.240	
 picea_abies	wfr_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0000
 picea_abies	wfr_cone_maturity	fruit_maturity_doy	conforme	264.8664596273292	0.240	-0.0333
-picea_abies	wen_height_record	height_m	conforme	41.16990661621094	0.240	-0.3435
+picea_abies	wen_height_record	height_m	conforme	43.332481384277344	0.240	-0.3090
 picea_abies	wen_leader_growth	height_increment_m_yr	conforme	0.6983191967010498	0.240	-0.3017
-picea_abies	wen_oldest_ring_dated	longevity_years	limite	248	0.240	-0.5338
-picea_abies	wde_height_typ	height_m	limite	39.12294960021973	0.240	-0.2329
-picea_abies	wde_longevity	longevity_years	limite	248	0.240	-0.5867
+picea_abies	wen_oldest_ring_dated	longevity_years	non mesurable		0.240	
+picea_abies	wde_height_typ	height_m	limite	39.12294578552246	0.240	-0.2329
+picea_abies	wde_longevity	longevity_years	non mesurable		0.240	
 picea_abies	wde_first_flowering	age_first_flowering_years	limite	29	0.240	-0.1714
 picea_abies	wde_flowering	flowering_doy	conforme	136.41925465838509	0.240	-0.0966
 picea_abies	wde_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0909
@@ -993,18 +993,18 @@ picea_abies	utschig_incr	mai_m3_ha_yr	non modélisé		0.800
 picea_abies	utschig_cai_peak	cai_peak_age_years	non modélisé		0.800	
 picea_abies	wde_mai_germany	mai_m3_ha_yr	non modélisé		0.240	
 picea_abies	kall_depth	root_depth_m	non mesurable		1.000	
-picea_abies	kall_spread	root_spread_m	non comparable	16.210896492004395	1.000	0.6050
+picea_abies	kall_spread	root_spread_m	non comparable	16.208333015441895	1.000	0.6048
 picea_abies	kall_crb30	root_fraction_top_30cm	indicatif	0.8721957206726074	1.000	0.0902
-picea_abies	kall_frb10	root_fraction_top_10cm	indicatif	0.39434537291526794	1.000	-0.4366
+picea_abies	kall_frb10	root_fraction_top_10cm	indicatif	0.39465415477752686	1.000	-0.4362
 picea_abies	kall_h16	height_m	indicatif	10.148748397827148	1.000	1.2553
 picea_abies	kall_h54	height_m	indicatif	27.829763412475586	1.000	0.2314
 picea_abies	schutz_return	storm_damage_return_time_years	non modélisé		0.500	
 picea_abies	zub_uproot	uprooted_share_of_damaged_pct	non modélisé		1.000	
-picea_abies	hale_cws	critical_wind_ms	hors plage	3.1473388671875	1.000	-0.8951
+picea_abies	hale_cws	critical_wind_ms	conforme	39.871185302734375	1.000	0.3290
 picea_abies	andreozzi_sitka	anchorage_moment_knm	non modélisé		0.600	
 picea_abies	andreozzi_tilt	tilt_at_critical_moment_deg	non modélisé		0.600	
 picea_abies	moore_damping	damping_ratio	non modélisé		0.450	
-picea_abies	sla85_lma	lma_g_m2	conforme	200.00041488430415	0.500	0.0000
+picea_abies	sla85_lma	lma_g_m2	conforme	200.0007970380492	0.500	0.0000
 picea_abies	fc34_ns_yc20_dbh_40	dbh_cm	indicatif	35.193870544433594	0.800	0.4078
 picea_abies	fc34_ns_yc20_dbh_50	dbh_cm	indicatif	40.011226654052734	0.800	0.1768
 picea_abies	fc34_ns_yc20_dbh_60	dbh_cm	indicatif	47.95511436462402	0.800	0.1418
@@ -1051,10 +1051,10 @@ taxus_baccata	wde_heartrot	heart_rot_onset_years	non modélisé		0.240
 taxus_baccata	wdb_density	dry_density_kg_m3	non comparable	550	0.600	-0.1852
 taxus_baccata	wdb_mor	mor_mpa	non comparable	41	0.600	-0.5764
 taxus_baccata	wdb_moe	moe_gpa	non comparable	9.199999809265137	0.600	-0.0936
-larix_decidua	atlas_height	height_m	hors plage	42.67005920410156	0.900	-0.1017
+larix_decidua	atlas_height	height_m	hors plage	42.66975402832031	0.900	-0.1017
 larix_decidua	atlas_longevity	longevity_years	non mesurable		0.900	
 larix_decidua	atlas_longevity_alt	longevity_years	non mesurable		0.900	
-larix_decidua	atlas_dbh	dbh_cm	conforme	146.59526824951172	0.900	0.1728
+larix_decidua	atlas_dbh	dbh_cm	conforme	145.85442352294922	0.900	0.1668
 larix_decidua	atlas_needle_length	needle_length_cm	conforme	2.799999952316284	0.900	0.0182
 larix_decidua	atlas_cone_length	cone_length_cm	non modélisé		0.900	
 larix_decidua	atlas_frost	frost_hardiness_c	non modélisé		0.900	
@@ -1062,18 +1062,18 @@ larix_decidua	atlas_waterlogging	waterlogging_tolerance	hors plage		0.900
 larix_decidua	atlas_shade	shade_tolerance	non mesurable		0.900	
 larix_decidua	atlas_deciduous	leaf_fall_doy	indicatif	303.1818181818182	0.900	
 larix_decidua	atlas_elevation	max_altitude_m	non modélisé		0.900	
-larix_decidua	wfr_height	height_m	hors plage	42.67005920410156	0.240	0.2191
+larix_decidua	wfr_height	height_m	hors plage	42.66975402832031	0.240	0.2191
 larix_decidua	wfr_cone_length	cone_length_cm	non modélisé		0.240	
 larix_decidua	wfr_cones_period	flowering_doy	conforme	98.71279373368147	0.240	-0.2742
 larix_decidua	wfr_valais	longevity_years	non mesurable		0.240	
-larix_decidua	wen_height	height_m	conforme	42.67005920410156	0.240	0.2191
-larix_decidua	wen_dbh	dbh_cm	conforme	146.59526824951172	0.240	-0.0227
+larix_decidua	wen_height	height_m	conforme	42.66975402832031	0.240	0.2191
+larix_decidua	wen_dbh	dbh_cm	conforme	145.85442352294922	0.240	-0.0276
 larix_decidua	wen_longevity	longevity_years	non mesurable		0.240	
 larix_decidua	wen_needle_length	needle_length_cm	conforme	2.799999952316284	0.240	-0.0667
 larix_decidua	wen_cone_length	cone_length_cm	non modélisé		0.240	
 larix_decidua	wen_cone_cycle	cone_cycle_years	non modélisé		0.240	
-larix_decidua	wde_height	height_m	conforme	43.62989044189453	0.240	-0.1920
-larix_decidua	wde_dbh	dbh_cm	conforme	146.59526824951172	0.240	-0.0227
+larix_decidua	wde_height	height_m	conforme	43.62919616699219	0.240	-0.1921
+larix_decidua	wde_dbh	dbh_cm	conforme	145.85442352294922	0.240	-0.0276
 larix_decidua	wde_longevity	longevity_years	non mesurable		0.240	
 larix_decidua	wde_first_flowering_open	age_first_flowering_years	conforme	18	0.240	0.0286
 larix_decidua	wde_first_flowering_stand	age_first_flowering_years	non comparable	18	0.240	-0.4857
@@ -1092,8 +1092,8 @@ larix_decidua	fc34_el_yc10_dbh_45	dbh_cm	indicatif	32.024739265441895	0.800	0.14
 larix_decidua	fc34_el_yc10_dbh_50	dbh_cm	indicatif	34.973533630371094	0.800	0.1282
 larix_decidua	andreozzi_larch	anchorage_moment_knm	non modélisé		0.600	
 larix_decidua	andreozzi_larch_tilt	tilt_at_critical_moment_deg	non modélisé		0.600	
-larix_decidua	hale_larch	critical_wind_ms	indicatif	35.871337890625	1.000	
-pinus_pinaster	atlas_height	height_m	conforme	26.846622467041016	0.900	0.0739
+larix_decidua	hale_larch	critical_wind_ms	indicatif	39.641469955444336	1.000	
+pinus_pinaster	atlas_height	height_m	conforme	26.845680236816406	0.900	0.0738
 pinus_pinaster	atlas_needle_length	needle_length_cm	conforme	17	0.900	-0.0286
 pinus_pinaster	atlas_needle_longevity	needle_longevity_years	conforme	2.5	0.900	0.0000
 pinus_pinaster	atlas_cone_length	cone_length_cm	non modélisé		0.900	
@@ -1102,24 +1102,24 @@ pinus_pinaster	atlas_shade	shade_tolerance	non mesurable		0.900
 pinus_pinaster	atlas_precip	rain_mm_yr	non mesurable		0.900	
 pinus_pinaster	atlas_root	root_architecture	conforme		0.900	
 pinus_pinaster	atlas_mycorrhiza	mycorrhiza_type	conforme		0.900	
-pinus_pinaster	wfr_height	height_m	conforme	26.846622467041016	0.240	0.0739
-pinus_pinaster	wfr_longevity	longevity_years	conforme	290	0.240	-0.4200
+pinus_pinaster	wfr_height	height_m	conforme	26.845680236816406	0.240	0.0738
+pinus_pinaster	wfr_longevity	longevity_years	conforme	338	0.240	-0.3240
 pinus_pinaster	wfr_first_cones	age_first_flowering_years	conforme	8	0.240	0.1429
 pinus_pinaster	wfr_needle_length	needle_length_cm	conforme	17	0.240	0.1333
 pinus_pinaster	wfr_cone_length	cone_length_cm	non modélisé		0.240	
-pinus_pinaster	wfr_flowering	flowering_doy	conforme	114.28378378378379	0.240	-0.0555
+pinus_pinaster	wfr_flowering	flowering_doy	conforme	114.21515151515152	0.240	-0.0561
 pinus_pinaster	wfr_mai_1960	mai_m3_ha_yr	non modélisé		0.240	
 pinus_pinaster	wfr_mai_2015	mai_m3_ha_yr	non modélisé		0.240	
 pinus_pinaster	wfr_rotation	rotation_years	non modélisé		0.240	
 pinus_pinaster	wfr_root	root_architecture	conforme		0.240	
 pinus_pinaster	wfr_klaus	storm_damage_fraction	non comparable	0	0.240	-1.0000
-pinus_pinaster	wen_height	height_m	conforme	26.846622467041016	0.240	-0.0238
-pinus_pinaster	wen_dbh	dbh_cm	conforme	101.2186279296875	0.240	-0.1565
-pinus_pinaster	wde_height	height_m	conforme	26.846622467041016	0.240	-0.0238
-pinus_pinaster	wde_longevity	longevity_years	conforme	290	0.240	-0.0333
+pinus_pinaster	wen_height	height_m	conforme	26.845680236816406	0.240	-0.0238
+pinus_pinaster	wen_dbh	dbh_cm	conforme	106.64998626708984	0.240	-0.1113
+pinus_pinaster	wde_height	height_m	conforme	26.845680236816406	0.240	-0.0238
+pinus_pinaster	wde_longevity	longevity_years	hors plage	338	0.240	0.1267
 pinus_pinaster	wde_needle_longevity	needle_longevity_years	conforme	2.5	0.240	-0.1667
 pinus_pinaster	wde_cone_length	cone_length_cm	non modélisé		0.240	
-pinus_pinaster	wde_pollen	flowering_doy	indicatif	114.28378378378379	0.240	0.0884
+pinus_pinaster	wde_pollen	flowering_doy	indicatif	114.21515151515152	0.240	0.0878
 pinus_pinaster	wde_polycyclic	shoot_flushes_per_year	non modélisé		0.240	
 pinus_pinaster	wde_root	root_architecture	non mesurable		0.240	
 pinus_pinaster	wde_density	dry_density_kg_m3	non comparable	390	0.240	-0.3710
@@ -1131,8 +1131,8 @@ pinus_pinaster	fruk_rain	rain_mm_yr	non mesurable		0.400
 pinus_pinaster	fruk_shade	shade_tolerance	non mesurable		0.400	
 pinus_pinaster	fibois_hdom40	height_m	non comparable	21.398479461669922	0.300	-0.2219
 pinus_pinaster	fibois_prod	mai_m3_ha_yr	non modélisé		0.300	
-pinus_sylvestris	atlas_height	height_m	conforme	25.372199058532715	0.900	0.0149
-pinus_sylvestris	atlas_height_max	height_m	conforme	26.694950103759766	0.900	-0.3326
+pinus_sylvestris	atlas_height	height_m	conforme	25.372326850891113	0.900	0.0149
+pinus_sylvestris	atlas_height_max	height_m	conforme	26.695449829101563	0.900	-0.3326
 pinus_sylvestris	atlas_longevity	longevity_years	hors plage	218	0.900	-0.4550
 pinus_sylvestris	atlas_longevity_record	longevity_years	limite	218	0.900	-0.7093
 pinus_sylvestris	atlas_needle_length	needle_length_cm	conforme	5.5	0.900	-0.0833
@@ -1141,19 +1141,19 @@ pinus_sylvestris	atlas_cone_length	cone_length_cm	non modélisé		0.900
 pinus_sylvestris	atlas_shade	shade_tolerance	non mesurable		0.900	
 pinus_sylvestris	atlas_drought	drought_tolerance	non mesurable		0.900	
 pinus_sylvestris	atlas_chilling	chilling_hours	non modélisé		0.900	
-pinus_sylvestris	wfr_height	height_m	conforme	25.372199058532715	0.240	-0.2193
+pinus_sylvestris	wfr_height	height_m	conforme	25.372326850891113	0.240	-0.2193
 pinus_sylvestris	wfr_longevity	longevity_years	hors plage	218	0.240	0.2457
 pinus_sylvestris	wfr_needle_length	needle_length_cm	conforme	5.5	0.240	0.0000
 pinus_sylvestris	wfr_cone_length	cone_length_cm	non modélisé		0.240	
-pinus_sylvestris	wen_height_record	height_m	conforme	26.694950103759766	0.240	-0.4271
-pinus_sylvestris	wen_dbh	dbh_cm	limite	89.70723342895508	0.240	-0.3355
+pinus_sylvestris	wen_height_record	height_m	conforme	26.695449829101563	0.240	-0.4271
+pinus_sylvestris	wen_dbh	dbh_cm	limite	89.70434951782227	0.240	-0.3355
 pinus_sylvestris	wen_longevity	longevity_years	conforme	218	0.240	-0.0311
 pinus_sylvestris	wen_needle_length	needle_length_cm	limite	5.5	0.240	0.4667
 pinus_sylvestris	wen_needle_longevity	needle_longevity_years	conforme	3	0.240	-0.4545
 pinus_sylvestris	wen_cone_cycle	cone_cycle_years	non modélisé		0.240	
 pinus_sylvestris	wen_dry_density	dry_density_kg_m3	non comparable	390	0.240	-0.1702
-pinus_sylvestris	wde_height	height_m	conforme	26.694950103759766	0.240	-0.4439
-pinus_sylvestris	wde_dbh	dbh_cm	hors plage	115.02765655517578	0.240	0.1503
+pinus_sylvestris	wde_height	height_m	conforme	26.695449829101563	0.240	-0.4438
+pinus_sylvestris	wde_dbh	dbh_cm	hors plage	114.98135375976563	0.240	0.1498
 pinus_sylvestris	wde_longevity	longevity_years	limite	218	0.240	-0.6367
 pinus_sylvestris	wde_first_flowering	age_first_flowering_years	conforme	13	0.240	0.0400
 pinus_sylvestris	wde_needle_longevity	needle_longevity_years	indicatif	3	0.240	0.0000
@@ -1165,8 +1165,8 @@ pinus_sylvestris	wdb_density	dry_density_kg_m3	non comparable	390	0.600	-0.2909
 pinus_sylvestris	wdb_mor	mor_mpa	non comparable	41	0.600	-0.5078
 pinus_sylvestris	wdb_moe	moe_gpa	non comparable	9.199999809265137	0.600	-0.0873
 pinus_sylvestris	kall_depth	root_depth_m	non mesurable		1.000	
-pinus_sylvestris	kall_spread	root_spread_m	non comparable	12.522114276885986	1.000	0.3181
-pinus_sylvestris	kall_crb30	root_fraction_top_30cm	indicatif	0.8923579454421997	1.000	0.1154
+pinus_sylvestris	kall_spread	root_spread_m	non comparable	12.51717233657837	1.000	0.3176
+pinus_sylvestris	kall_crb30	root_fraction_top_30cm	indicatif	0.8928161561489105	1.000	0.1160
 pinus_sylvestris	zub_share	storm_damaged_forest_fraction	non modélisé		1.000	
 pinus_sylvestris	zub_uproot	uprooted_share_of_damaged_pct	non modélisé		1.000	
 pinus_sylvestris	fc34_sp_yc14_dbh_40	dbh_cm	indicatif	35.59062194824219	0.800	0.5474
@@ -1176,7 +1176,7 @@ pinus_sylvestris	fc34_sp_yc12_dbh_40	dbh_cm	indicatif	35.59062194824219	0.800	0.
 pinus_sylvestris	fc34_sp_yc12_dbh_50	dbh_cm	indicatif	42.781925201416016	0.800	0.5845
 pinus_sylvestris	fc34_sp_yc12_dbh_60	dbh_cm	indicatif	49.57167434692383	0.800	0.5022
 pinus_sylvestris	klemmt_increment	mai_m3_ha_yr	non modélisé		0.800	
-pinus_sylvestris	hale_species	critical_wind_ms	indicatif	26.4405517578125	1.000	
+pinus_sylvestris	hale_species	critical_wind_ms	indicatif	35.0615234375	1.000	
 abies_alba	atlas_height	height_m	conforme	48.51718521118164	0.900	-0.1914
 abies_alba	atlas_longevity	longevity_years	non mesurable		0.900	
 abies_alba	atlas_first_flowering	age_first_flowering_years	conforme	31	0.900	-0.1143
@@ -1273,8 +1273,8 @@ physics	broadleaf_f0_not_cantilever	f0_vs_d_over_h2	non mesurable		0.700
 physics	leaves_lower_f0_damping	damping_ratio	conforme		0.700	
 physics	jackson_damping_summer	damping_ratio	conforme	0.085999995470047	0.300	-0.0000
 physics	jackson_damping_winter	damping_ratio	conforme	0.039000000804662704	0.300	0.0000
-physics	jackson_f0_winter_gain	f0_winter_gain_pct	conforme	18.528157247989686	0.300	0.0015
-physics	virot_critical_wind	critical_wind_ms	indicatif	45.2083740234375	0.700	0.0764
+physics	jackson_f0_winter_gain	f0_winter_gain_pct	conforme	18.53941298343129	0.300	0.0021
+physics	virot_critical_wind	critical_wind_ms	indicatif	45.19752502441406	0.700	0.0761
 physics	albrecht_comment_virot	critical_wind_ms	non mesurable		0.700	
 physics	rigid_model_tree_cd	drag_coefficient	hors plage	0.4000000059604645	0.700	-0.6000
 physics	anchorage_root_depth_gain	anchorage_moment_gain_deep_roots_pct	hors plage	16.25326852004294	0.420	0.3003
@@ -1289,7 +1289,7 @@ physics	bock_storm_acid_soils	storm_damage_predictors	non modélisé		0.700
 physics	black_forest_lothar_area	storm_damaged_forest_fraction	non modélisé		0.700	
 physics	lothar_wood_volume_france	windthrown_volume_m3	non modélisé		0.240	
 physics	great_storm_1987_brittany	forest_destroyed_fraction	non modélisé		0.240	
-physics	leaf_on_effect_1987	leaf_on_damage_effect	non comparable	0.650222629047893	0.240	
+physics	leaf_on_effect_1987	leaf_on_damage_effect	non comparable	0.6501786338247135	0.240	
 physics	thigmo_jaffe1973	thigmomorphogenesis_effect	hors plage		0.240	
 physics	thigmo_beech_guyed	radial_growth_mechanical_control	hors plage		0.700	
 physics	thigmo_beech_stem_vs_roots	stem_vs_anchorage_strengthening	non mesurable		0.700	
