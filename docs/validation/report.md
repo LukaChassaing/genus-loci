@@ -6,7 +6,7 @@ Rapport généré par `dendro-validate` (ne pas éditer à la main). Régénére
 cargo run --release -p dendro-validate -- --seeds 5 --out docs/validation/report.md
 ```
 
-Graines : [1, 2, 3, 4, 5] ; durées simulées : bouleau verruqueux 150 ans (adulte : 60 ans), charme commun 200 ans (adulte : 90 ans), châtaignier 400 ans (adulte : 300 ans), chêne pédonculé 400 ans (adulte : 150 ans), chêne sessile 400 ans (adulte : 400 ans), érable sycomore 400 ans (adulte : 240 ans), frêne commun 300 ans (adulte : 120 ans), hêtre commun 350 ans (adulte : 150 ans), merisier 150 ans (adulte : 70 ans), tilleul à petites feuilles 400 ans (adulte : 300 ans), noisetier 100 ans (adulte : 50 ans), noyer commun 250 ans (adulte : 110 ans), poirier 200 ans (adulte : 90 ans), pommier 150 ans (adulte : 50 ans), prunier 100 ans (adulte : 30 ans), douglas 400 ans (adulte : 300 ans), épicéa commun 350 ans (adulte : 150 ans), if commun 400 ans (adulte : 360 ans), mélèze d'europe 400 ans (adulte : 360 ans), pin maritime 400 ans (adulte : 180 ans), pin sylvestre 350 ans (adulte : 150 ans), sapin pectiné 400 ans (adulte : 300 ans), + 30 ans sur argile à gley (châtaignier), + 30 ans sur argile à gley (chêne sessile), + 30 ans sur argile à gley (érable sycomore), + 30 ans sur argile à gley (hêtre commun), + 30 ans sur argile à gley (merisier), + 30 ans sur argile à gley (noisetier), + 30 ans sur argile à gley (noyer commun), + 30 ans sur argile à gley (poirier), + 30 ans sur argile à gley (pommier), + 30 ans sur argile à gley (prunier), + 30 ans sur argile à gley (if commun), + 30 ans sur argile à gley (mélèze d'europe), + 30 ans sur argile à gley (pin maritime), + 30 ans sur argile à gley (sapin pectiné), climat 400 ans par graine ; durée du banc : 1132 s. Contrôle « le banc ne change rien » : identique bit à bit (merisier, graine 3, 40 ans : hauteur, DBH, 40 cernes).
+Graines : [1, 2, 3, 4, 5] ; durées simulées : bouleau verruqueux 150 ans (adulte : 60 ans), charme commun 200 ans (adulte : 90 ans), châtaignier 400 ans (adulte : 300 ans), chêne pédonculé 400 ans (adulte : 150 ans), chêne sessile 400 ans (adulte : 400 ans), érable sycomore 400 ans (adulte : 240 ans), frêne commun 300 ans (adulte : 120 ans), hêtre commun 350 ans (adulte : 150 ans), merisier 150 ans (adulte : 70 ans), tilleul à petites feuilles 400 ans (adulte : 300 ans), noisetier 100 ans (adulte : 50 ans), noyer commun 250 ans (adulte : 110 ans), poirier 200 ans (adulte : 90 ans), pommier 150 ans (adulte : 50 ans), prunier 100 ans (adulte : 30 ans), douglas 400 ans (adulte : 300 ans), épicéa commun 350 ans (adulte : 150 ans), if commun 400 ans (adulte : 360 ans), mélèze d'europe 400 ans (adulte : 360 ans), pin maritime 400 ans (adulte : 180 ans), pin sylvestre 350 ans (adulte : 150 ans), sapin pectiné 400 ans (adulte : 300 ans), + 30 ans sur argile à gley (châtaignier), + 30 ans sur argile à gley (chêne sessile), + 30 ans sur argile à gley (érable sycomore), + 30 ans sur argile à gley (hêtre commun), + 30 ans sur argile à gley (merisier), + 30 ans sur argile à gley (noisetier), + 30 ans sur argile à gley (noyer commun), + 30 ans sur argile à gley (poirier), + 30 ans sur argile à gley (pommier), + 30 ans sur argile à gley (prunier), + 30 ans sur argile à gley (if commun), + 30 ans sur argile à gley (mélèze d'europe), + 30 ans sur argile à gley (pin maritime), + 30 ans sur argile à gley (sapin pectiné), climat 400 ans par graine ; durée du banc : 1124 s. Contrôle « le banc ne change rien » : identique bit à bit (merisier, graine 3, 40 ans : hauteur, DBH, 40 cernes).
 
 ## Méthode
 
@@ -36,8 +36,8 @@ Graines : [1, 2, 3, 4, 5] ; durées simulées : bouleau verruqueux 150 ans (adul
 | Noyer commun (Juglans regia) | 10 | 1 | 6 | 4 | 8 | 11 | 8 | 2 | 49 % | 3 |
 | Mélèze d'Europe (Larix decidua) | 10 | 0 | 3 | 8 | 4 | 10 | 7 | 0 | 65 % | 0 |
 | Pommier (Malus domestica) | 11 | 2 | 1 | 4 | 26 | 29 | 6 | 4 | 87 % | 2 |
-| Physique, climat de Rennes, sol | 16 | 3 | 7 | 33 | 7 | 18 | 8 | 0 | 70 % | 3 |
-| Épicéa commun (Picea abies) | 15 | 6 | 1 | 11 | 5 | 15 | 5 | 0 | 81 % | 4 |
+| Physique, climat de Rennes, sol | 17 | 3 | 6 | 33 | 7 | 18 | 8 | 0 | 72 % | 3 |
+| Épicéa commun (Picea abies) | 15 | 5 | 2 | 11 | 5 | 15 | 5 | 0 | 76 % | 4 |
 | Pin maritime (Pinus pinaster) | 16 | 0 | 0 | 1 | 6 | 10 | 5 | 0 | 100 % | 2 |
 | Pin sylvestre (Pinus sylvestris) | 12 | 4 | 3 | 10 | 5 | 8 | 4 | 0 | 74 % | 5 |
 | Merisier (Prunus avium) | 40 | 6 | 12 | 18 | 35 | 37 | 21 | 0 | 73 % | 13 |
@@ -48,7 +48,7 @@ Graines : [1, 2, 3, 4, 5] ; durées simulées : bouleau verruqueux 150 ans (adul
 | Chêne pédonculé (Quercus robur) | 20 | 7 | 10 | 11 | 48 | 14 | 19 | 3 | 70 % | 0 |
 | If commun (Taxus baccata) | 15 | 1 | 2 | 4 | 6 | 4 | 8 | 0 | 79 % | 0 |
 | Tilleul à petites feuilles (Tilia cordata) | 6 | 0 | 3 | 18 | 11 | 5 | 10 | 0 | 63 % | 1 |
-| **total** | 287 | 52 | 80 | 181 | 250 | 262 | 177 | 27 | 74 % | 62 |
+| **total** | 288 | 51 | 80 | 181 | 250 | 262 | 177 | 27 | 74 % | 62 |
 
 Conformité pondérée = Σ poids(✅) + ½ Σ poids(⚠️), divisé par Σ poids des entrées jugées (✅ ⚠️ ❌). « dont calage » : entrées jugées qui ne font que contrôler une source ayant servi au calage du moteur.
 
@@ -56,7 +56,7 @@ Entrées **indépendantes et simulées** seulement (ni calage, ni paramètre lu,
 
 | sélection | ✅ conforme | ⚠️ limite | ❌ hors plage | ℹ️ indicatif | ➖ non comparable | ⬜ non modélisé | ◻️ non mesurable | ∅ entrée d'absence | conformité pondérée | dont calage |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| indépendantes, simulées | 204 | 40 | 64 | 130 | 128 | 262 | 177 | 21 | 71 % | 0 |
+| indépendantes, simulées | 205 | 39 | 64 | 130 | 128 | 262 | 177 | 21 | 71 % | 0 |
 
 ## Résumé par domaine
 
@@ -160,8 +160,8 @@ Entrées **indépendantes et simulées** seulement (ni calage, ni paramètre lu,
 | Mécanique et vent — noyer commun | 1 | 0 | 0 | 1 | 0 | 7 | 0 | 0 | 100 % | 0 |
 | Mécanique et vent — mélèze d'europe | 3 | 0 | 0 | 1 | 0 | 8 | 0 | 0 | 100 % | 0 |
 | Mécanique et vent — pommier | 0 | 0 | 0 | 1 | 0 | 25 | 5 | 1 | — | 0 |
-| Mécanique et vent — physique | 8 | 0 | 7 | 1 | 1 | 8 | 6 | 0 | 54 % | 2 |
-| Mécanique et vent — épicéa commun | 4 | 1 | 0 | 0 | 0 | 10 | 0 | 0 | 81 % | 0 |
+| Mécanique et vent — physique | 9 | 0 | 6 | 1 | 1 | 8 | 6 | 0 | 57 % | 2 |
+| Mécanique et vent — épicéa commun | 4 | 0 | 1 | 0 | 0 | 10 | 0 | 0 | 62 % | 0 |
 | Mécanique et vent — pin maritime | 4 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 100 % | 0 |
 | Mécanique et vent — pin sylvestre | 4 | 1 | 0 | 2 | 0 | 5 | 0 | 0 | 95 % | 0 |
 | Mécanique et vent — prunier | 0 | 0 | 0 | 1 | 1 | 11 | 1 | 1 | — | 0 |
@@ -317,78 +317,78 @@ Triés par gravité = poids de confiance x distance (demi-largeurs de plage au-d
 | 10 | picea_abies | `atlas_height_max` hauteur à 150 ans (âge de référence « adulte » du banc) | 50.0–60.0 m (range) | 39.1 [39.1–39.1] (4 graines debout) | ❌ hors plage | -29 % | ●●● 0.90 (review/full) | simulé | hors plage (2.2 demi-largeurs au-delà du bord) ;  |
 | 11 | prunus_avium | `stoj_senescence` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 80.0–90.0 years (range) | 108 [79.0–146] | ❌ hors plage | +27 % | ●●○ 0.60 (secondary/full) | simulé, calage | hors plage (3.6 demi-largeurs au-delà du bord) ;  |
 | 12 | quercus_robur | `eaton_budburst_2013` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 129 [126–142] day of year (range) | 113 [112–113] | ❌ hors plage | -13 % | ●●● 1.00 (primary/table) | simulé | hors plage (1.7 demi-largeurs au-delà du bord) ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
-| 13 | abies_alba | `utschig_gap` hauteur de l'épicéa moins hauteur du sapin pectiné à 100 ans (même graine, arbres isolés) | 4.00–5.00 m (range) | 2.89 [2.88–2.89] (4 graines debout) | ❌ hors plage | -36 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (2.2 demi-largeurs au-delà du bord) ; tables de production de peuplement (Wiedemann, Assmann & Franz contre Hausser) comparées à deux arbres isolés ; âge de 100 ans choisi par le banc |
-| 14 | tilia_cordata | `ra_biel_incr_33` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 16.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +270 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 15 | corylus_avellana | `atlas_lifespan` âge médian de mort du tronc, émergent (5/5 graines mortes en 100 ans) | 80.0–90.0 years (range) | 97.0 [80.0–99.0] | ❌ hors plage | +14 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
-| 16 | prunus_avium | `albrecht_dbh_incr_max` accroissement annuel maximal du DBH (mm/an) | ≤ 10.0 mm/yr (single) | 16.5 [15.4–18.7] | ❌ hors plage | +65 % | ●●● 0.90 (review/full) | simulé | borne ≤ 10 manquée de plus d'un facteur 1,5 ;  |
-| 17 | pyrus_communis | `wdb_pear_size_dbh` DBH à 90 ans (âge de référence « adulte » du banc) | 15.0–30.0 cm (range) | 48.0 [47.2–49.9] | ❌ hors plage | +113 % | ●●○ 0.60 (secondary/table) | simulé | hors plage (2.4 demi-largeurs au-delà du bord) ;  |
-| 18 | fraxinus_excelsior | `wpf_diameter` DBH maximal sur 300 ans simulés | 160–180 cm (range) | 85.6 [80.2–92.0] | ❌ hors plage | -50 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (7.4 demi-largeurs au-delà du bord) ; l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence |
-| 19 | prunus_avium | `atlas_first_fruiting` âge de la première floraison simulée | 10.0–15.0 years (range) | 7.00 [7.00–7.00] | ❌ hors plage | -44 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.2 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
-| 20 | corylus_avellana | `sk_italy_onset` pleine floraison (30 % de la floraison), jour moyen des années fleuries | 19.0 doy (single) | 56.4 [53.6–57.3] | ℹ️ indicatif | +197 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 21 | juglans_regia | `wal_height` hauteur à 110 ans (âge de référence « adulte » du banc) | 25.0–30.0 m (range) | 21.4 [20.8–21.7] (4 graines debout) | ❌ hors plage | -22 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
-| 22 | juglans_regia | `atlas_longevity` âge médian de mort du tronc, émergent (2/5 graines mortes en 250 ans) : médiane > 250 ans (censurée) | 100–200 years (range) | 250 | ❌ hors plage | +67 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.0 demi-largeurs au-delà du bord) ; borne inférieure : la médiane dépasse déjà la borne haute publiée |
-| 23 | tilia_cordata | `ra_biel_incr_28` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 20.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +196 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 24 | larix_decidua | `atlas_height` hauteur à 360 ans (âge de référence « adulte » du banc) | 45.0–50.0 m (range) | 42.7 [42.7–42.7] (4 graines debout) | ❌ hors plage | -10 % | ●●● 0.90 (review/full) | simulé | hors plage (0.9 demi-largeurs au-delà du bord) ;  |
-| 25 | pinus_sylvestris | `atlas_longevity` âge médian de mort du tronc, émergent (4/5 graines mortes en 350 ans) | ≥ 400 years (range) | 218 [70.0–350] | ❌ hors plage | -46 % | ●●● 0.90 (review/full) | simulé, calage | borne ≥ 400 manquée de plus d'un facteur 1,5 ; 1 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
-| 26 | physics | `rennes_frost_days_tn_m10` jours Tn ≤ -10 °C par an | 0.100 days/yr (single) | 0.270 [0.235–0.310] | ℹ️ indicatif | +170 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 27 | carpinus_betulus | `atlas_height_usual` hauteur à 90 ans (âge de référence « adulte » du banc) | 20.0–25.0 m (range) | 18.0 [17.7–19.3] | ❌ hors plage | -20 % | ●●● 0.90 (review/full) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ;  |
-| 28 | juglans_regia | `atlas_height` hauteur à 110 ans (âge de référence « adulte » du banc) | 25.0–35.0 m (range) | 21.4 [20.8–21.7] (4 graines debout) | ❌ hors plage | -29 % | ●●● 0.90 (review/full) | simulé | hors plage (0.7 demi-largeurs au-delà du bord) ;  |
-| 29 | tilia_cordata | `ra_height` hauteur à 300 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 33.3 [33.2–34.1] | ❌ hors plage | -11 % | ●●● 0.90 (review/full) | simulé | hors plage (0.7 demi-largeurs au-delà du bord) ;  |
-| 30 | prunus_avium | `wpde_first_flowering` âge de la première floraison simulée | 20.0–25.0 years (range) | 7.00 [7.00–7.00] | ❌ hors plage | -69 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (5.2 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
-| 31 | prunus_domestica | `wdb_plum_dbh` DBH à 30 ans (âge de référence « adulte » du banc) | 30.0–40.0 cm (range) | 22.6 [20.3–23.8] | ❌ hors plage | -35 % | ●●○ 0.60 (secondary/table) | simulé | hors plage (1.5 demi-largeurs au-delà du bord) ;  |
-| 32 | juglans_regia | `wal_first_flowering` âge de la première floraison simulée | 15.0–20.0 years (range) | 13.0 [13.0–14.0] | ❌ hors plage | -26 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 12 (± 1 an) |
-| 33 | tilia_cordata | `ra_biel_incr_8` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 23.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +158 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 34 | prunus_avium | `euf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 70.0–100 years (range) | 108 [79.0–146] | ❌ hors plage | +27 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (0.5 demi-largeurs au-delà du bord) ;  |
-| 35 | fagus_sylvatica | `eu_height` hauteur à 150 ans (âge de référence « adulte » du banc) | 30.0–35.0 m (range) | 28.7 [28.5–29.4] | ❌ hors plage | -12 % | ●●● 0.90 (review/full) | simulé | hors plage (0.5 demi-largeurs au-delà du bord) ;  |
-| 36 | prunus_avium | `atlas_flowering_duration` durée moyenne de la floraison (ouverture -> chute des pétales) | 7.00 days (single) | 17.4 [17.0–18.1] | ℹ️ indicatif | +149 % | ●●● 0.90 (review/full) | simulé, calage | valeur unique publiée : écart rapporté ;  |
-| 37 | tilia_cordata | `ra_biel_incr_23` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 24.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +147 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 38 | quercus_robur | `lucot_bruckert_extensive_reach` rayon d'extension racinaire à 150 ans | ≤ 20.0 m (max_record) | 23.0 [22.1–24.0] (4 graines debout) | ❌ hors plage | +15 % | ●●○ 0.50 (primary/snippet) | simulé | dépasse le record de plus de 10 % ;  |
-| 39 | picea_abies | `kall_h16` hauteur à 16 ans | 4.50 m (single) | 10.1 [10.1–10.2] | ℹ️ indicatif | +126 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 40 | tilia_cordata | `ra_biel_incr_18` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 25.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +137 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 41 | fraxinus_excelsior | `wpe_height` hauteur à 120 ans (âge de référence « adulte » du banc) | 12.0–18.0 m (range) | 30.0 [29.1–30.1] | ❌ hors plage | +100 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (4.0 demi-largeurs au-delà du bord) ;  |
-| 42 | tilia_cordata | `ra_biel_incr_13` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 26.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +128 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 43 | prunus_avium | `wpde_longevity_typ` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 80.0–90.0 years (range) | 108 [79.0–146] | ❌ hors plage | +27 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (3.6 demi-largeurs au-delà du bord) ;  |
-| 44 | tilia_cordata | `ra_dbh_50` DBH à 50 ans | 15.0 cm (single) | 33.3 [32.9–34.1] | ℹ️ indicatif | +122 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 45 | physics | `rigid_model_tree_cd` Cd du houppier à 5 m/s (chêne 100 ans ; constant sous RECONF_MIN_MS = 10 m/s) | 1.00 [0.800–1.20] (range) | 0.400 [0.400–0.400] | ❌ hors plage | -60 % | ●●○ 0.70 (primary/abstract) | paramètre | hors plage (2.0 demi-largeurs au-delà du bord) ; modèles rigides en soufflerie, « bon accord avec les arbres naturels à faible vitesse » |
-| 46 | quercus_robur | `cole_sheldon_budburst_2013` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 122 [120–124] day of year (sd) | 113 [112–113] | ❌ hors plage | -8 % | ●●○ 0.50 (primary/snippet) | simulé | hors ±2 sd (1.1 demi-largeurs au-delà du bord) ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
-| 47 | tilia_cordata | `ra_dbh_75` DBH à 75 ans | 25.0 cm (single) | 50.3 [48.8–50.6] | ℹ️ indicatif | +101 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 48 | abies_alba | `wen_dbh` DBH maximal sur 400 ans simulés | 150 cm (max_record) | 191 [17.9–193] | ❌ hors plage | +28 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
-| 49 | quercus_petraea | `wpd_height` hauteur à 400 ans (âge de référence « adulte » du banc) | 25.0–30.0 m (range) | 36.5 [35.7–36.9] | ❌ hors plage | +33 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.6 demi-largeurs au-delà du bord) ;  |
-| 50 | fagus_sylvatica | `wpe_first_seed` âge de la première floraison simulée | 10.0 years (single) | 46.0 [46.0–47.0] | ℹ️ indicatif | +360 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 45 (± 1 an) |
-| 51 | quercus_robur | `wp_pl_height_10y` hauteur à 10 ans | 1.80–3.00 m (range) | 4.52 [4.44–4.65] | ❌ hors plage | +88 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.5 demi-largeurs au-delà du bord) ;  |
-| 52 | acer_pseudoplatanus | `wpd_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 400 ans) | 600–800 years (range) | 366 [297–379] | ❌ hors plage | -48 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (2.3 demi-largeurs au-delà du bord) ;  |
-| 53 | betula_pendula | `wpd_dbh` DBH maximal sur 150 ans simulés | 90.0 [90.0–130] cm (range) | 46.2 [21.3–57.2] | ❌ hors plage | -49 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.2 demi-largeurs au-delà du bord) ; l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence |
-| 54 | prunus_avium | `pryor_waterlog` croissance sur sol engorgé | qualitatif category (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 1.00 (primary/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) ;  |
-| 55 | prunus_avium | `nocetti_ring_decline` déclin du cerne après 4-5 ans | qualitatif category (single) | cerne à 1,3 m, âge cambial 4-6 : 4.71 mm, 12-20 : 5.94 mm (critère du banc : déclin) | ❌ hors plage |  | ●●● 1.00 (primary/full) | simulé | cerne à 1,3 m, âge cambial 4-6 : 4.71 mm, 12-20 : 5.94 mm (critère du banc : déclin) ;  |
-| 56 | fagus_sylvatica | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) ;  |
-| 57 | prunus_avium | `euf_first_flowering` âge de la première floraison simulée | 4.00 years (single) | 7.00 [7.00–7.00] | ℹ️ indicatif | +75 % | ●●● 0.90 (review/full) | simulé, calage | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
-| 58 | prunus_avium | `atlas_waterlog` croissance sur sol engorgé | qualitatif category (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) ;  |
-| 59 | taxus_baccata | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.95 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.95 (critère du banc : < 0,7) ;  |
-| 60 | larix_decidua | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.87 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.87 (critère du banc : < 0,7) ;  |
-| 61 | abies_alba | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.90 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.90 (critère du banc : < 0,7) ;  |
-| 62 | prunus_avium | `wpnl_height` hauteur maximale sur 150 ans simulés | 20.0 m (max_record) | 23.5 [21.9–24.3] | ❌ hors plage | +17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
-| 63 | tilia_cordata | `ra_dbh_400` DBH à 400 ans | 85.0 cm (single) | 145 [142–148] | ℹ️ indicatif | +70 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 64 | fraxinus_excelsior | `wpd_fruit_group` âge de la première floraison simulée | 30.0–35.0 years (range) | 26.0 [26.0–27.0] | ❌ hors plage | -20 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.6 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 25 (± 1 an) |
-| 65 | pinus_sylvestris | `fc34_sp_yc12_dbh_40` DBH à 40 ans | 20.0 cm (single) | 35.6 [34.4–38.3] | ℹ️ indicatif | +78 % | ●●○ 0.80 (handbook/table) | simulé | valeur unique publiée : écart rapporté ;  |
-| 66 | castanea_sativa | `wpp_height` hauteur maximale sur 400 ans simulés | ≤ 30.0 m (max_record) | 34.7 [34.3–35.0] | ❌ hors plage | +16 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
-| 67 | fraxinus_excelsior | `wpd_100y_dbh` DBH à 100 ans | 30.0–40.0 cm (range) | 47.8 [45.4–50.1] | ❌ hors plage | +37 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.6 demi-largeurs au-delà du bord) ;  |
-| 68 | betula_pendula | `wpe_dbh` DBH maximal sur 150 ans simulés | ≤ 40.0 cm (max_record) | 46.2 [21.3–57.2] | ❌ hors plage | +16 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
-| 69 | physics | `rennes_frost_days_tn_m5` jours Tn ≤ -5 °C par an | 2.70 days/yr (single) | 4.33 [4.24–4.41] | ℹ️ indicatif | +60 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
-| 70 | pinus_sylvestris | `wde_dbh` DBH maximal sur 350 ans simulés | 100 cm (max_record) | 115 [55.5–133] | ❌ hors plage | +15 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
-| 71 | fagus_sylvatica | `fr_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) | ❌ hors plage |  | ●●○ 0.80 (handbook/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) ;  |
-| 72 | picea_abies | `fc34_ns_yc14_dbh_50` DBH à 50 ans | 23.0 cm (single) | 40.0 [38.1–43.7] | ℹ️ indicatif | +74 % | ●●○ 0.80 (handbook/table) | simulé | valeur unique publiée : écart rapporté ;  |
-| 73 | fraxinus_excelsior | `wpf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 300 ans) | 150–200 years (range) | 234 [211–259] | ❌ hors plage | +34 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
-| 74 | fraxinus_excelsior | `wpd_root_spread` rayon d'extension racinaire à 150 ans | 3.50 m (single) | 11.5 [10.6–11.6] | ℹ️ indicatif | +230 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
-| 75 | quercus_robur | `martinik_first_fruit_open` âge de la première floraison simulée | 40.0–50.0 years (range) | 36.0 [36.0–37.0] | ❌ hors plage | -20 % | ●○○ 0.30 (secondary/snippet) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 35 (± 1 an) |
-| 76 | physics | `conifers_f0_linear_dbh_h2` f0 linéaire en DBH/H² | qualitatif relation (pente non obtenue) (single) | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) ; conifères ; aucune pente feuillue publiée |
-| 77 | physics | `dfir_f0_linear_dbh_h2_both_states` f0 linéaire en DBH/H² | qualitatif relation (pente non obtenue) (single) | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) ; conifères ; aucune pente feuillue publiée |
-| 78 | physics | `thigmo_beech_guyed` contrôle mécanique de la croissance radiale | qualitatif qualitative (single) | chêne 40 ans, H/D (test 13 de physics.md : plus faible) : avec acclimatation 51.73, sans 51.73 (+0.0 %) ; plus faible avec acclimatation pour 0 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | chêne 40 ans, H/D (test 13 de physics.md : plus faible) : avec acclimatation 51.73, sans 51.73 (+0.0 %) ; plus faible avec acclimatation pour 0 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable ;  |
-| 79 | acer_pseudoplatanus | `wpf_height` hauteur à 240 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 32.2 [31.9–32.4] | ❌ hors plage | -14 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.1 demi-largeurs au-delà du bord) ;  |
-| 80 | acer_pseudoplatanus | `wpp_height` hauteur à 240 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 32.2 [31.9–32.4] | ❌ hors plage | -14 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.1 demi-largeurs au-delà du bord) ;  |
-| 81 | quercus_robur | `eaton_budburst_2012` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 123 [114–124] day of year (range) | 113 [112–113] | ⚠️ limite | -8 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
-| 82 | quercus_robur | `eaton_budburst_2014` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 119 [114–132] day of year (range) | 113 [112–113] | ⚠️ limite | -5 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
-| 83 | quercus_robur | `eaton_autumn_2013` fin de la coloration / début de chute (jour moyen) ; stade 4 « couleur ou chute » lu ainsi | 320 [315–332] day of year (range) | 312 [312–313] | ⚠️ limite | -2 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; arbre nu en moyenne au jour 333 ; Angleterre du Sud, année précise |
-| 84 | picea_abies | `hale_cws` première rafale critique, houppier en feuilles (persistant), 100 ans | 20.0–40.0 m/s (range) | 41.0 [38.9–42.2] (4 graines debout) | ⚠️ limite | +37 % | ●●● 1.00 (primary/full) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 13 | picea_abies | `hale_cws` première rafale critique, houppier en feuilles (persistant), 100 ans | 20.0–40.0 m/s (range) | 3.15 [2.46–4.32] (4 graines debout) | ❌ hors plage | -90 % | ●●● 1.00 (primary/full) | simulé | hors plage (1.7 demi-largeurs au-delà du bord) ;  |
+| 14 | abies_alba | `utschig_gap` hauteur de l'épicéa moins hauteur du sapin pectiné à 100 ans (même graine, arbres isolés) | 4.00–5.00 m (range) | 2.89 [2.88–2.89] (4 graines debout) | ❌ hors plage | -36 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (2.2 demi-largeurs au-delà du bord) ; tables de production de peuplement (Wiedemann, Assmann & Franz contre Hausser) comparées à deux arbres isolés ; âge de 100 ans choisi par le banc |
+| 15 | tilia_cordata | `ra_biel_incr_33` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 16.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +270 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 16 | corylus_avellana | `atlas_lifespan` âge médian de mort du tronc, émergent (5/5 graines mortes en 100 ans) | 80.0–90.0 years (range) | 97.0 [80.0–99.0] | ❌ hors plage | +14 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
+| 17 | prunus_avium | `albrecht_dbh_incr_max` accroissement annuel maximal du DBH (mm/an) | ≤ 10.0 mm/yr (single) | 16.5 [15.4–18.7] | ❌ hors plage | +65 % | ●●● 0.90 (review/full) | simulé | borne ≤ 10 manquée de plus d'un facteur 1,5 ;  |
+| 18 | pyrus_communis | `wdb_pear_size_dbh` DBH à 90 ans (âge de référence « adulte » du banc) | 15.0–30.0 cm (range) | 48.0 [47.2–49.9] | ❌ hors plage | +113 % | ●●○ 0.60 (secondary/table) | simulé | hors plage (2.4 demi-largeurs au-delà du bord) ;  |
+| 19 | fraxinus_excelsior | `wpf_diameter` DBH maximal sur 300 ans simulés | 160–180 cm (range) | 85.6 [80.2–92.0] | ❌ hors plage | -50 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (7.4 demi-largeurs au-delà du bord) ; l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence |
+| 20 | prunus_avium | `atlas_first_fruiting` âge de la première floraison simulée | 10.0–15.0 years (range) | 7.00 [7.00–7.00] | ❌ hors plage | -44 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.2 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
+| 21 | corylus_avellana | `sk_italy_onset` pleine floraison (30 % de la floraison), jour moyen des années fleuries | 19.0 doy (single) | 56.4 [53.6–57.3] | ℹ️ indicatif | +197 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 22 | juglans_regia | `wal_height` hauteur à 110 ans (âge de référence « adulte » du banc) | 25.0–30.0 m (range) | 21.4 [20.8–21.7] (4 graines debout) | ❌ hors plage | -22 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
+| 23 | juglans_regia | `atlas_longevity` âge médian de mort du tronc, émergent (2/5 graines mortes en 250 ans) : médiane > 250 ans (censurée) | 100–200 years (range) | 250 | ❌ hors plage | +67 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (1.0 demi-largeurs au-delà du bord) ; borne inférieure : la médiane dépasse déjà la borne haute publiée |
+| 24 | tilia_cordata | `ra_biel_incr_28` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 20.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +196 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 25 | larix_decidua | `atlas_height` hauteur à 360 ans (âge de référence « adulte » du banc) | 45.0–50.0 m (range) | 42.7 [42.7–42.7] (4 graines debout) | ❌ hors plage | -10 % | ●●● 0.90 (review/full) | simulé | hors plage (0.9 demi-largeurs au-delà du bord) ;  |
+| 26 | pinus_sylvestris | `atlas_longevity` âge médian de mort du tronc, émergent (4/5 graines mortes en 350 ans) | ≥ 400 years (range) | 218 [70.0–350] | ❌ hors plage | -46 % | ●●● 0.90 (review/full) | simulé, calage | borne ≥ 400 manquée de plus d'un facteur 1,5 ; 1 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
+| 27 | physics | `rennes_frost_days_tn_m10` jours Tn ≤ -10 °C par an | 0.100 days/yr (single) | 0.270 [0.235–0.310] | ℹ️ indicatif | +170 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 28 | carpinus_betulus | `atlas_height_usual` hauteur à 90 ans (âge de référence « adulte » du banc) | 20.0–25.0 m (range) | 18.0 [17.7–19.3] | ❌ hors plage | -20 % | ●●● 0.90 (review/full) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ;  |
+| 29 | juglans_regia | `atlas_height` hauteur à 110 ans (âge de référence « adulte » du banc) | 25.0–35.0 m (range) | 21.4 [20.8–21.7] (4 graines debout) | ❌ hors plage | -29 % | ●●● 0.90 (review/full) | simulé | hors plage (0.7 demi-largeurs au-delà du bord) ;  |
+| 30 | tilia_cordata | `ra_height` hauteur à 300 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 33.3 [33.2–34.1] | ❌ hors plage | -11 % | ●●● 0.90 (review/full) | simulé | hors plage (0.7 demi-largeurs au-delà du bord) ;  |
+| 31 | prunus_avium | `wpde_first_flowering` âge de la première floraison simulée | 20.0–25.0 years (range) | 7.00 [7.00–7.00] | ❌ hors plage | -69 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (5.2 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
+| 32 | prunus_domestica | `wdb_plum_dbh` DBH à 30 ans (âge de référence « adulte » du banc) | 30.0–40.0 cm (range) | 22.6 [20.3–23.8] | ❌ hors plage | -35 % | ●●○ 0.60 (secondary/table) | simulé | hors plage (1.5 demi-largeurs au-delà du bord) ;  |
+| 33 | juglans_regia | `wal_first_flowering` âge de la première floraison simulée | 15.0–20.0 years (range) | 13.0 [13.0–14.0] | ❌ hors plage | -26 % | ●●○ 0.80 (handbook/full) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 12 (± 1 an) |
+| 34 | tilia_cordata | `ra_biel_incr_8` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 23.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +158 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 35 | prunus_avium | `euf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 70.0–100 years (range) | 108 [79.0–146] | ❌ hors plage | +27 % | ●●● 0.90 (review/full) | simulé, calage | hors plage (0.5 demi-largeurs au-delà du bord) ;  |
+| 36 | fagus_sylvatica | `eu_height` hauteur à 150 ans (âge de référence « adulte » du banc) | 30.0–35.0 m (range) | 28.7 [28.5–29.4] | ❌ hors plage | -12 % | ●●● 0.90 (review/full) | simulé | hors plage (0.5 demi-largeurs au-delà du bord) ;  |
+| 37 | prunus_avium | `atlas_flowering_duration` durée moyenne de la floraison (ouverture -> chute des pétales) | 7.00 days (single) | 17.4 [17.0–18.1] | ℹ️ indicatif | +149 % | ●●● 0.90 (review/full) | simulé, calage | valeur unique publiée : écart rapporté ;  |
+| 38 | tilia_cordata | `ra_biel_incr_23` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 24.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +147 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 39 | quercus_robur | `lucot_bruckert_extensive_reach` rayon d'extension racinaire à 150 ans | ≤ 20.0 m (max_record) | 23.0 [22.1–24.0] (4 graines debout) | ❌ hors plage | +15 % | ●●○ 0.50 (primary/snippet) | simulé | dépasse le record de plus de 10 % ;  |
+| 40 | picea_abies | `kall_h16` hauteur à 16 ans | 4.50 m (single) | 10.1 [10.1–10.2] | ℹ️ indicatif | +126 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 41 | tilia_cordata | `ra_biel_incr_18` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 25.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +137 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 42 | fraxinus_excelsior | `wpe_height` hauteur à 120 ans (âge de référence « adulte » du banc) | 12.0–18.0 m (range) | 30.0 [29.1–30.1] | ❌ hors plage | +100 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (4.0 demi-largeurs au-delà du bord) ;  |
+| 43 | tilia_cordata | `ra_biel_incr_13` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | 26.0 cm/yr (single) | 59.2 [58.2–59.7] | ℹ️ indicatif | +128 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 44 | prunus_avium | `wpde_longevity_typ` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 80.0–90.0 years (range) | 108 [79.0–146] | ❌ hors plage | +27 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (3.6 demi-largeurs au-delà du bord) ;  |
+| 45 | tilia_cordata | `ra_dbh_50` DBH à 50 ans | 15.0 cm (single) | 33.3 [32.9–34.1] | ℹ️ indicatif | +122 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 46 | physics | `rigid_model_tree_cd` Cd du houppier à 5 m/s (chêne 100 ans ; constant sous RECONF_MIN_MS = 10 m/s) | 1.00 [0.800–1.20] (range) | 0.400 [0.400–0.400] | ❌ hors plage | -60 % | ●●○ 0.70 (primary/abstract) | paramètre | hors plage (2.0 demi-largeurs au-delà du bord) ; modèles rigides en soufflerie, « bon accord avec les arbres naturels à faible vitesse » |
+| 47 | quercus_robur | `cole_sheldon_budburst_2013` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 122 [120–124] day of year (sd) | 113 [112–113] | ❌ hors plage | -8 % | ●●○ 0.50 (primary/snippet) | simulé | hors ±2 sd (1.1 demi-largeurs au-delà du bord) ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
+| 48 | tilia_cordata | `ra_dbh_75` DBH à 75 ans | 25.0 cm (single) | 50.3 [48.8–50.6] | ℹ️ indicatif | +101 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 49 | abies_alba | `wen_dbh` DBH maximal sur 400 ans simulés | 150 cm (max_record) | 191 [17.9–193] | ❌ hors plage | +28 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
+| 50 | quercus_petraea | `wpd_height` hauteur à 400 ans (âge de référence « adulte » du banc) | 25.0–30.0 m (range) | 36.5 [35.7–36.9] | ❌ hors plage | +33 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.6 demi-largeurs au-delà du bord) ;  |
+| 51 | fagus_sylvatica | `wpe_first_seed` âge de la première floraison simulée | 10.0 years (single) | 46.0 [46.0–47.0] | ℹ️ indicatif | +360 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 45 (± 1 an) |
+| 52 | quercus_robur | `wp_pl_height_10y` hauteur à 10 ans | 1.80–3.00 m (range) | 4.52 [4.44–4.65] | ❌ hors plage | +88 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.5 demi-largeurs au-delà du bord) ;  |
+| 53 | acer_pseudoplatanus | `wpd_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 400 ans) | 600–800 years (range) | 366 [297–379] | ❌ hors plage | -48 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (2.3 demi-largeurs au-delà du bord) ;  |
+| 54 | betula_pendula | `wpd_dbh` DBH maximal sur 150 ans simulés | 90.0 [90.0–130] cm (range) | 46.2 [21.3–57.2] | ❌ hors plage | -49 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (2.2 demi-largeurs au-delà du bord) ; l'entrée annonce un maximum : lu au maximum de vie simulé, pas à l'âge de référence |
+| 55 | prunus_avium | `pryor_waterlog` croissance sur sol engorgé | qualitatif category (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 1.00 (primary/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) ;  |
+| 56 | prunus_avium | `nocetti_ring_decline` déclin du cerne après 4-5 ans | qualitatif category (single) | cerne à 1,3 m, âge cambial 4-6 : 4.71 mm, 12-20 : 5.94 mm (critère du banc : déclin) | ❌ hors plage |  | ●●● 1.00 (primary/full) | simulé | cerne à 1,3 m, âge cambial 4-6 : 4.71 mm, 12-20 : 5.94 mm (critère du banc : déclin) ;  |
+| 57 | fagus_sylvatica | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) ;  |
+| 58 | prunus_avium | `euf_first_flowering` âge de la première floraison simulée | 4.00 years (single) | 7.00 [7.00–7.00] | ℹ️ indicatif | +75 % | ●●● 0.90 (review/full) | simulé, calage | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 5.5 (± 1 an) |
+| 59 | prunus_avium | `atlas_waterlog` croissance sur sol engorgé | qualitatif category (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.77 (critère du banc : < 0,7) ;  |
+| 60 | taxus_baccata | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.95 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.95 (critère du banc : < 0,7) ;  |
+| 61 | larix_decidua | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.87 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.87 (critère du banc : < 0,7) ;  |
+| 62 | abies_alba | `atlas_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.90 (critère du banc : < 0,7) | ❌ hors plage |  | ●●● 0.90 (review/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.90 (critère du banc : < 0,7) ;  |
+| 63 | prunus_avium | `wpnl_height` hauteur maximale sur 150 ans simulés | 20.0 m (max_record) | 23.5 [21.9–24.3] | ❌ hors plage | +17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
+| 64 | tilia_cordata | `ra_dbh_400` DBH à 400 ans | 85.0 cm (single) | 145 [142–148] | ℹ️ indicatif | +70 % | ●●● 0.90 (review/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 65 | fraxinus_excelsior | `wpd_fruit_group` âge de la première floraison simulée | 30.0–35.0 years (range) | 26.0 [26.0–27.0] | ❌ hors plage | -20 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.6 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 25 (± 1 an) |
+| 66 | pinus_sylvestris | `fc34_sp_yc12_dbh_40` DBH à 40 ans | 20.0 cm (single) | 35.6 [34.4–38.3] | ℹ️ indicatif | +78 % | ●●○ 0.80 (handbook/table) | simulé | valeur unique publiée : écart rapporté ;  |
+| 67 | castanea_sativa | `wpp_height` hauteur maximale sur 400 ans simulés | ≤ 30.0 m (max_record) | 34.7 [34.3–35.0] | ❌ hors plage | +16 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
+| 68 | fraxinus_excelsior | `wpd_100y_dbh` DBH à 100 ans | 30.0–40.0 cm (range) | 47.8 [45.4–50.1] | ❌ hors plage | +37 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.6 demi-largeurs au-delà du bord) ;  |
+| 69 | betula_pendula | `wpe_dbh` DBH maximal sur 150 ans simulés | ≤ 40.0 cm (max_record) | 46.2 [21.3–57.2] | ❌ hors plage | +16 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
+| 70 | physics | `rennes_frost_days_tn_m5` jours Tn ≤ -5 °C par an | 2.70 days/yr (single) | 4.33 [4.24–4.41] | ℹ️ indicatif | +60 % | ●●● 1.00 (primary/full) | simulé | valeur unique publiée : écart rapporté ;  |
+| 71 | pinus_sylvestris | `wde_dbh` DBH maximal sur 350 ans simulés | 100 cm (max_record) | 115 [55.5–133] | ❌ hors plage | +15 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | dépasse le record de plus de 10 % ;  |
+| 72 | fagus_sylvatica | `fr_waterlogging` croissance sur sol engorgé | qualitatif qualitative (single) | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) | ❌ hors plage |  | ●●○ 0.80 (handbook/full) | simulé | DBH à 30 ans sur argile à gley / sol de référence = 0.80 (critère du banc : < 0,7) ;  |
+| 73 | picea_abies | `fc34_ns_yc14_dbh_50` DBH à 50 ans | 23.0 cm (single) | 40.0 [38.1–43.7] | ℹ️ indicatif | +74 % | ●●○ 0.80 (handbook/table) | simulé | valeur unique publiée : écart rapporté ;  |
+| 74 | fraxinus_excelsior | `wpf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 300 ans) | 150–200 years (range) | 234 [211–259] | ❌ hors plage | +34 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | hors plage (1.4 demi-largeurs au-delà du bord) ;  |
+| 75 | fraxinus_excelsior | `wpd_root_spread` rayon d'extension racinaire à 150 ans | 3.50 m (single) | 11.5 [10.6–11.6] | ℹ️ indicatif | +230 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
+| 76 | quercus_robur | `martinik_first_fruit_open` âge de la première floraison simulée | 40.0–50.0 years (range) | 36.0 [36.0–37.0] | ❌ hors plage | -20 % | ●○○ 0.30 (secondary/snippet) | simulé | hors plage (0.8 demi-largeurs au-delà du bord) ; piloté par le paramètre first_flowering_age_years = 35 (± 1 an) |
+| 77 | physics | `conifers_f0_linear_dbh_h2` f0 linéaire en DBH/H² | qualitatif relation (pente non obtenue) (single) | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) ; conifères ; aucune pente feuillue publiée |
+| 78 | physics | `dfir_f0_linear_dbh_h2_both_states` f0 linéaire en DBH/H² | qualitatif relation (pente non obtenue) (single) | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = 0.25, merisier r = -0.72 (critère de physics.md : r > 0,8, pente > 0) ; conifères ; aucune pente feuillue publiée |
+| 79 | physics | `thigmo_beech_guyed` contrôle mécanique de la croissance radiale | qualitatif qualitative (single) | chêne 40 ans, H/D (test 13 de physics.md : plus faible) : avec acclimatation 51.73, sans 51.73 (+0.0 %) ; plus faible avec acclimatation pour 0 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable | ❌ hors plage |  | ●●○ 0.70 (primary/abstract) | simulé | chêne 40 ans, H/D (test 13 de physics.md : plus faible) : avec acclimatation 51.73, sans 51.73 (+0.0 %) ; plus faible avec acclimatation pour 0 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable ;  |
+| 80 | acer_pseudoplatanus | `wpf_height` hauteur à 240 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 32.2 [31.9–32.4] | ❌ hors plage | -14 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.1 demi-largeurs au-delà du bord) ;  |
+| 81 | acer_pseudoplatanus | `wpp_height` hauteur à 240 ans (âge de référence « adulte » du banc) | 35.0–40.0 m (range) | 32.2 [31.9–32.4] | ❌ hors plage | -14 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage (1.1 demi-largeurs au-delà du bord) ;  |
+| 82 | quercus_robur | `eaton_budburst_2012` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 123 [114–124] day of year (range) | 113 [112–113] | ⚠️ limite | -8 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
+| 83 | quercus_robur | `eaton_budburst_2014` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 119 [114–132] day of year (range) | 113 [112–113] | ⚠️ limite | -5 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; site plus frais que Rennes (Angleterre / Pays-Bas) ; année précise contre moyenne climatique |
+| 84 | quercus_robur | `eaton_autumn_2013` fin de la coloration / début de chute (jour moyen) ; stade 4 « couleur ou chute » lu ainsi | 320 [315–332] day of year (range) | 312 [312–313] | ⚠️ limite | -2 % | ●●● 1.00 (primary/table) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; arbre nu en moyenne au jour 333 ; Angleterre du Sud, année précise |
 | 85 | physics | `rennes_record_low` Tn minimale sur 80 ans (médiane des fenêtres) | -14.7 degC (max_record) | -15.0 [-15.4–-13.7] | ⚠️ limite | -2 % | ●●● 1.00 (primary/full) | simulé | au-dessus du record, de moins de 10 % ;  |
 | 86 | physics | `rennes_gust_record` rafale maximale sur 45 ans (médiane des fenêtres) | 38.0 m/s (max_record) | 39.3 [38.0–41.4] | ⚠️ limite | +3 % | ●●● 1.00 (primary/full) | simulé, calage | au-dessus du record, de moins de 10 % ;  |
 | 87 | physics | `rennes_gust_record_jul` rafale maximale de juillet sur 45 ans | 23.0 m/s (max_record) | 24.7 [23.2–26.6] | ⚠️ limite | +8 % | ●●● 1.00 (primary/full) | simulé | au-dessus du record, de moins de 10 % ;  |
@@ -452,39 +452,38 @@ Triés par gravité = poids de confiance x distance (demi-largeurs de plage au-d
 | 145 | pseudotsuga_menziesii | `wde_needle_length` paramètre leaf.length_cm (texture du feuillage) | 3.00–4.00 cm (range) | 2.60 | ❌ hors plage | -26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | paramètre | hors plage (0.8 demi-largeurs au-delà du bord) ;  |
 | 146 | pseudotsuga_menziesii | `fruk_height` hauteur maximale sur 400 ans simulés | ≥ 60.0 m (max_record) | 62.2 [62.2–62.2] | ⚠️ limite | +4 % | ●○○ 0.40 (handbook/snippet) | simulé | au-dessus du record, de moins de 10 % ;  |
 | 147 | betula_pendula | `wpd_fruit_age` âge de la première floraison simulée | 5.00 years (single) | 9.00 [9.00–10.0] | ℹ️ indicatif | +80 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 8 (± 1 an) |
-| 148 | physics | `windthrow_age_mode` mode de rupture selon l'âge | qualitatif qualitative (single) | chêne, premier mode défeuillé : 40 ans ["uproot", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) | ❌ hors plage |  | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | chêne, premier mode défeuillé : 40 ans ["uproot", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) ; Wikipédia sans valeur chiffrée |
-| 149 | physics | `thigmo_jaffe1973` la stimulation freine l'élongation | qualitatif qualitative (single) | chêne 40 ans, hauteur : avec acclimatation 16.94, sans 16.94 (+0.0 %) ; plus faible avec acclimatation pour 1 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable | ❌ hors plage |  | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | chêne 40 ans, hauteur : avec acclimatation 16.94, sans 16.94 (+0.0 %) ; plus faible avec acclimatation pour 1 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable ; plantes herbacées (via Wikipédia) ; le moteur ne réduit pas l'élongation |
-| 150 | quercus_robur | `wp_pl_root_depth` profondeur racinaire à 40 ans | 5.00 m (single) | 1.98 [1.65–2.12] | ℹ️ indicatif | -60 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
-| 151 | fagus_sylvatica | `wpd_age_record` âge médian de mort du tronc, émergent (5/5 graines mortes en 350 ans) | 546 years (single) | 240 [218–289] | ℹ️ indicatif | -56 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | valeur unique publiée : écart rapporté ;  |
-| 152 | picea_abies | `wfr_longevity` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | 500 years (single) | 248 [51.0–350] | ℹ️ indicatif | -50 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | valeur unique publiée : écart rapporté ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
-| 153 | betula_pendula | `wpe_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 154 | betula_pendula | `wpd_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 155 | betula_pendula | `wpf_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 156 | carpinus_betulus | `wpf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 200 ans) | ≤ 100 years (max_record) | 109 [100–115] | ⚠️ limite | +9 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | au-dessus du record, de moins de 10 % ;  |
-| 157 | quercus_robur | `wp_nl_crown_width` largeur de houppier à 150 ans | ≤ 25.0 m (range) | 32.5 [31.1–34.1] (4 graines debout) | ⚠️ limite | +30 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | borne ≤ 25 manquée, à moins d'un facteur 1,5 ;  |
-| 158 | quercus_robur | `wp_nl_acorn_fall` maturité des fruits (jour moyen) | 274–334 day of year (range) | 265 [263–266] | ⚠️ limite | -13 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; chute des glands, lue comme maturité |
-| 159 | acer_pseudoplatanus | `wpe_flowering` pleine floraison (30 % de la floraison), jour moyen des années fleuries | 121–181 day of year (range) | 112 [112–113] | ⚠️ limite | -26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 160 | fraxinus_excelsior | `wpd_shoot` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | ≤ 150 cm/yr (max_record) | 73.8 [73.2–74.7] | ⚠️ limite | -51 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
-| 161 | fagus_sylvatica | `wpe_oldest` âge médian de mort du tronc, émergent (5/5 graines mortes en 350 ans) | ≥ 500 years (max_record) | 240 [218–289] | ⚠️ limite | -52 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ;  |
-| 162 | fagus_sylvatica | `wpf_budburst` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 115–125 day of year (range) | 113 [113–115] | ⚠️ limite | -6 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 163 | prunus_avium | `wpde_dbh` DBH à 70 ans (âge de référence « adulte » du banc) | ≥ 60.0 cm (single) | 59.7 [58.1–62.5] | ⚠️ limite | -1 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | borne ≥ 60 manquée, à moins d'un facteur 1,5 ;  |
-| 164 | prunus_avium | `wpde_longevity_max` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 300 years (max_record) | 108 [79.0–146] | ⚠️ limite | -64 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ;  |
-| 165 | prunus_avium | `wpcs_fruit` maturité des fruits (jour moyen) | 182–212 doy (range) | 176 [176–180] | ⚠️ limite | -11 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 166 | corylus_avellana | `de_wiki_height` hauteur à 50 ans (âge de référence « adulte » du banc) | 5.00–6.00 m (range) | 6.04 [5.99–6.23] | ⚠️ limite | +10 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 167 | corylus_avellana | `en_wiki_height_max` hauteur maximale sur 100 ans simulés | 15.0 m (max_record) | 6.69 [6.44–6.88] | ⚠️ limite | -55 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
-| 168 | malus_domestica | `de_wiki_freestanding_height` hauteur à 50 ans (âge de référence « adulte » du banc) | 8.00–15.0 m (range) | 7.33 [7.14–7.37] | ⚠️ limite | -36 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 169 | picea_abies | `wen_oldest_ring_dated` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | 532 years (max_record) | 248 [51.0–350] | ⚠️ limite | -53 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
-| 170 | picea_abies | `wde_height_typ` hauteur à 150 ans (âge de référence « adulte » du banc) | 40.0–62.0 m (range) | 39.1 [39.1–39.1] (4 graines debout) | ⚠️ limite | -23 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 171 | picea_abies | `wde_longevity` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | ≤ 600 years (max_record) | 248 [51.0–350] | ⚠️ limite | -59 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
-| 172 | picea_abies | `wde_first_flowering` âge de la première floraison simulée | 30.0–40.0 years (range) | 29.0 [29.0–30.0] | ⚠️ limite | -17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; piloté par le paramètre first_flowering_age_years = 28 (± 1 an) |
-| 173 | picea_abies | `wsv_first_cones` âge de la première floraison simulée | 30.0–40.0 years (range) | 29.0 [29.0–30.0] | ⚠️ limite | -17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; piloté par le paramètre first_flowering_age_years = 28 (± 1 an) |
-| 174 | pinus_sylvestris | `wen_dbh` DBH à 150 ans (âge de référence « adulte » du banc) | 100–170 cm (range) | 89.7 [87.9–94.2] (4 graines debout) | ⚠️ limite | -34 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
-| 175 | pinus_sylvestris | `wde_longevity` âge médian de mort du tronc, émergent (4/5 graines mortes en 350 ans) | 600 years (max_record) | 218 [70.0–350] | ⚠️ limite | -64 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 1 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
-| 176 | abies_alba | `wpl_dbh` DBH maximal sur 400 ans simulés | 676 cm (max_record) | 191 [17.9–193] | ⚠️ limite | -72 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
-| 177 | fagus_sylvatica | `wpe_open_height` hauteur à 150 ans (âge de référence « adulte » du banc) | 20.0 m (single) | 28.7 [28.5–29.4] | ℹ️ indicatif | +44 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
-| 178 | quercus_robur | `wp_fr_first_fruit` âge de la première floraison simulée | 60.0 years (single) | 36.0 [36.0–37.0] | ℹ️ indicatif | -40 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 35 (± 1 an) |
-| 179 | castanea_sativa | `wpe_diameter` DBH à 300 ans (âge de référence « adulte » du banc) | 200 cm (single) | 139 [136–140] | ℹ️ indicatif | -30 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
-| 180 | pinus_sylvestris | `wen_needle_length` paramètre leaf.length_cm (texture du feuillage) | 2.50–5.00 cm (range) | 5.50 | ⚠️ limite | +47 % | ●○○ 0.24 (wikipedia/via_wikipedia) | paramètre | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 148 | physics | `thigmo_jaffe1973` la stimulation freine l'élongation | qualitatif qualitative (single) | chêne 40 ans, hauteur : avec acclimatation 16.94, sans 16.94 (+0.0 %) ; plus faible avec acclimatation pour 1 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable | ❌ hors plage |  | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | chêne 40 ans, hauteur : avec acclimatation 16.94, sans 16.94 (+0.0 %) ; plus faible avec acclimatation pour 1 graine(s) sur 5 ; écart < 3 % : pas d'effet détectable ; plantes herbacées (via Wikipédia) ; le moteur ne réduit pas l'élongation |
+| 149 | quercus_robur | `wp_pl_root_depth` profondeur racinaire à 40 ans | 5.00 m (single) | 1.98 [1.65–2.12] | ℹ️ indicatif | -60 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
+| 150 | fagus_sylvatica | `wpd_age_record` âge médian de mort du tronc, émergent (5/5 graines mortes en 350 ans) | 546 years (single) | 240 [218–289] | ℹ️ indicatif | -56 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | valeur unique publiée : écart rapporté ;  |
+| 151 | picea_abies | `wfr_longevity` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | 500 years (single) | 248 [51.0–350] | ℹ️ indicatif | -50 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | valeur unique publiée : écart rapporté ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
+| 152 | betula_pendula | `wpe_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 153 | betula_pendula | `wpd_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 154 | betula_pendula | `wpf_height` hauteur à 60 ans (âge de référence « adulte » du banc) | 15.0–25.0 m (range) | 25.1 [25.1–25.1] (3 graines debout) | ⚠️ limite | +26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 155 | carpinus_betulus | `wpf_longevity` âge médian de mort du tronc, émergent (5/5 graines mortes en 200 ans) | ≤ 100 years (max_record) | 109 [100–115] | ⚠️ limite | +9 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | au-dessus du record, de moins de 10 % ;  |
+| 156 | quercus_robur | `wp_nl_crown_width` largeur de houppier à 150 ans | ≤ 25.0 m (range) | 32.5 [31.1–34.1] (4 graines debout) | ⚠️ limite | +30 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | borne ≤ 25 manquée, à moins d'un facteur 1,5 ;  |
+| 157 | quercus_robur | `wp_nl_acorn_fall` maturité des fruits (jour moyen) | 274–334 day of year (range) | 265 [263–266] | ⚠️ limite | -13 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; chute des glands, lue comme maturité |
+| 158 | acer_pseudoplatanus | `wpe_flowering` pleine floraison (30 % de la floraison), jour moyen des années fleuries | 121–181 day of year (range) | 112 [112–113] | ⚠️ limite | -26 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 159 | fraxinus_excelsior | `wpd_shoot` accroissement annuel maximal de la hauteur (cm/an) sur la vie simulée | ≤ 150 cm/yr (max_record) | 73.8 [73.2–74.7] | ⚠️ limite | -51 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
+| 160 | fagus_sylvatica | `wpe_oldest` âge médian de mort du tronc, émergent (5/5 graines mortes en 350 ans) | ≥ 500 years (max_record) | 240 [218–289] | ⚠️ limite | -52 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ;  |
+| 161 | fagus_sylvatica | `wpf_budburst` date moyenne de débourrement (jour, ans 5 et +), climat de Rennes | 115–125 day of year (range) | 113 [113–115] | ⚠️ limite | -6 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 162 | prunus_avium | `wpde_dbh` DBH à 70 ans (âge de référence « adulte » du banc) | ≥ 60.0 cm (single) | 59.7 [58.1–62.5] | ⚠️ limite | -1 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | borne ≥ 60 manquée, à moins d'un facteur 1,5 ;  |
+| 163 | prunus_avium | `wpde_longevity_max` âge médian de mort du tronc, émergent (5/5 graines mortes en 150 ans) | 300 years (max_record) | 108 [79.0–146] | ⚠️ limite | -64 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ;  |
+| 164 | prunus_avium | `wpcs_fruit` maturité des fruits (jour moyen) | 182–212 doy (range) | 176 [176–180] | ⚠️ limite | -11 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 165 | corylus_avellana | `de_wiki_height` hauteur à 50 ans (âge de référence « adulte » du banc) | 5.00–6.00 m (range) | 6.04 [5.99–6.23] | ⚠️ limite | +10 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 166 | corylus_avellana | `en_wiki_height_max` hauteur maximale sur 100 ans simulés | 15.0 m (max_record) | 6.69 [6.44–6.88] | ⚠️ limite | -55 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
+| 167 | malus_domestica | `de_wiki_freestanding_height` hauteur à 50 ans (âge de référence « adulte » du banc) | 8.00–15.0 m (range) | 7.33 [7.14–7.37] | ⚠️ limite | -36 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 168 | picea_abies | `wen_oldest_ring_dated` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | 532 years (max_record) | 248 [51.0–350] | ⚠️ limite | -53 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
+| 169 | picea_abies | `wde_height_typ` hauteur à 150 ans (âge de référence « adulte » du banc) | 40.0–62.0 m (range) | 39.1 [39.1–39.1] (4 graines debout) | ⚠️ limite | -23 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 170 | picea_abies | `wde_longevity` âge médian de mort du tronc, émergent (3/5 graines mortes en 350 ans) | ≤ 600 years (max_record) | 248 [51.0–350] | ⚠️ limite | -59 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 2 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
+| 171 | picea_abies | `wde_first_flowering` âge de la première floraison simulée | 30.0–40.0 years (range) | 29.0 [29.0–30.0] | ⚠️ limite | -17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; piloté par le paramètre first_flowering_age_years = 28 (± 1 an) |
+| 172 | picea_abies | `wsv_first_cones` âge de la première floraison simulée | 30.0–40.0 years (range) | 29.0 [29.0–30.0] | ⚠️ limite | -17 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ; piloté par le paramètre first_flowering_age_years = 28 (± 1 an) |
+| 173 | pinus_sylvestris | `wen_dbh` DBH à 150 ans (âge de référence « adulte » du banc) | 100–170 cm (range) | 89.7 [87.9–94.2] (4 graines debout) | ⚠️ limite | -34 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | hors plage, dans 1,5 fois sa demi-largeur ;  |
+| 174 | pinus_sylvestris | `wde_longevity` âge médian de mort du tronc, émergent (4/5 graines mortes en 350 ans) | 600 years (max_record) | 218 [70.0–350] | ⚠️ limite | -64 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé, calage | très en dessous du record (< 50 %) ; 1 graine(s) encore vivante(s) à 350 ans, comptée(s) à 350 ans |
+| 175 | abies_alba | `wpl_dbh` DBH maximal sur 400 ans simulés | 676 cm (max_record) | 191 [17.9–193] | ⚠️ limite | -72 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | très en dessous du record (< 50 %) ;  |
+| 176 | fagus_sylvatica | `wpe_open_height` hauteur à 150 ans (âge de référence « adulte » du banc) | 20.0 m (single) | 28.7 [28.5–29.4] | ℹ️ indicatif | +44 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
+| 177 | quercus_robur | `wp_fr_first_fruit` âge de la première floraison simulée | 60.0 years (single) | 36.0 [36.0–37.0] | ℹ️ indicatif | -40 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ; piloté par le paramètre first_flowering_age_years = 35 (± 1 an) |
+| 178 | castanea_sativa | `wpe_diameter` DBH à 300 ans (âge de référence « adulte » du banc) | 200 cm (single) | 139 [136–140] | ℹ️ indicatif | -30 % | ●○○ 0.24 (wikipedia/via_wikipedia) | simulé | valeur unique publiée : écart rapporté ;  |
+| 179 | pinus_sylvestris | `wen_needle_length` paramètre leaf.length_cm (texture du feuillage) | 2.50–5.00 cm (range) | 5.50 | ⚠️ limite | +47 % | ●○○ 0.24 (wikipedia/via_wikipedia) | paramètre | hors plage, dans 1,5 fois sa demi-largeur ;  |
 
 ## Sources divergentes
 
@@ -666,14 +665,14 @@ Mort du tronc (émergente) : 5/5 graines mortes en 150 ans, âges [33, 53, 101, 
 | 25 | 17.8 [17.8–17.9] | 17.2 [16.5–18.6] | 5.1 [4.7–5.2] | 3.5 [2.9–3.8] | 1.3 [0.7–1.4] | 39.5 [37.9–42.0] | 27.2 [25.5–29.0] | 43.8 [25.9–49.6] | 0.2 [0.1–0.2] |
 | 30 | 19.7 [19.6–19.7] | 20.0 [19.3–21.8] | 5.6 [5.1–5.8] | 2.8 [2.6–3.3] | 1.4 [0.8–1.5] | 42.8 [41.4–45.3] | 28.7 [27.1–30.7] | 47.5 [22.5–57.8] | 0.2 [0.2–0.3] |
 | 40 | 22.3 [22.3–22.4] | 25.1 [24.3–26.4] | 6.0 [5.8–6.6] | 2.1 [-0.0–2.5] | 1.6 [0.8–1.8] | 49.0 [47.2–50.8] | 31.9 [29.2–33.8] | 56.4 [51.2–70.3] | 0.4 [0.3–0.4] |
-| 50 | 24.0 [24.0–24.0] | 29.8 [28.3–30.7] | 7.0 [6.5–7.3] | 2.2 [-0.0–2.4] | 1.7 [0.8–1.9] | 50.9 [50.5–51.7] | 34.6 [30.3–35.8] | 66.0 [52.0–99.6] | 0.6 [0.5–0.6] |
-| 56 | 24.7 [24.7–24.7] | 31.9 [30.7–33.7] | 7.6 [7.0–8.2] | 2.2 [-0.0–2.6] | 1.8 [0.8–2.0] | 51.4 [51.2–51.5] | 34.9 [34.1–35.4] | 101 [52.7–102] | 0.7 [0.6–0.8] |
-| 59 | 25.0 [25.0–25.0] | 33.2 [31.9–35.2] | 7.9 [7.1–8.2] | 1.9 [-0.0–2.4] | 1.8 [0.9–2.0] | 51.7 [51.4–51.9] | 35.6 [35.2–36.9] | 89.5 [77.3–111] | 0.7 [0.7–0.8] |
-| 60 | 25.1 [25.1–25.1] | 33.6 [32.3–35.6] | 7.9 [7.2–8.3] | 1.9 [-0.0–2.4] | 1.8 [0.9–2.0] | 51.7 [51.6–51.9] | 35.8 [32.7–37.2] | 94.5 [72.0–112] | 0.8 [0.7–0.9] |
-| 70 | 25.8 [25.8–25.8] | 38.4 [35.6–40.4] | 9.2 [8.2–9.3] | 1.4 [-0.0–2.5] | 1.8 [0.9–2.0] | 52.8 [52.7–53.1] | 38.2 [33.4–38.9] | 137 [72.7–141] | 1.0 [0.9–1.1] |
-| 75 | 26.0 [26.0–26.0] | 40.8 [37.3–42.3] | 9.6 [8.3–10.4] | 1.6 [-0.0–2.4] | 1.9 [0.9–2.0] | 53.8 [53.6–53.8] | 39.3 [36.1–40.0] | 97.9 [89.3–158] | 1.2 [1.0–1.3] |
-| 80 | 26.2 [26.2–26.2] | 42.6 [39.0–44.4] | 10.2 [8.4–10.8] | 1.7 [-0.0–2.2] | 1.9 [0.9–2.0] | 54.0 [53.8–54.5] | 39.1 [34.1–39.9] | 167 [103–173] | 1.3 [1.1–1.4] |
-| 100 | 27.0 [26.9–27.0] | 50.9 [45.5–52.7] | 11.5 [10.2–12.2] | 1.8 [-0.0–2.1] | 1.9 [0.9–2.0] | 55.2 [54.8–56.0] | 41.8 [41.0–41.9] | 165 [137–293] | 2.0 [1.5–2.1] |
+| 50 | 24.0 [24.0–24.0] | 29.8 [28.3–30.7] | 7.0 [6.5–7.3] | 2.2 [-0.0–2.4] | 1.7 [0.8–1.9] | 50.9 [50.5–51.7] | 28.2 [23.2–32.5] | 66.0 [52.0–99.6] | 0.6 [0.5–0.6] |
+| 56 | 24.7 [24.7–24.7] | 31.9 [30.7–33.7] | 7.6 [7.0–8.2] | 2.2 [-0.0–2.6] | 1.8 [0.8–2.0] | 51.4 [51.2–51.5] | 27.6 [25.8–30.4] | 101 [52.7–102] | 0.7 [0.6–0.8] |
+| 59 | 25.0 [25.0–25.0] | 33.2 [31.9–35.2] | 7.9 [7.1–8.2] | 1.9 [-0.0–2.4] | 1.8 [0.9–2.0] | 51.7 [51.4–51.9] | 25.0 [24.1–27.6] | 89.5 [77.3–111] | 0.7 [0.7–0.8] |
+| 60 | 25.1 [25.1–25.1] | 33.6 [32.3–35.6] | 7.9 [7.2–8.3] | 1.9 [-0.0–2.4] | 1.8 [0.9–2.0] | 51.7 [51.6–51.9] | 27.6 [24.4–33.2] | 94.5 [72.0–112] | 0.8 [0.7–0.9] |
+| 70 | 25.8 [25.8–25.8] | 38.4 [35.6–40.4] | 9.2 [8.2–9.3] | 1.4 [-0.0–2.5] | 1.8 [0.9–2.0] | 52.8 [52.7–53.1] | 31.3 [30.2–33.4] | 137 [72.7–141] | 1.0 [0.9–1.1] |
+| 75 | 26.0 [26.0–26.0] | 40.8 [37.3–42.3] | 9.6 [8.3–10.4] | 1.6 [-0.0–2.4] | 1.9 [0.9–2.0] | 53.8 [53.6–53.8] | 28.7 [25.8–37.9] | 97.9 [89.3–158] | 1.2 [1.0–1.3] |
+| 80 | 26.2 [26.2–26.2] | 42.6 [39.0–44.4] | 10.2 [8.4–10.8] | 1.7 [-0.0–2.2] | 1.9 [0.9–2.0] | 54.0 [53.8–54.5] | 29.1 [27.4–29.3] | 167 [103–173] | 1.3 [1.1–1.4] |
+| 100 | 27.0 [26.9–27.0] | 50.9 [45.5–52.7] | 11.5 [10.2–12.2] | 1.8 [-0.0–2.1] | 1.9 [0.9–2.0] | 55.2 [54.8–56.0] | 25.6 [23.1–35.4] | 165 [137–293] | 2.0 [1.5–2.1] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 98.4 [97.6–101] (σ 10.2 [9.1–11.7]) ; début de coloration 268 [268–269] ; fin de coloration 311 [310–313] ; arbre nu 329 [328–331] ; pleine floraison 109 [108–112] (σ 10.1 [9.8–11.8]) ; maturité des fruits 226 [225–228] ; première floraison à 9.0 [9.0–10.0] ans.
 
@@ -710,7 +709,7 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 20 | 13.4 [13.3–13.6] | 14.4 [13.2–14.8] | 4.5 [4.3–5.0] | 4.6 [4.1–4.8] | 1.3 [1.3–1.4] | 31.1 [22.7–31.5] | 27.7 [20.0–28.7] | 28.7 [26.5–42.5] | 0.1 [0.1–0.1] |
 | 25 | 16.4 [16.3–16.6] | 18.5 [17.4–19.1] | 4.9 [4.9–5.6] | 4.1 [3.7–4.3] | 1.4 [1.3–1.6] | 33.7 [29.5–38.3] | 29.0 [28.5–30.3] | 42.4 [36.9–47.0] | 0.2 [0.1–0.2] |
 | 30 | 19.1 [19.0–19.3] | 22.1 [21.1–23.0] | 5.5 [5.2–6.0] | 3.7 [3.4–3.9] | 1.6 [1.4–1.7] | 40.0 [39.4–41.2] | 29.9 [28.5–30.9] | 44.3 [37.1–56.6] | 0.2 [0.2–0.3] |
-| 40 | 23.0 [22.8–23.0] | 28.5 [28.3–29.1] | 6.7 [6.3–7.1] | 3.3 [2.6–3.7] | 2.0 [1.8–2.1] | 43.2 [40.5–44.3] | 24.2 [23.6–29.5] | 80.9 [63.1–93.8] | 0.5 [0.5–0.5] |
+| 40 | 23.0 [22.8–23.0] | 28.5 [28.3–29.1] | 6.7 [6.3–7.1] | 3.3 [2.6–3.7] | 2.0 [1.8–2.1] | 43.2 [40.5–44.3] | 24.2 [23.6–29.0] | 80.9 [63.1–93.8] | 0.5 [0.5–0.5] |
 | 50 | 24.2 [23.8–24.4] | 34.5 [34.4–35.5] | 8.3 [7.6–9.0] | 3.0 [2.6–3.4] | 2.1 [2.0–2.4] | 44.5 [44.1–46.1] | 27.1 [25.8–31.8] | 126 [91.4–155] | 0.7 [0.7–0.8] |
 | 60 | 25.2 [24.9–25.5] | 40.1 [39.7–41.4] | 10.5 [9.2–11.0] | 2.8 [2.6–3.0] | 2.1 [2.1–2.5] | 45.3 [44.8–46.9] | 26.9 [23.4–32.6] | 186 [131–193] | 1.1 [1.0–1.1] |
 | 70 | 25.9 [25.6–26.3] | 46.0 [45.0–47.1] | 12.7 [11.1–13.9] | 2.9 [2.2–3.2] | 2.1 [2.1–2.5] | 46.0 [44.9–48.3] | 27.1 [21.5–33.4] | 252 [227–322] | 1.5 [1.4–1.6] |
@@ -721,9 +720,9 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 150 | 30.4 [30.3–30.7] | 86.1 [85.0–87.1] | 24.1 [22.9–25.9] | 2.1 [1.9–2.3] | 2.1 [2.1–2.6] | 45.7 [43.8–46.7] | 32.1 [26.7–35.3] | 942 [854–1337] | 7.2 [6.9–7.5] |
 | 200 | 32.2 [31.5–32.5] | 106 [104–106] | 28.7 [27.5–29.2] | 1.8 [1.6–1.9] | 2.1 [2.1–2.6] | 45.2 [42.7–46.5] | 31.7 [27.3–34.2] | 1442 [1343–1549] | 12.0 [11.3–12.1] |
 | 250 | 33.0 [32.6–33.3] | 123 [120–123] | 31.8 [31.1–31.9] | 1.8 [1.6–1.9] | 2.1 [2.1–2.6] | 44.7 [42.7–47.3] | 34.4 [32.3–35.6] | 1631 [1581–2285] | 17.1 [16.8–17.5] |
-| 300 | 33.7 [33.5–34.4] | 139 [136–140] | 35.6 [34.7–36.5] | 1.5 [1.2–1.6] | 2.1 [2.1–2.6] | 45.1 [43.2–48.0] | 35.6 [34.5–38.5] | 2096 [2050–2337] | 23.3 [23.1–23.7] |
-| 350 | 34.0 [33.8–34.4] | 152 [149–154] | 39.2 [38.8–40.4] | 1.3 [1.1–1.5] | 2.1 [2.1–2.6] | 48.3 [45.1–52.1] | 37.5 [35.5–41.1] | 2519 [2303–3223] | 29.1 [28.6–29.8] |
-| 400 | 34.7 [34.3–35.0] | 165 [162–166] | 42.0 [40.9–42.7] | 1.2 [1.1–1.3] | 2.1 [2.1–2.6] | 49.0 [45.9–53.5] | 38.1 [36.8–42.3] | 3434 [3246–3712] | 35.8 [34.9–36.5] |
+| 300 | 33.7 [33.5–34.4] | 139 [136–140] | 35.6 [34.7–36.5] | 1.5 [1.2–1.6] | 2.1 [2.1–2.6] | 45.1 [43.2–48.0] | 35.4 [33.0–35.6] | 2096 [2050–2337] | 23.3 [23.1–23.7] |
+| 350 | 34.0 [33.8–34.4] | 152 [149–154] | 39.2 [38.8–40.4] | 1.3 [1.1–1.5] | 2.1 [2.1–2.6] | 47.6 [45.1–51.4] | 37.5 [26.5–41.1] | 2519 [2303–3223] | 29.1 [28.6–29.8] |
+| 400 | 34.7 [34.3–35.0] | 165 [162–166] | 42.0 [40.9–42.7] | 1.2 [1.1–1.3] | 2.1 [2.1–2.6] | 49.0 [45.9–53.5] | 38.1 [25.6–42.3] | 3434 [3246–3712] | 35.8 [34.9–36.5] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 118 [117–118] (σ 11.5 [11.2–11.6]) ; début de coloration 274 [274–274] ; fin de coloration 313 [313–314] ; arbre nu 334 [334–335] ; pleine floraison 174 [174–174] (σ 5.2 [4.6–5.3]) ; maturité des fruits 280 [280–280] ; première floraison à 29.0 [29.0–30.0] ans.
 
@@ -739,7 +738,7 @@ Mort du tronc (émergente) : 1/5 graines mortes en 400 ans, âges [122], 4 vivan
 | 20 | 9.2 [9.2–9.2] | 15.7 [14.7–16.4] | 5.1 [4.8–5.3] | 5.3 [4.7–5.4] | 1.5 [1.4–1.5] | 30.1 [28.8–31.5] | 28.8 [27.9–31.1] | 36.1 [32.9–44.2] | 0.1 [0.1–0.1] |
 | 25 | 11.4 [11.4–11.5] | 20.8 [19.7–21.4] | 5.7 [5.4–5.8] | 5.0 [4.4–5.1] | 1.6 [1.6–1.6] | 33.3 [31.9–41.0] | 30.1 [27.2–41.9] | 51.8 [43.9–53.8] | 0.2 [0.1–0.2] |
 | 30 | 13.5 [13.5–13.6] | 24.8 [24.1–26.0] | 6.3 [6.2–6.5] | 4.4 [3.8–4.6] | 1.7 [1.6–1.9] | 35.5 [32.7–37.3] | 30.3 [28.1–32.3] | 56.9 [40.0–71.0] | 0.3 [0.2–0.3] |
-| 40 | 16.9 [16.8–17.0] | 32.8 [32.4–33.2] | 8.2 [7.9–8.6] | 4.0 [3.3–4.1] | 2.0 [1.7–2.1] | 48.2 [47.2–49.1] | 31.4 [30.9–35.4] | 118 [107–122] | 0.5 [0.5–0.5] |
+| 40 | 16.9 [16.8–17.0] | 32.8 [32.4–33.2] | 8.2 [7.9–8.6] | 4.0 [3.3–4.1] | 2.0 [1.7–2.1] | 47.6 [45.5–49.1] | 31.4 [30.9–35.4] | 118 [107–122] | 0.5 [0.5–0.5] |
 | 50 | 18.1 [18.0–18.5] | 40.8 [39.6–40.8] | 11.1 [11.0–12.2] | 4.0 [3.4–4.3] | 2.1 [1.7–2.4] | 48.4 [47.1–49.6] | 34.1 [32.3–34.7] | 230 [169–274] | 0.9 [0.8–0.9] |
 | 60 | 19.5 [19.2–19.7] | 48.7 [47.5–49.8] | 15.0 [14.3–16.3] | 4.0 [3.9–4.4] | 2.1 [1.8–2.4] | 48.5 [46.1–49.1] | 31.4 [29.9–34.4] | 375 [305–460] | 1.5 [1.4–1.6] |
 | 70 | 20.6 [20.1–20.8] | 57.1 [54.8–59.0] | 18.1 [17.0–20.9] | 4.2 [3.4–4.7] | 2.1 [2.1–2.4] | 47.4 [45.0–48.0] | 30.8 [30.3–34.3] | 456 [426–740] | 2.2 [2.0–2.5] |
@@ -768,20 +767,20 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 20 | 9.2 [9.2–9.3] | 15.5 [14.2–15.6] | 4.6 [4.2–5.0] | 5.1 [4.4–5.3] | 1.7 [1.7–1.8] | 32.9 [30.1–46.5] | 30.1 [29.4–45.2] | 32.9 [27.2–37.8] | 0.1 [0.1–0.1] |
 | 25 | 11.5 [11.4–11.6] | 20.0 [19.1–20.5] | 5.2 [4.8–5.5] | 4.9 [4.4–5.1] | 1.9 [1.8–1.9] | 36.2 [32.6–38.7] | 32.1 [28.7–36.4] | 47.6 [34.7–54.0] | 0.2 [0.1–0.2] |
 | 30 | 13.6 [13.5–13.7] | 24.6 [23.4–25.0] | 5.9 [5.5–6.2] | 4.4 [3.7–4.6] | 1.9 [1.9–1.9] | 37.4 [33.3–37.7] | 31.9 [29.4–38.5] | 53.0 [31.2–62.9] | 0.3 [0.2–0.3] |
-| 40 | 17.4 [17.4–17.6] | 31.9 [31.2–32.9] | 7.9 [7.8–8.1] | 4.0 [3.1–4.1] | 2.0 [2.0–2.1] | 48.7 [44.4–50.9] | 31.8 [30.4–38.5] | 102 [84.6–120] | 0.5 [0.5–0.5] |
-| 50 | 19.5 [19.3–20.0] | 39.8 [38.0–40.8] | 10.0 [9.6–10.4] | 3.7 [3.3–4.1] | 2.1 [2.0–2.1] | 50.7 [50.6–51.1] | 36.6 [30.5–38.6] | 154 [140–215] | 0.9 [0.8–0.9] |
-| 60 | 21.2 [21.1–22.0] | 47.3 [45.4–48.3] | 12.4 [12.2–12.5] | 3.6 [3.6–3.7] | 2.1 [2.1–2.1] | 50.1 [47.9–51.0] | 33.2 [27.3–38.0] | 257 [246–275] | 1.4 [1.2–1.4] |
+| 40 | 17.4 [17.4–17.6] | 31.9 [31.2–32.9] | 7.9 [7.8–8.1] | 4.0 [3.1–4.1] | 2.0 [2.0–2.1] | 47.7 [44.2–49.6] | 31.8 [28.5–34.2] | 102 [84.6–120] | 0.5 [0.5–0.5] |
+| 50 | 19.5 [19.3–20.0] | 39.8 [38.0–40.8] | 10.0 [9.6–10.4] | 3.7 [3.3–4.1] | 2.1 [2.0–2.1] | 50.7 [47.1–51.1] | 32.6 [29.3–38.6] | 154 [140–215] | 0.9 [0.8–0.9] |
+| 60 | 21.2 [21.1–22.0] | 47.3 [45.4–48.3] | 12.4 [12.2–12.5] | 3.6 [3.6–3.7] | 2.1 [2.1–2.1] | 50.1 [47.9–51.0] | 33.1 [27.3–37.0] | 257 [246–275] | 1.4 [1.2–1.4] |
 | 70 | 22.8 [22.6–23.6] | 55.2 [52.2–56.5] | 14.7 [14.1–15.3] | 4.0 [3.2–4.2] | 2.1 [2.1–2.1] | 49.1 [48.7–50.8] | 33.1 [29.7–38.1] | 376 [290–416] | 2.0 [1.8–2.2] |
-| 80 | 24.2 [23.9–25.0] | 62.5 [59.7–63.7] | 17.1 [16.7–17.4] | 3.6 [3.2–4.3] | 2.1 [2.1–2.1] | 50.0 [48.2–51.3] | 35.1 [32.1–38.2] | 517 [440–556] | 2.8 [2.5–2.9] |
+| 80 | 24.2 [23.9–25.0] | 62.5 [59.7–63.7] | 17.1 [16.7–17.4] | 3.6 [3.2–4.3] | 2.1 [2.1–2.1] | 50.0 [48.2–51.3] | 34.2 [32.1–38.2] | 517 [440–556] | 2.8 [2.5–2.9] |
 | 100 | 27.0 [26.4–27.7] | 75.9 [73.6–78.2] | 21.3 [20.9–22.5] | 3.4 [3.4–3.9] | 2.1 [2.1–2.1] | 48.8 [46.9–52.4] | 35.6 [27.1–37.3] | 793 [712–1046] | 4.9 [4.6–5.1] |
-| 130 | 30.0 [29.6–30.4] | 94.3 [92.3–97.0] | 26.2 [24.5–27.3] | 2.7 [2.7–2.8] | 2.1 [2.1–2.1] | 47.6 [46.3–52.5] | 35.7 [33.1–39.4] | 1033 [836–1399] | 9.0 [8.5–9.4] |
-| 144 | 30.9 [30.8–31.4] | 102 [99.9–104] | 27.8 [25.3–28.1] | 2.4 [2.3–2.7] | 2.1 [2.1–2.1] | 47.3 [46.1–52.5] | 36.0 [32.3–39.5] | 1095 [811–1331] | 11.1 [10.6–11.3] |
-| 150 | 31.2 [31.2–31.8] | 105 [103–107] | 28.4 [26.0–28.4] | 2.6 [2.2–2.7] | 2.1 [2.1–2.1] | 47.6 [46.0–52.3] | 35.2 [34.5–39.7] | 1327 [974–1552] | 11.8 [11.4–12.3] |
-| 200 | 33.7 [33.6–33.9] | 128 [125–129] | 31.6 [31.5–33.3] | 2.0 [2.0–2.2] | 2.1 [2.1–2.1] | 46.5 [45.3–52.5] | 36.5 [35.1–41.8] | 1727 [1554–2264] | 19.8 [19.5–20.2] |
-| 250 | 34.8 [33.6–35.0] | 149 [144–151] | 35.9 [35.2–36.6] | 2.0 [1.8–2.0] | 2.1 [2.1–2.1] | 47.8 [45.8–54.1] | 38.8 [36.9–43.2] | 2147 [1936–2791] | 28.9 [28.4–29.7] |
-| 300 | 35.1 [34.4–36.1] | 166 [161–169] | 39.6 [38.8–40.2] | 1.6 [1.4–1.7] | 2.1 [2.1–2.1] | 49.9 [46.4–56.9] | 39.2 [37.3–45.7] | 2615 [2372–2724] | 38.6 [37.1–39.6] |
-| 350 | 35.9 [34.9–36.4] | 180 [177–184] | 42.4 [41.9–43.2] | 1.3 [1.2–1.5] | 2.1 [2.1–2.1] | 50.0 [46.3–60.9] | 39.5 [37.1–48.3] | 2877 [2771–3552] | 48.2 [45.8–49.6] |
-| 400 | 36.5 [35.7–36.9] | 193 [189–196] | 45.0 [43.5–46.0] | 1.2 [1.2–1.3] | 2.1 [2.1–2.1] | 49.7 [45.4–60.9] | 40.2 [37.4–49.5] | 3848 [3827–3975] | 57.7 [54.4–58.9] |
+| 130 | 30.0 [29.6–30.4] | 94.3 [92.3–97.0] | 26.2 [24.5–27.3] | 2.7 [2.7–2.8] | 2.1 [2.1–2.1] | 47.6 [46.3–52.5] | 35.6 [32.2–39.4] | 1033 [836–1399] | 9.0 [8.5–9.4] |
+| 144 | 30.9 [30.8–31.4] | 102 [99.9–104] | 27.8 [25.3–28.1] | 2.4 [2.3–2.7] | 2.1 [2.1–2.1] | 47.3 [46.1–52.5] | 35.0 [32.3–39.5] | 1095 [811–1331] | 11.1 [10.6–11.3] |
+| 150 | 31.2 [31.2–31.8] | 105 [103–107] | 28.4 [26.0–28.4] | 2.6 [2.2–2.7] | 2.1 [2.1–2.1] | 47.6 [46.0–52.3] | 35.0 [32.3–36.8] | 1327 [974–1552] | 11.8 [11.4–12.3] |
+| 200 | 33.7 [33.6–33.9] | 128 [125–129] | 31.6 [31.5–33.3] | 2.0 [2.0–2.2] | 2.1 [2.1–2.1] | 46.5 [45.3–52.5] | 36.5 [35.1–39.7] | 1727 [1554–2264] | 19.8 [19.5–20.2] |
+| 250 | 34.8 [33.6–35.0] | 149 [144–151] | 35.9 [35.2–36.6] | 2.0 [1.8–2.0] | 2.1 [2.1–2.1] | 47.8 [45.8–54.1] | 37.6 [33.3–42.1] | 2147 [1936–2791] | 28.9 [28.4–29.7] |
+| 300 | 35.1 [34.4–36.1] | 166 [161–169] | 39.6 [38.8–40.2] | 1.6 [1.4–1.7] | 2.1 [2.1–2.1] | 49.9 [46.4–56.9] | 30.5 [26.2–44.0] | 2615 [2372–2724] | 38.6 [37.1–39.6] |
+| 350 | 35.9 [34.9–36.4] | 180 [177–184] | 42.4 [41.9–43.2] | 1.3 [1.2–1.5] | 2.1 [2.1–2.1] | 50.0 [46.3–60.9] | 34.5 [28.0–39.5] | 2877 [2771–3552] | 48.2 [45.8–49.6] |
+| 400 | 36.5 [35.7–36.9] | 193 [189–196] | 45.0 [43.5–46.0] | 1.2 [1.2–1.3] | 2.1 [2.1–2.1] | 46.0 [44.4–60.9] | 37.4 [27.6–49.5] | 3848 [3827–3975] | 57.7 [54.4–58.9] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 113 [112–114] (σ 11.8 [11.4–11.9]) ; début de coloration 270 [270–270] ; fin de coloration 298 [297–298] ; arbre nu 319 [318–319] ; pleine floraison 122 [120–122] (σ 11.4 [11.3–11.6]) ; maturité des fruits 268 [267–269] ; première floraison à 46.0 [46.0–47.0] ans.
 
@@ -809,7 +808,7 @@ Mort du tronc (émergente) : 5/5 graines mortes en 400 ans, âges [297, 361, 366
 | 200 | 31.2 [30.9–31.6] | 101 [98.6–103] | 33.5 [33.1–35.0] | 1.6 [1.5–1.7] | 2.1 [2.1–2.5] | 37.9 [36.2–41.9] | 28.5 [24.7–31.0] | 1792 [1610–2253] | 14.5 [13.7–15.1] |
 | 250 | 32.5 [32.1–32.7] | 116 [113–119] | 37.6 [36.9–39.9] | 1.5 [1.3–1.5] | 2.1 [2.1–2.5] | 36.2 [33.7–41.3] | 29.4 [27.4–32.3] | 2331 [1994–2936] | 20.1 [19.9–22.0] |
 | 300 | 33.5 [32.9–33.7] | 127 [126–132] | 42.7 [41.6–44.7] | 1.2 [1.1–1.3] | 2.2 [2.1–2.5] | 37.2 [33.6–41.5] | 29.9 [27.9–34.9] | 2806 [2684–2933] | 26.6 [26.3–28.3] |
-| 350 | 34.2 [33.5–34.3] | 138 [137–143] | 46.9 [46.5–47.3] | 1.1 [-0.0–1.1] | 2.2 [2.1–2.5] | 36.4 [32.7–41.4] | 28.8 [28.0–32.1] | 3184 [3093–3646] | 33.4 [32.5–35.2] |
+| 350 | 34.2 [33.5–34.3] | 138 [137–143] | 46.9 [46.5–47.3] | 1.1 [-0.0–1.1] | 2.2 [2.1–2.5] | 36.4 [31.6–41.1] | 28.8 [28.0–32.1] | 3184 [3093–3646] | 33.4 [32.5–35.2] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 104 [103–105] (σ 11.5 [11.0–12.0]) ; début de coloration 268 [268–268] ; fin de coloration 312 [311–312] ; arbre nu 333 [332–333] ; pleine floraison 112 [112–113] (σ 11.7 [11.0–11.9]) ; maturité des fruits 260 [259–261] ; première floraison à 21.0 [21.0–22.0] ans.
 
@@ -851,17 +850,17 @@ Mort du tronc (émergente) : 5/5 graines mortes en 350 ans, âges [218, 234, 240
 | 20 | 8.2 [8.2–8.3] | 11.7 [11.1–12.9] | 3.2 [2.9–3.5] | 4.1 [3.7–4.5] | 1.1 [0.6–1.1] | 39.4 [37.6–40.7] | 39.8 [37.7–41.9] | 13.3 [10.4–16.3] | 0.0 [0.0–0.1] |
 | 25 | 10.3 [10.2–10.4] | 15.6 [15.0–16.9] | 3.7 [3.4–3.9] | 3.9 [3.5–4.1] | 1.2 [0.6–1.2] | 38.6 [35.0–39.7] | 38.1 [31.5–39.0] | 18.1 [16.0–23.5] | 0.1 [0.1–0.1] |
 | 30 | 12.3 [12.2–12.4] | 18.8 [18.4–21.0] | 4.0 [3.9–4.2] | 3.4 [3.2–4.0] | 1.3 [0.7–1.3] | 41.4 [41.0–42.4] | 36.6 [34.0–40.6] | 19.6 [13.9–27.2] | 0.1 [0.1–0.2] |
-| 40 | 16.1 [16.0–16.2] | 25.6 [25.3–27.1] | 4.9 [4.8–5.0] | 3.2 [2.6–3.8] | 1.4 [0.7–1.5] | 47.4 [43.2–50.1] | 32.3 [30.2–34.6] | 32.3 [29.3–40.6] | 0.3 [0.3–0.3] |
-| 50 | 19.2 [19.0–19.2] | 31.9 [31.5–32.9] | 5.9 [5.6–6.2] | 2.9 [2.7–3.3] | 1.5 [0.7–1.6] | 56.0 [52.2–57.2] | 32.9 [30.2–36.0] | 47.2 [40.9–66.8] | 0.6 [0.5–0.6] |
-| 60 | 20.5 [20.3–20.6] | 38.0 [36.5–39.2] | 7.1 [6.8–7.5] | 2.9 [2.5–3.3] | 1.6 [0.8–1.7] | 58.7 [57.8–60.0] | 43.9 [35.3–44.8] | 67.4 [54.6–78.4] | 0.9 [0.8–1.0] |
-| 70 | 21.6 [21.3–21.8] | 44.3 [42.5–45.9] | 8.6 [8.3–9.4] | 3.4 [2.6–3.6] | 1.7 [0.8–1.8] | 59.2 [58.7–61.2] | 44.9 [40.5–45.7] | 109 [65.2–120] | 1.3 [1.2–1.4] |
-| 80 | 22.6 [22.4–22.8] | 50.6 [48.3–51.7] | 10.0 [9.6–11.1] | 2.9 [2.7–3.2] | 1.8 [0.9–1.8] | 60.0 [59.1–61.7] | 46.3 [45.5–46.9] | 148 [102–201] | 1.8 [1.6–2.0] |
-| 100 | 24.6 [24.4–24.8] | 63.2 [59.1–64.7] | 12.5 [11.6–15.3] | 3.3 [2.7–3.4] | 1.8 [0.9–1.8] | 60.9 [60.2–62.9] | 46.5 [44.7–47.4] | 238 [160–358] | 3.2 [2.7–3.4] |
-| 130 | 27.1 [26.9–27.7] | 80.9 [76.4–86.1] | 17.4 [15.6–21.0] | 2.9 [2.5–3.5] | 1.8 [1.0–1.8] | 63.0 [61.0–64.9] | 47.2 [46.8–49.6] | 430 [291–777] | 6.0 [5.2–7.2] |
-| 144 | 28.2 [28.0–29.0] | 90.0 [84.1–95.8] | 19.3 [17.8–23.7] | 3.0 [2.4–3.3] | 1.8 [1.0–1.8] | 63.3 [61.0–65.0] | 47.7 [44.2–49.2] | 527 [323–753] | 8.0 [6.7–9.4] |
-| 150 | 28.7 [28.5–29.4] | 94.3 [87.2–99.5] | 20.2 [18.6–24.7] | 2.9 [2.6–3.6] | 1.8 [1.0–1.9] | 63.4 [60.9–65.1] | 48.4 [45.8–49.7] | 579 [455–1060] | 9.0 [7.3–10.5] |
-| 200 | 32.2 [31.7–32.8] | 120 [115–127] | 28.8 [25.7–31.2] | 2.6 [2.3–2.7] | 1.8 [1.0–1.9] | 64.0 [60.4–64.6] | 49.3 [47.6–50.5] | 1243 [849–1453] | 17.3 [15.1–19.9] |
-| 250 | 35.0 [35.0–35.0] | 150 [150–150] | 35.6 [35.6–35.6] | -0.0 [-0.0–2.4] | 1.9 [1.9–1.9] | 62.9 [62.9–62.9] | 50.4 [50.4–50.4] | 2526 [2526–2526] | 31.1 [31.1–31.1] |
+| 40 | 16.1 [16.0–16.2] | 25.6 [25.3–27.1] | 4.9 [4.8–5.0] | 3.2 [2.6–3.8] | 1.4 [0.7–1.5] | 46.8 [42.2–50.1] | 32.3 [28.4–34.6] | 32.3 [29.3–40.6] | 0.3 [0.3–0.3] |
+| 50 | 19.2 [19.0–19.2] | 31.9 [31.5–32.9] | 5.9 [5.6–6.2] | 2.9 [2.7–3.3] | 1.5 [0.7–1.6] | 56.0 [52.2–57.2] | 32.8 [27.0–35.1] | 47.2 [40.9–66.8] | 0.6 [0.5–0.6] |
+| 60 | 20.5 [20.3–20.6] | 38.0 [36.5–39.2] | 7.1 [6.8–7.5] | 2.9 [2.5–3.3] | 1.6 [0.8–1.7] | 58.7 [57.8–60.0] | 35.3 [30.9–38.5] | 67.4 [54.6–78.4] | 0.9 [0.8–1.0] |
+| 70 | 21.6 [21.3–21.8] | 44.3 [42.5–45.9] | 8.6 [8.3–9.4] | 3.4 [2.6–3.6] | 1.7 [0.8–1.8] | 59.2 [58.7–61.2] | 42.7 [40.3–43.9] | 109 [65.2–120] | 1.3 [1.2–1.4] |
+| 80 | 22.6 [22.4–22.8] | 50.6 [48.3–51.7] | 10.0 [9.6–11.1] | 2.9 [2.7–3.2] | 1.8 [0.9–1.8] | 60.0 [59.1–61.7] | 45.5 [38.1–46.9] | 148 [102–201] | 1.8 [1.6–2.0] |
+| 100 | 24.6 [24.4–24.8] | 63.2 [59.1–64.7] | 12.5 [11.6–15.3] | 3.3 [2.7–3.4] | 1.8 [0.9–1.8] | 60.9 [60.2–62.9] | 46.5 [40.3–47.4] | 238 [160–358] | 3.2 [2.7–3.4] |
+| 130 | 27.1 [26.9–27.7] | 80.9 [76.4–86.1] | 17.4 [15.6–21.0] | 2.9 [2.5–3.5] | 1.8 [1.0–1.8] | 62.8 [61.0–64.9] | 41.1 [33.4–44.9] | 430 [291–777] | 6.0 [5.2–7.2] |
+| 144 | 28.2 [28.0–29.0] | 90.0 [84.1–95.8] | 19.3 [17.8–23.7] | 3.0 [2.4–3.3] | 1.8 [1.0–1.8] | 61.1 [59.7–65.0] | 42.8 [40.6–49.0] | 527 [323–753] | 8.0 [6.7–9.4] |
+| 150 | 28.7 [28.5–29.4] | 94.3 [87.2–99.5] | 20.2 [18.6–24.7] | 2.9 [2.6–3.6] | 1.8 [1.0–1.9] | 63.4 [60.9–65.1] | 42.6 [39.5–49.1] | 579 [455–1060] | 9.0 [7.3–10.5] |
+| 200 | 32.2 [31.7–32.8] | 120 [115–127] | 28.8 [25.7–31.2] | 2.6 [2.3–2.7] | 1.8 [1.0–1.9] | 64.0 [59.5–64.6] | 45.6 [29.1–47.1] | 1243 [849–1453] | 17.3 [15.1–19.9] |
+| 250 | 35.0 [35.0–35.0] | 150 [150–150] | 35.6 [35.6–35.6] | -0.0 [-0.0–2.4] | 1.9 [1.9–1.9] | 57.8 [57.8–57.8] | 43.1 [43.1–43.1] | 2526 [2526–2526] | 31.1 [31.1–31.1] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 113 [113–115] (σ 11.5 [10.6–12.0]) ; début de coloration 266 [265–266] ; fin de coloration 296 [295–297] ; arbre nu 321 [320–322] ; pleine floraison 119 [119–121] (σ 11.3 [10.7–11.9]) ; maturité des fruits 277 [276–278] ; première floraison à 46.0 [46.0–47.0] ans.
 
@@ -877,16 +876,16 @@ Mort du tronc (émergente) : 5/5 graines mortes en 150 ans, âges [79, 86, 108, 
 | 20 | 11.5 [11.5–11.6] | 20.7 [18.8–21.7] | 5.4 [5.0–5.7] | 6.3 [5.5–6.8] | 0.9 [0.9–1.1] | 37.9 [37.5–54.2] | 31.9 [30.5–43.5] | 40.0 [33.1–45.8] | 0.1 [0.1–0.2] |
 | 25 | 13.7 [13.7–13.7] | 25.4 [24.5–27.3] | 6.1 [5.8–6.7] | 5.4 [4.8–5.7] | 0.9 [0.9–1.1] | 41.1 [40.3–41.9] | 32.9 [32.5–34.7] | 53.7 [46.0–79.7] | 0.2 [0.2–0.3] |
 | 30 | 15.5 [15.5–15.5] | 30.3 [28.8–32.6] | 6.7 [6.4–7.3] | 4.6 [4.2–5.3] | 1.0 [1.0–1.1] | 44.4 [43.3–45.6] | 34.9 [34.2–36.6] | 57.5 [38.1–91.9] | 0.3 [0.3–0.4] |
-| 40 | 18.3 [18.2–18.3] | 38.5 [36.9–40.1] | 8.5 [7.7–8.8] | 3.8 [3.3–4.5] | 1.0 [1.0–1.1] | 47.6 [46.9–49.5] | 35.6 [30.0–38.2] | 108 [90.8–115] | 0.6 [0.6–0.7] |
-| 50 | 19.7 [19.5–19.9] | 45.2 [44.2–47.2] | 10.6 [9.6–11.3] | 3.6 [3.3–4.0] | 1.1 [1.1–1.1] | 47.9 [47.0–48.9] | 36.6 [35.5–37.5] | 145 [139–162] | 1.0 [0.9–1.1] |
-| 56 | 20.3 [20.3–20.6] | 49.6 [48.1–51.7] | 11.9 [10.7–12.5] | 3.9 [3.0–4.0] | 1.1 [1.1–1.2] | 47.8 [47.5–48.1] | 36.5 [34.1–37.5] | 176 [113–250] | 1.2 [1.1–1.4] |
-| 59 | 20.8 [20.6–20.9] | 51.9 [49.9–54.0] | 12.4 [11.0–13.0] | 3.6 [3.1–4.1] | 1.1 [1.1–1.2] | 47.9 [47.5–48.2] | 37.1 [35.9–37.8] | 217 [175–260] | 1.4 [1.3–1.5] |
-| 60 | 20.8 [20.7–21.0] | 52.7 [50.8–54.8] | 12.5 [11.2–13.1] | 3.7 [3.3–4.0] | 1.1 [1.1–1.2] | 47.8 [47.7–48.2] | 37.5 [35.8–37.9] | 222 [156–260] | 1.4 [1.3–1.6] |
+| 40 | 18.3 [18.2–18.3] | 38.5 [36.9–40.1] | 8.5 [7.7–8.8] | 3.8 [3.3–4.5] | 1.0 [1.0–1.1] | 47.6 [46.9–49.5] | 31.9 [27.3–35.6] | 108 [90.8–115] | 0.6 [0.6–0.7] |
+| 50 | 19.7 [19.5–19.9] | 45.2 [44.2–47.2] | 10.6 [9.6–11.3] | 3.6 [3.3–4.0] | 1.1 [1.1–1.1] | 47.9 [47.0–48.9] | 33.6 [31.3–36.0] | 145 [139–162] | 1.0 [0.9–1.1] |
+| 56 | 20.3 [20.3–20.6] | 49.6 [48.1–51.7] | 11.9 [10.7–12.5] | 3.9 [3.0–4.0] | 1.1 [1.1–1.2] | 47.8 [47.5–48.1] | 36.5 [34.1–37.2] | 176 [113–250] | 1.2 [1.1–1.4] |
+| 59 | 20.8 [20.6–20.9] | 51.9 [49.9–54.0] | 12.4 [11.0–13.0] | 3.6 [3.1–4.1] | 1.1 [1.1–1.2] | 47.9 [47.5–48.2] | 37.1 [34.2–37.8] | 217 [175–260] | 1.4 [1.3–1.5] |
+| 60 | 20.8 [20.7–21.0] | 52.7 [50.8–54.8] | 12.5 [11.2–13.1] | 3.7 [3.3–4.0] | 1.1 [1.1–1.2] | 47.8 [47.7–48.2] | 37.3 [34.8–37.9] | 222 [156–260] | 1.4 [1.3–1.6] |
 | 70 | 21.7 [21.4–21.8] | 59.7 [58.1–62.5] | 13.4 [12.7–14.3] | 3.5 [2.5–3.8] | 1.2 [1.2–1.2] | 48.9 [47.5–50.1] | 38.1 [36.6–39.6] | 234 [156–308] | 1.8 [1.8–2.1] |
 | 75 | 22.0 [21.7–22.2] | 62.3 [60.8–65.9] | 14.1 [13.4–15.1] | 2.7 [2.6–3.4] | 1.2 [1.2–1.2] | 48.5 [48.1–49.8] | 38.4 [37.7–39.6] | 238 [203–308] | 2.1 [2.0–2.4] |
 | 80 | 22.3 [22.2–22.4] | 66.5 [64.5–68.7] | 15.3 [14.9–15.7] | 2.9 [2.6–3.2] | 1.2 [1.2–1.3] | 48.4 [47.3–50.1] | 38.3 [38.1–39.3] | 338 [314–376] | 2.5 [2.3–2.7] |
-| 100 | 23.2 [23.1–23.3] | 75.8 [74.6–78.6] | 17.6 [16.0–18.0] | 2.1 [-0.0–2.9] | 1.3 [1.3–1.3] | 52.8 [51.3–53.7] | 42.8 [40.2–43.5] | 413 [370–643] | 3.4 [3.3–3.8] |
-| 120 | 23.7 [23.7–23.8] | 85.0 [84.1–85.9] | 17.9 [17.3–18.6] | -0.0 [-0.0–2.6] | 1.3 [1.3–1.4] | 58.8 [57.9–59.8] | 46.9 [45.7–48.0] | 482 [358–607] | 4.3 [4.2–4.4] |
+| 100 | 23.2 [23.1–23.3] | 75.8 [74.6–78.6] | 17.6 [16.0–18.0] | 2.1 [-0.0–2.9] | 1.3 [1.3–1.3] | 52.8 [51.3–53.7] | 42.7 [40.2–43.5] | 413 [370–643] | 3.4 [3.3–3.8] |
+| 120 | 23.7 [23.7–23.8] | 85.0 [84.1–85.9] | 17.9 [17.3–18.6] | -0.0 [-0.0–2.6] | 1.3 [1.3–1.4] | 58.8 [57.9–59.8] | 45.5 [45.3–45.7] | 482 [358–607] | 4.3 [4.2–4.4] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 103 [102–106] (σ 11.0 [10.2–12.9]) ; début de coloration 263 [263–263] ; fin de coloration 292 [292–294] ; arbre nu 304 [304–306] ; pleine floraison 106 [106–110] (σ 11.3 [9.8–12.4]) ; maturité des fruits 177 [176–180] ; première floraison à 7.0 [7.0–7.0] ans.
 
@@ -902,7 +901,7 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 20 | 10.5 [10.3–10.6] | 12.9 [12.3–13.2] | 4.8 [4.5–5.2] | 4.3 [4.0–4.3] | 1.3 [1.1–1.4] | 21.2 [19.8–22.3] | 22.2 [17.7–26.1] | 31.6 [27.6–42.3] | 0.1 [0.0–0.1] |
 | 25 | 13.0 [12.8–13.1] | 16.6 [16.2–17.2] | 5.6 [5.2–5.9] | 4.0 [3.7–4.2] | 1.4 [1.2–1.5] | 22.3 [20.3–24.1] | 21.5 [19.0–33.2] | 45.6 [44.2–58.9] | 0.1 [0.1–0.1] |
 | 30 | 15.2 [15.1–15.5] | 20.0 [19.6–20.9] | 6.4 [5.8–6.8] | 3.4 [3.2–3.7] | 1.6 [1.3–1.8] | 25.3 [24.7–29.3] | 20.8 [19.9–25.3] | 52.8 [42.4–73.4] | 0.2 [0.1–0.2] |
-| 40 | 18.6 [18.4–18.7] | 26.9 [25.6–27.2] | 8.3 [8.1–9.3] | 3.4 [2.6–3.7] | 1.8 [1.6–1.9] | 38.0 [33.8–40.6] | 22.6 [18.9–25.9] | 118 [97.0–152] | 0.3 [0.3–0.3] |
+| 40 | 18.6 [18.4–18.7] | 26.9 [25.6–27.2] | 8.3 [8.1–9.3] | 3.4 [2.6–3.7] | 1.8 [1.6–1.9] | 38.0 [33.8–40.6] | 21.5 [18.9–25.9] | 118 [97.0–152] | 0.3 [0.3–0.3] |
 | 50 | 19.3 [19.0–19.6] | 33.3 [32.9–34.1] | 11.2 [10.9–12.3] | 3.3 [3.0–3.7] | 2.0 [1.8–2.3] | 41.3 [39.6–41.9] | 29.9 [25.8–30.6] | 224 [172–262] | 0.5 [0.5–0.6] |
 | 60 | 20.0 [19.9–20.3] | 40.4 [39.5–40.7] | 14.3 [13.9–15.5] | 3.3 [3.2–3.5] | 2.1 [2.1–2.5] | 42.1 [40.3–42.8] | 29.7 [29.7–30.6] | 335 [282–384] | 0.9 [0.9–0.9] |
 | 70 | 20.8 [20.6–21.1] | 47.4 [45.4–47.6] | 16.9 [16.3–17.2] | 3.4 [2.8–3.6] | 2.1 [2.1–2.5] | 41.5 [39.9–42.6] | 29.5 [27.6–31.1] | 430 [398–524] | 1.3 [1.2–1.3] |
@@ -913,9 +912,9 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 150 | 27.4 [27.1–28.0] | 84.2 [82.0–86.9] | 26.1 [24.7–28.8] | 1.7 [1.6–2.2] | 2.1 [2.1–2.5] | 37.6 [36.2–39.8] | 27.1 [25.4–28.2] | 1170 [964–1545] | 6.4 [5.6–6.7] |
 | 200 | 30.6 [30.2–30.8] | 98.2 [97.5–102] | 28.8 [28.4–32.2] | 1.4 [1.3–1.4] | 2.1 [2.1–2.5] | 36.9 [35.8–41.3] | 27.0 [24.7–27.5] | 1393 [1358–2030] | 9.2 [9.0–10.1] |
 | 250 | 32.3 [32.1–32.9] | 112 [109–115] | 31.6 [30.8–34.1] | 1.2 [1.1–1.3] | 2.1 [2.1–2.5] | 36.3 [34.7–40.3] | 28.6 [26.5–31.0] | 1567 [1497–2278] | 13.0 [12.2–14.1] |
-| 300 | 33.3 [33.2–34.1] | 124 [121–126] | 33.4 [31.8–34.9] | 1.1 [1.0–1.3] | 2.1 [2.1–2.5] | 36.7 [35.9–41.1] | 30.2 [26.8–31.2] | 1948 [1550–2001] | 16.4 [15.8–17.8] |
+| 300 | 33.3 [33.2–34.1] | 124 [121–126] | 33.4 [31.8–34.9] | 1.1 [1.0–1.3] | 2.1 [2.1–2.5] | 36.6 [35.9–41.1] | 30.2 [26.8–31.2] | 1948 [1550–2001] | 16.4 [15.8–17.8] |
 | 350 | 34.1 [33.9–34.8] | 135 [132–137] | 35.2 [33.7–35.6] | 1.0 [0.8–1.2] | 2.1 [2.1–2.5] | 40.1 [37.2–43.2] | 33.5 [29.1–34.8] | 1964 [1657–2402] | 19.9 [19.1–21.5] |
-| 400 | 34.8 [34.6–34.9] | 145 [142–148] | 36.1 [35.2–36.8] | 1.0 [0.9–1.1] | 2.1 [2.1–2.5] | 41.5 [38.1–44.1] | 34.9 [31.1–36.4] | 2515 [2367–2637] | 23.8 [22.8–25.4] |
+| 400 | 34.8 [34.6–34.9] | 145 [142–148] | 36.1 [35.2–36.8] | 1.0 [0.9–1.1] | 2.1 [2.1–2.5] | 41.5 [37.9–44.1] | 34.9 [31.1–36.4] | 2515 [2367–2637] | 23.8 [22.8–25.4] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 116 [116–117] (σ 11.5 [11.2–11.7]) ; début de coloration 270 [270–270] ; fin de coloration 312 [312–313] ; arbre nu 333 [333–334] ; pleine floraison 175 [174–175] (σ 3.9 [3.3–4.0]) ; maturité des fruits 263 [263–263] ; première floraison à 31.0 [31.0–32.0] ans.
 
@@ -1045,20 +1044,20 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 20 | 15.9 [15.8–15.9] | 20.9 [20.0–21.2] | 6.4 [6.3–6.6] | 6.1 [5.7–6.3] | 0.9 [0.8–1.0] | 27.5 [25.8–29.7] | 9.9 [8.6–11.7] | 44.0 [43.3–63.3] | 0.2 [0.1–0.2] |
 | 25 | 19.4 [19.4–19.5] | 26.8 [26.0–27.0] | 6.7 [6.7–7.0] | 5.8 [5.2–6.0] | 1.0 [0.9–1.0] | 28.7 [27.8–32.2] | 9.9 [8.6–13.6] | 61.6 [48.6–71.5] | 0.3 [0.3–0.3] |
 | 30 | 22.7 [22.7–22.8] | 31.6 [30.9–32.4] | 7.3 [7.2–7.6] | 4.9 [4.6–5.6] | 1.0 [1.0–1.1] | 30.9 [27.5–31.8] | 9.9 [8.0–10.6] | 64.0 [42.2–83.6] | 0.4 [0.4–0.5] |
-| 40 | 28.6 [28.6–28.7] | 40.6 [40.3–41.4] | 9.3 [9.2–9.6] | 4.6 [3.9–4.7] | 1.2 [1.1–1.2] | 37.9 [36.4–40.5] | 10.9 [10.1–13.3] | 111 [98.5–137] | 0.8 [0.8–0.9] |
-| 50 | 33.7 [33.6–33.7] | 48.9 [48.5–50.8] | 11.0 [10.8–11.4] | 4.2 [3.8–4.4] | 1.3 [1.2–1.7] | 40.5 [36.8–46.1] | 13.1 [10.2–30.3] | 153 [120–202] | 1.4 [1.4–1.5] |
-| 60 | 37.9 [37.9–37.9] | 56.6 [56.4–58.9] | 12.4 [12.2–13.0] | 3.9 [3.8–4.3] | 1.3 [1.3–1.7] | 42.4 [38.0–47.3] | 19.0 [14.1–29.3] | 196 [159–247] | 2.1 [2.1–2.2] |
-| 70 | 41.4 [41.4–41.4] | 64.4 [63.6–66.8] | 14.0 [13.2–14.5] | 3.9 [3.2–4.1] | 1.4 [1.4–1.7] | 47.8 [36.0–48.4] | 27.6 [13.7–33.1] | 238 [169–296] | 2.9 [2.8–3.1] |
-| 80 | 44.3 [44.3–44.4] | 71.8 [71.3–73.7] | 15.6 [15.0–15.9] | 3.7 [3.2–3.8] | 1.5 [1.4–1.7] | 39.1 [37.3–48.7] | 16.7 [15.0–32.5] | 346 [253–360] | 3.8 [3.8–4.1] |
-| 100 | 48.8 [48.8–48.8] | 86.6 [86.1–88.0] | 19.3 [18.8–19.7] | 3.7 [3.4–3.8] | 1.9 [1.6–2.0] | 48.2 [39.9–49.1] | 31.5 [17.5–34.2] | 480 [382–732] | 6.2 [6.1–6.3] |
-| 130 | 52.9 [52.9–53.0] | 107 [107–108] | 24.4 [24.3–25.0] | 3.2 [3.1–3.4] | 1.9 [1.6–2.0] | 48.0 [44.8–48.5] | 26.5 [23.5–33.9] | 725 [671–850] | 10.5 [10.4–10.7] |
-| 144 | 54.2 [54.2–54.2] | 116 [115–117] | 26.4 [26.4–26.7] | 3.0 [2.9–3.2] | 1.9 [1.6–2.0] | 47.2 [43.1–47.7] | 25.6 [18.3–33.8] | 752 [608–833] | 13.0 [12.8–13.2] |
-| 150 | 54.6 [54.6–54.6] | 120 [119–121] | 27.2 [27.0–27.5] | 3.1 [2.8–3.4] | 1.9 [1.6–2.0] | 46.9 [46.4–47.3] | 31.7 [21.3–33.7] | 863 [797–1111] | 14.1 [13.8–14.3] |
-| 200 | 56.8 [56.8–56.8] | 149 [146–151] | 31.6 [31.4–31.7] | 2.8 [2.5–3.1] | 1.9 [1.6–2.0] | 44.8 [43.7–45.4] | 32.2 [28.1–33.5] | 1223 [1130–1485] | 24.8 [23.9–25.5] |
-| 250 | 58.1 [58.1–58.1] | 175 [170–178] | 35.1 [34.6–36.0] | 2.5 [2.4–2.9] | 1.9 [1.6–2.0] | 44.1 [42.8–46.4] | 33.9 [33.0–34.4] | 1584 [1419–2005] | 37.2 [35.0–38.8] |
-| 300 | 59.5 [59.5–59.5] | 200 [195–206] | 38.3 [37.9–39.8] | 2.6 [2.2–2.7] | 1.9 [1.6–2.0] | 44.1 [43.2–44.9] | 35.1 [34.2–35.7] | 1849 [1603–1946] | 52.0 [48.4–54.9] |
-| 350 | 60.8 [60.8–60.8] | 224 [219–229] | 40.9 [40.3–42.8] | 2.3 [2.1–2.4] | 1.9 [1.7–2.0] | 43.6 [42.6–44.0] | 36.5 [35.5–37.6] | 2043 [1611–2437] | 68.1 [64.8–71.4] |
-| 400 | 62.2 [62.2–62.2] | 246 [241–252] | 43.0 [42.0–44.6] | 2.1 [2.1–2.2] | 1.9 [1.7–2.0] | 44.0 [42.3–44.4] | 38.0 [36.1–39.2] | 2917 [2223–3124] | 84.6 [81.3–90.0] |
+| 40 | 28.6 [28.6–28.7] | 40.6 [40.3–41.4] | 9.3 [9.2–9.6] | 4.6 [3.9–4.7] | 1.2 [1.1–1.2] | 35.7 [34.5–38.1] | 7.9 [6.1–8.2] | 111 [98.5–137] | 0.8 [0.8–0.9] |
+| 50 | 33.7 [33.6–33.7] | 48.9 [48.5–50.8] | 11.0 [10.8–11.4] | 4.2 [3.8–4.4] | 1.3 [1.2–1.7] | 32.7 [30.4–33.0] | 5.5 [5.3–6.0] | 153 [120–202] | 1.4 [1.4–1.5] |
+| 60 | 37.9 [37.9–37.9] | 56.6 [56.4–58.9] | 12.4 [12.2–13.0] | 3.9 [3.8–4.3] | 1.3 [1.3–1.7] | 34.6 [33.3–35.2] | 5.0 [4.2–5.5] | 196 [159–247] | 2.1 [2.1–2.2] |
+| 70 | 41.4 [41.4–41.4] | 64.4 [63.6–66.8] | 14.0 [13.2–14.5] | 3.9 [3.2–4.1] | 1.4 [1.4–1.7] | 36.9 [36.0–37.1] | 4.7 [3.4–5.4] | 238 [169–296] | 2.9 [2.8–3.1] |
+| 80 | 44.3 [44.3–44.4] | 71.8 [71.3–73.7] | 15.6 [15.0–15.9] | 3.7 [3.2–3.8] | 1.5 [1.4–1.7] | 36.7 [35.3–37.1] | 2.7 [2.3–2.9] | 346 [253–360] | 3.8 [3.8–4.1] |
+| 100 | 48.8 [48.8–48.8] | 86.6 [86.1–88.0] | 19.3 [18.8–19.7] | 3.7 [3.4–3.8] | 1.9 [1.6–2.0] | 36.8 [35.0–37.8] | 2.5 [2.5–2.8] | 480 [382–732] | 6.2 [6.1–6.3] |
+| 130 | 52.9 [52.9–53.0] | 107 [107–108] | 24.4 [24.3–25.0] | 3.2 [3.1–3.4] | 1.9 [1.6–2.0] | 39.8 [38.8–40.7] | 2.5 [2.4–18.3] | 725 [671–850] | 10.5 [10.4–10.7] |
+| 144 | 54.2 [54.2–54.2] | 116 [115–117] | 26.4 [26.4–26.7] | 3.0 [2.9–3.2] | 1.9 [1.6–2.0] | 40.9 [39.1–44.7] | 2.3 [0.0–20.9] | 752 [608–833] | 13.0 [12.8–13.2] |
+| 150 | 54.6 [54.6–54.6] | 120 [119–121] | 27.2 [27.0–27.5] | 3.1 [2.8–3.4] | 1.9 [1.6–2.0] | 45.8 [37.6–46.5] | 17.8 [2.2–23.7] | 863 [797–1111] | 14.1 [13.8–14.3] |
+| 200 | 56.8 [56.8–56.8] | 149 [146–151] | 31.6 [31.4–31.7] | 2.8 [2.5–3.1] | 1.9 [1.6–2.0] | 44.2 [40.3–44.8] | 23.1 [15.9–24.4] | 1223 [1130–1485] | 24.8 [23.9–25.5] |
+| 250 | 58.1 [58.1–58.1] | 175 [170–178] | 35.1 [34.6–36.0] | 2.5 [2.4–2.9] | 1.9 [1.6–2.0] | 42.8 [38.5–46.4] | 17.6 [6.6–31.3] | 1584 [1419–2005] | 37.2 [35.0–38.8] |
+| 300 | 59.5 [59.5–59.5] | 200 [195–206] | 38.3 [37.9–39.8] | 2.6 [2.2–2.7] | 1.9 [1.6–2.0] | 42.7 [34.6–44.9] | 19.5 [14.9–30.8] | 1849 [1603–1946] | 52.0 [48.4–54.9] |
+| 350 | 60.8 [60.8–60.8] | 224 [219–229] | 40.9 [40.3–42.8] | 2.3 [2.1–2.4] | 1.9 [1.7–2.0] | 40.7 [29.8–43.3] | 20.7 [19.7–26.1] | 2043 [1611–2437] | 68.1 [64.8–71.4] |
+| 400 | 62.2 [62.2–62.2] | 246 [241–252] | 43.0 [42.0–44.6] | 2.1 [2.1–2.2] | 1.9 [1.7–2.0] | 41.8 [29.9–44.0] | 19.4 [13.2–28.7] | 2917 [2223–3124] | 84.6 [81.3–90.0] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 125 [124–126] (σ 10.5 [10.3–10.9]) ; début de coloration 273 [272–273] ; fin de coloration 312 [312–313] ; arbre nu 352 [351–352] ; pleine floraison 131 [130–132] (σ 10.3 [10.1–10.5]) ; maturité des fruits 255 [254–256] ; première floraison à 15.0 [15.0–16.0] ans.
 
@@ -1073,20 +1072,20 @@ Mort du tronc (émergente) : 3/5 graines mortes en 350 ans, âges [51, 168, 248]
 | 15 | 9.5 [9.5–9.6] | 13.0 [12.6–13.6] | 5.0 [4.8–5.1] | 5.8 [5.0–6.3] | 0.4 [0.3–0.4] | 35.6 [29.7–38.2] | 20.7 [12.9–24.9] | 30.3 [20.9–34.5] | 0.0 [0.0–0.0] |
 | 20 | 12.6 [12.6–12.6] | 18.5 [17.8–19.2] | 5.4 [5.2–5.5] | 5.5 [5.1–5.7] | 0.4 [0.3–0.5] | 32.6 [32.1–32.9] | 15.5 [14.3–16.0] | 29.2 [22.1–38.9] | 0.1 [0.1–0.1] |
 | 25 | 15.5 [15.4–15.5] | 23.4 [23.3–24.4] | 5.7 [5.5–5.8] | 5.1 [4.7–5.5] | 0.5 [0.4–0.5] | 31.5 [30.8–34.5] | 13.1 [12.0–15.7] | 34.8 [26.4–42.3] | 0.1 [0.1–0.2] |
-| 30 | 18.1 [18.1–18.1] | 27.9 [27.5–28.4] | 6.0 [5.9–6.2] | 4.5 [3.9–4.8] | 0.5 [0.4–0.6] | 33.5 [31.8–33.9] | 12.1 [10.4–12.7] | 30.3 [18.5–44.9] | 0.2 [0.2–0.2] |
-| 40 | 22.7 [22.7–22.8] | 35.2 [34.1–36.3] | 7.1 [6.9–7.2] | 3.2 [2.5–4.1] | 0.6 [0.4–0.6] | 38.8 [37.5–42.0] | 15.1 [12.6–18.9] | 53.9 [41.7–67.5] | 0.4 [0.4–0.5] |
-| 50 | 26.5 [26.5–26.6] | 40.0 [38.1–43.7] | 8.5 [7.8–8.6] | 2.8 [1.4–3.6] | 0.6 [0.4–0.7] | 47.7 [43.3–48.7] | 24.2 [16.4–32.7] | 66.2 [53.7–99.2] | 0.6 [0.5–0.8] |
-| 60 | 29.6 [29.6–29.6] | 48.0 [42.7–48.7] | 9.2 [8.6–9.5] | 1.5 [-0.0–3.5] | 0.7 [0.6–0.7] | 51.2 [40.4–51.6] | 28.2 [16.2–35.1] | 90.9 [59.5–106] | 1.0 [0.7–1.0] |
-| 70 | 32.0 [32.0–32.0] | 53.7 [45.8–54.1] | 9.7 [9.2–10.0] | 2.5 [-0.0–3.2] | 0.7 [0.6–0.8] | 53.0 [49.0–54.7] | 29.7 [22.3–36.5] | 83.4 [66.7–130] | 1.3 [0.8–1.3] |
-| 80 | 33.9 [33.9–33.9] | 58.0 [49.3–60.5] | 10.2 [9.8–10.7] | 2.3 [-0.0–2.7] | 0.7 [0.6–0.8] | 51.2 [47.1–56.0] | 30.9 [18.1–39.4] | 119 [97.2–132] | 1.6 [1.0–1.8] |
-| 100 | 36.5 [36.4–36.5] | 67.6 [63.0–71.7] | 12.3 [11.4–13.4] | 3.1 [-0.0–3.8] | 0.8 [0.7–0.9] | 58.4 [57.9–60.2] | 41.0 [38.9–42.2] | 158 [151–163] | 2.3 [2.0–2.6] |
-| 130 | 38.5 [38.5–38.5] | 84.0 [81.6–87.5] | 16.7 [16.1–17.9] | 2.9 [-0.0–3.2] | 0.8 [0.7–0.9] | 62.3 [61.8–63.0] | 45.8 [43.3–48.0] | 319 [248–373] | 3.8 [3.6–4.2] |
-| 144 | 39.0 [39.0–39.0] | 90.7 [89.0–91.6] | 17.7 [16.2–18.8] | 1.8 [-0.0–2.5] | 0.9 [0.8–0.9] | 63.8 [62.7–66.0] | 48.7 [46.7–53.1] | 291 [187–348] | 4.5 [4.4–4.7] |
-| 150 | 39.1 [39.1–39.1] | 92.9 [92.2–93.5] | 17.5 [17.0–18.9] | 1.8 [-0.0–2.7] | 0.9 [0.9–0.9] | 65.2 [63.2–66.5] | 50.8 [44.7–52.7] | 368 [313–401] | 4.8 [4.6–4.8] |
-| 200 | 40.2 [40.2–40.2] | 116 [113–116] | 22.4 [22.0–22.6] | 1.3 [-0.0–2.8] | 0.9 [0.9–0.9] | 68.2 [67.3–69.7] | 43.5 [38.5–51.4] | 524 [493–682] | 7.5 [7.3–7.5] |
-| 250 | 41.2 [41.2–41.2] | 133 [131–134] | 24.8 [24.5–25.0] | 0.9 [-0.0–1.7] | 1.2 [0.9–1.5] | 71.6 [70.2–73.1] | 41.5 [34.9–48.1] | 756 [560–952] | 10.0 [9.9–10.2] |
-| 300 | 42.3 [42.3–42.3] | 148 [146–150] | 25.5 [25.0–26.0] | -0.0 [-0.0–2.0] | 1.2 [0.9–1.5] | 68.6 [68.4–68.8] | 46.0 [39.1–52.9] | 668 [658–678] | 12.9 [12.5–13.3] |
-| 350 | 43.3 [43.3–43.3] | 162 [161–163] | 26.3 [25.6–26.9] | -0.0 [-0.0–1.5] | 1.2 [0.9–1.5] | 68.9 [68.9–68.9] | 49.8 [44.6–54.9] | 542 [525–559] | 15.7 [15.4–15.9] |
+| 30 | 18.1 [18.1–18.1] | 27.9 [27.5–28.4] | 6.0 [5.9–6.2] | 4.5 [3.9–4.8] | 0.5 [0.4–0.6] | 33.4 [31.1–33.5] | 11.5 [9.2–12.7] | 30.3 [18.5–44.9] | 0.2 [0.2–0.2] |
+| 40 | 22.7 [22.7–22.8] | 35.2 [34.1–36.3] | 7.1 [6.9–7.2] | 3.2 [2.5–4.1] | 0.6 [0.4–0.6] | 37.0 [36.3–41.0] | 8.7 [8.2–12.6] | 53.9 [41.7–67.5] | 0.4 [0.4–0.5] |
+| 50 | 26.5 [26.5–26.6] | 40.0 [38.1–43.7] | 8.5 [7.8–8.6] | 2.8 [1.4–3.6] | 0.6 [0.4–0.7] | 38.0 [35.1–45.6] | 8.4 [7.2–8.6] | 66.2 [53.7–99.2] | 0.6 [0.5–0.8] |
+| 60 | 29.6 [29.6–29.6] | 48.0 [42.7–48.7] | 9.2 [8.6–9.5] | 1.5 [-0.0–3.5] | 0.7 [0.6–0.7] | 41.6 [40.4–42.3] | 7.9 [4.1–11.0] | 90.9 [59.5–106] | 1.0 [0.7–1.0] |
+| 70 | 32.0 [32.0–32.0] | 53.7 [45.8–54.1] | 9.7 [9.2–10.0] | 2.5 [-0.0–3.2] | 0.7 [0.6–0.8] | 42.8 [40.2–47.9] | 5.5 [1.7–7.4] | 83.4 [66.7–130] | 1.3 [0.8–1.3] |
+| 80 | 33.9 [33.9–33.9] | 58.0 [49.3–60.5] | 10.2 [9.8–10.7] | 2.3 [-0.0–2.7] | 0.7 [0.6–0.8] | 41.7 [38.6–45.7] | 4.8 [1.5–7.3] | 119 [97.2–132] | 1.6 [1.0–1.8] |
+| 100 | 36.5 [36.4–36.5] | 67.6 [63.0–71.7] | 12.3 [11.4–13.4] | 3.1 [-0.0–3.8] | 0.8 [0.7–0.9] | 44.2 [38.4–49.1] | 3.1 [2.5–4.3] | 158 [151–163] | 2.3 [2.0–2.6] |
+| 130 | 38.5 [38.5–38.5] | 84.0 [81.6–87.5] | 16.7 [16.1–17.9] | 2.9 [-0.0–3.2] | 0.8 [0.7–0.9] | 48.9 [48.1–56.4] | 3.5 [2.9–4.3] | 319 [248–373] | 3.8 [3.6–4.2] |
+| 144 | 39.0 [39.0–39.0] | 90.7 [89.0–91.6] | 17.7 [16.2–18.8] | 1.8 [-0.0–2.5] | 0.9 [0.8–0.9] | 52.2 [46.6–64.6] | 7.5 [4.7–32.8] | 291 [187–348] | 4.5 [4.4–4.7] |
+| 150 | 39.1 [39.1–39.1] | 92.9 [92.2–93.5] | 17.5 [17.0–18.9] | 1.8 [-0.0–2.7] | 0.9 [0.9–0.9] | 53.3 [46.9–66.5] | 5.2 [4.6–29.7] | 368 [313–401] | 4.8 [4.6–4.8] |
+| 200 | 40.2 [40.2–40.2] | 116 [113–116] | 22.4 [22.0–22.6] | 1.3 [-0.0–2.8] | 0.9 [0.9–0.9] | 51.9 [44.0–53.7] | 6.1 [5.8–15.2] | 524 [493–682] | 7.5 [7.3–7.5] |
+| 250 | 41.2 [41.2–41.2] | 133 [131–134] | 24.8 [24.5–25.0] | 0.9 [-0.0–1.7] | 1.2 [0.9–1.5] | 49.4 [46.2–52.5] | 11.4 [10.6–12.2] | 756 [560–952] | 10.0 [9.9–10.2] |
+| 300 | 42.3 [42.3–42.3] | 148 [146–150] | 25.5 [25.0–26.0] | -0.0 [-0.0–2.0] | 1.2 [0.9–1.5] | 48.7 [46.6–50.7] | 5.2 [4.5–5.8] | 668 [658–678] | 12.9 [12.5–13.3] |
+| 350 | 43.3 [43.3–43.3] | 162 [161–163] | 26.3 [25.6–26.9] | -0.0 [-0.0–1.5] | 1.2 [0.9–1.5] | 46.8 [43.3–50.2] | 6.8 [4.4–9.3] | 542 [525–559] | 15.7 [15.4–15.9] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 129 [129–131] (σ 10.3 [9.7–10.6]) ; début de coloration 273 [272–273] ; fin de coloration 312 [312–313] ; arbre nu 352 [352–353] ; pleine floraison 136 [136–137] (σ 10.1 [9.8–11.0]) ; maturité des fruits 265 [264–266] ; première floraison à 29.0 [29.0–30.0] ans.
 
@@ -1105,7 +1104,7 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 40 | 6.9 [6.9–6.9] | 18.0 [17.6–18.5] | 4.6 [4.5–4.8] | 2.6 [2.3–2.7] | 0.9 [0.9–0.9] | 49.7 [48.0–53.0] | 43.0 [40.4–47.4] | 24.6 [22.5–33.8] | 0.1 [0.1–0.1] |
 | 50 | 8.2 [8.2–8.2] | 23.3 [22.1–23.8] | 6.2 [5.7–6.6] | 2.6 [2.2–2.7] | 1.0 [1.0–1.0] | 49.0 [40.4–49.1] | 39.2 [26.8–41.2] | 48.1 [28.4–64.9] | 0.2 [0.1–0.2] |
 | 60 | 9.3 [9.3–9.4] | 28.4 [26.8–28.7] | 8.1 [7.7–8.7] | 2.5 [2.2–2.7] | 1.1 [1.0–1.1] | 44.0 [40.8–45.9] | 30.8 [28.8–35.2] | 66.6 [63.5–94.2] | 0.3 [0.2–0.3] |
-| 70 | 10.1 [10.0–10.1] | 33.8 [30.9–34.1] | 9.7 [9.4–10.0] | 2.6 [1.9–2.8] | 1.1 [1.1–1.2] | 46.9 [44.9–48.0] | 36.3 [31.9–37.6] | 109 [69.9–119] | 0.4 [0.3–0.4] |
+| 70 | 10.1 [10.0–10.1] | 33.8 [30.9–34.1] | 9.7 [9.4–10.0] | 2.6 [1.9–2.8] | 1.1 [1.1–1.2] | 46.9 [44.9–48.0] | 35.1 [31.9–37.6] | 109 [69.9–119] | 0.4 [0.3–0.4] |
 | 80 | 10.5 [10.4–10.5] | 38.3 [35.6–38.7] | 10.5 [10.4–10.9] | 2.3 [2.0–2.5] | 1.1 [1.1–1.3] | 47.8 [45.4–48.5] | 36.6 [32.2–39.0] | 137 [111–152] | 0.6 [0.5–0.6] |
 | 100 | 11.5 [11.4–11.7] | 46.6 [44.3–47.4] | 11.9 [11.8–12.4] | 2.0 [2.0–2.2] | 1.1 [1.1–1.3] | 47.8 [46.9–49.0] | 38.1 [36.6–40.1] | 168 [114–253] | 0.9 [0.8–1.0] |
 | 130 | 13.1 [12.8–13.3] | 57.0 [54.4–57.2] | 13.8 [13.4–14.2] | 1.4 [1.4–1.6] | 1.2 [1.1–1.3] | 48.4 [46.8–49.5] | 42.6 [40.6–44.0] | 208 [186–253] | 1.5 [1.4–1.6] |
@@ -1115,7 +1114,7 @@ Mort du tronc (émergente) : 0/5 graines mortes en 400 ans, âges [], 5 vivante(
 | 250 | 15.3 [15.2–15.4] | 81.0 [79.6–82.1] | 17.6 [16.8–18.4] | 0.8 [0.7–0.8] | 1.2 [1.2–1.3] | 48.7 [47.4–50.0] | 45.7 [43.2–46.8] | 345 [312–476] | 3.9 [3.8–4.0] |
 | 300 | 16.0 [15.9–16.1] | 88.0 [86.3–89.4] | 18.4 [17.6–19.7] | 0.6 [0.6–0.7] | 1.2 [1.2–1.3] | 48.8 [47.2–51.0] | 46.1 [43.8–48.0] | 357 [333–421] | 5.0 [4.8–5.1] |
 | 350 | 16.7 [16.6–16.8] | 93.9 [92.5–95.8] | 19.1 [18.5–20.6] | 0.6 [0.5–0.6] | 1.2 [1.2–1.3] | 48.9 [46.1–50.6] | 46.6 [42.9–47.0] | 422 [310–493] | 5.8 [5.5–6.1] |
-| 400 | 17.4 [17.3–17.5] | 99.8 [98.6–102] | 19.9 [19.1–21.2] | 0.6 [0.5–0.7] | 1.2 [1.2–1.3] | 48.2 [45.1–51.2] | 46.3 [42.2–47.7] | 535 [372–681] | 6.9 [6.6–7.2] |
+| 400 | 17.4 [17.3–17.5] | 99.8 [98.6–102] | 19.9 [19.1–21.2] | 0.6 [0.5–0.7] | 1.2 [1.2–1.3] | 48.2 [45.1–51.2] | 46.1 [42.2–47.6] | 535 [372–681] | 6.9 [6.6–7.2] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 120 [119–121] (σ 10.6 [10.6–11.0]) ; début de coloration 273 [272–273] ; fin de coloration 312 [312–313] ; arbre nu 352 [351–352] ; pleine floraison 65.6 [65.4–67.0] (σ 8.8 [8.3–9.3]) ; maturité des fruits 249 [249–250] ; première floraison à 21.0 [21.0–22.0] ans.
 
@@ -1131,20 +1130,20 @@ Mort du tronc (émergente) : 1/5 graines mortes en 400 ans, âges [39], 4 vivant
 | 20 | 13.9 [13.8–13.9] | 15.0 [13.8–15.2] | 5.7 [5.7–6.1] | 4.3 [4.0–4.7] | 0.9 [0.9–1.0] | 16.9 [16.2–25.0] | 7.4 [6.5–15.7] | 44.9 [35.9–46.4] | 0.1 [0.1–0.1] |
 | 25 | 16.9 [16.8–16.9] | 18.7 [18.1–19.5] | 6.4 [6.2–6.6] | 4.2 [3.7–4.3] | 1.0 [0.9–1.1] | 18.8 [17.8–28.1] | 7.2 [6.6–21.8] | 58.1 [40.7–68.8] | 0.1 [0.1–0.1] |
 | 30 | 19.6 [19.5–19.6] | 22.3 [21.3–23.5] | 6.9 [6.7–7.2] | 3.5 [3.1–4.0] | 1.1 [0.9–1.1] | 22.5 [20.8–33.2] | 7.9 [7.1–23.6] | 61.5 [34.4–85.7] | 0.2 [0.2–0.2] |
-| 40 | 24.1 [24.1–24.1] | 28.9 [28.2–29.5] | 8.5 [8.2–9.4] | 2.8 [2.6–3.3] | 1.1 [1.1–1.2] | 34.6 [27.2–38.3] | 13.7 [7.6–24.4] | 107 [96.7–121] | 0.4 [0.4–0.4] |
-| 50 | 27.6 [27.6–27.7] | 35.0 [33.9–35.1] | 10.9 [10.7–11.7] | 2.8 [-0.0–3.1] | 1.2 [1.2–1.3] | 39.6 [28.6–39.8] | 22.1 [8.1–25.0] | 174 [154–213] | 0.6 [0.6–0.6] |
-| 60 | 30.3 [30.3–30.3] | 40.4 [38.8–41.3] | 13.3 [13.2–14.0] | 2.6 [-0.0–2.9] | 1.3 [1.3–1.4] | 40.6 [40.4–41.0] | 18.1 [16.1–25.9] | 244 [209–274] | 0.9 [0.8–1.0] |
-| 70 | 32.3 [32.3–32.4] | 46.1 [44.1–47.2] | 15.4 [15.1–16.0] | 2.8 [-0.0–3.1] | 1.4 [1.4–1.9] | 41.1 [40.9–41.6] | 21.7 [14.3–25.3] | 328 [237–386] | 1.3 [1.2–1.3] |
-| 80 | 33.8 [33.8–33.9] | 51.0 [49.4–52.1] | 16.9 [16.5–17.5] | 2.4 [-0.0–2.9] | 1.5 [1.5–1.9] | 41.0 [34.0–41.5] | 20.3 [7.8–24.6] | 420 [346–449] | 1.7 [1.6–1.7] |
-| 100 | 35.8 [35.8–35.8] | 60.4 [59.4–61.7] | 19.5 [18.9–20.2] | 2.3 [-0.0–2.4] | 1.7 [1.6–2.0] | 40.4 [40.1–40.7] | 18.4 [16.6–26.0] | 509 [440–724] | 2.6 [2.5–2.7] |
-| 130 | 37.1 [37.1–37.1] | 73.2 [71.0–75.0] | 23.0 [22.3–23.7] | 1.9 [-0.0–2.1] | 1.8 [1.7–2.0] | 38.5 [37.8–39.3] | 20.0 [16.9–25.4] | 739 [616–777] | 4.3 [3.9–4.4] |
-| 144 | 37.5 [37.5–37.5] | 78.4 [75.8–80.7] | 24.5 [23.6–25.4] | 1.6 [-0.0–2.1] | 1.8 [1.7–2.0] | 37.8 [37.1–38.6] | 22.4 [19.0–23.2] | 700 [629–808] | 5.1 [4.7–5.3] |
-| 150 | 37.6 [37.6–37.6] | 80.4 [78.1–82.9] | 25.1 [24.3–26.0] | 1.7 [-0.0–1.9] | 1.8 [1.7–2.0] | 37.5 [36.8–38.3] | 22.1 [17.6–25.2] | 936 [713–1048] | 5.5 [5.0–5.7] |
-| 200 | 38.8 [38.8–38.8] | 97.9 [95.1–100] | 28.9 [28.6–29.9] | 1.7 [-0.0–1.8] | 1.9 [1.7–2.0] | 36.5 [36.0–36.8] | 24.0 [20.6–25.4] | 1159 [1103–1337] | 9.1 [8.4–9.3] |
-| 250 | 40.0 [40.0–40.0] | 114 [110–115] | 31.9 [30.7–32.2] | 1.5 [-0.0–1.7] | 1.9 [1.7–2.0] | 36.5 [36.1–37.0] | 28.2 [27.1–29.4] | 1410 [1277–1920] | 13.2 [12.1–13.3] |
-| 300 | 41.2 [41.2–41.2] | 130 [124–130] | 33.3 [32.0–33.6] | 1.4 [-0.0–1.5] | 1.9 [1.7–2.0] | 37.2 [36.6–38.1] | 30.7 [29.8–31.4] | 1538 [1409–1599] | 17.6 [16.2–18.0] |
-| 350 | 42.4 [42.4–42.4] | 144 [136–145] | 35.0 [33.4–36.0] | 1.2 [-0.0–1.6] | 1.9 [1.9–2.0] | 38.3 [37.2–39.4] | 32.7 [28.5–34.1] | 1642 [1443–2067] | 22.5 [20.5–23.6] |
-| 400 | 43.6 [43.6–43.6] | 156 [148–158] | 36.9 [36.2–38.5] | 1.1 [-0.0–1.2] | 2.0 [1.9–2.0] | 38.6 [38.5–40.6] | 33.9 [31.3–36.0] | 2188 [1966–2383] | 27.5 [25.2–29.2] |
+| 40 | 24.1 [24.1–24.1] | 28.9 [28.2–29.5] | 8.5 [8.2–9.4] | 2.8 [2.6–3.3] | 1.1 [1.1–1.2] | 26.6 [25.5–31.8] | 6.1 [5.7–7.2] | 107 [96.7–121] | 0.4 [0.4–0.4] |
+| 50 | 27.6 [27.6–27.7] | 35.0 [33.9–35.1] | 10.9 [10.7–11.7] | 2.8 [-0.0–3.1] | 1.2 [1.2–1.3] | 25.9 [25.6–27.8] | 5.4 [4.7–5.9] | 174 [154–213] | 0.6 [0.6–0.6] |
+| 60 | 30.3 [30.3–30.3] | 40.4 [38.8–41.3] | 13.3 [13.2–14.0] | 2.6 [-0.0–2.9] | 1.3 [1.3–1.4] | 29.4 [29.1–29.8] | 4.7 [4.1–6.4] | 244 [209–274] | 0.9 [0.8–1.0] |
+| 70 | 32.3 [32.3–32.4] | 46.1 [44.1–47.2] | 15.4 [15.1–16.0] | 2.8 [-0.0–3.1] | 1.4 [1.4–1.9] | 34.2 [32.0–35.4] | 6.1 [3.9–7.2] | 328 [237–386] | 1.3 [1.2–1.3] |
+| 80 | 33.8 [33.8–33.9] | 51.0 [49.4–52.1] | 16.9 [16.5–17.5] | 2.4 [-0.0–2.9] | 1.5 [1.5–1.9] | 33.3 [31.1–34.3] | 2.3 [1.9–3.0] | 420 [346–449] | 1.7 [1.6–1.7] |
+| 100 | 35.8 [35.8–35.8] | 60.4 [59.4–61.7] | 19.5 [18.9–20.2] | 2.3 [-0.0–2.4] | 1.7 [1.6–2.0] | 35.9 [35.0–40.0] | 6.4 [5.0–8.5] | 509 [440–724] | 2.6 [2.5–2.7] |
+| 130 | 37.1 [37.1–37.1] | 73.2 [71.0–75.0] | 23.0 [22.3–23.7] | 1.9 [-0.0–2.1] | 1.8 [1.7–2.0] | 37.4 [36.0–38.6] | 11.1 [8.0–12.5] | 739 [616–777] | 4.3 [3.9–4.4] |
+| 144 | 37.5 [37.5–37.5] | 78.4 [75.8–80.7] | 24.5 [23.6–25.4] | 1.6 [-0.0–2.1] | 1.8 [1.7–2.0] | 37.2 [33.0–37.9] | 13.0 [11.0–16.4] | 700 [629–808] | 5.1 [4.7–5.3] |
+| 150 | 37.6 [37.6–37.6] | 80.4 [78.1–82.9] | 25.1 [24.3–26.0] | 1.7 [-0.0–1.9] | 1.8 [1.7–2.0] | 37.3 [36.8–37.5] | 15.6 [11.6–17.6] | 936 [713–1048] | 5.5 [5.0–5.7] |
+| 200 | 38.8 [38.8–38.8] | 97.9 [95.1–100] | 28.9 [28.6–29.9] | 1.7 [-0.0–1.8] | 1.9 [1.7–2.0] | 36.5 [36.0–36.8] | 19.9 [7.3–22.5] | 1159 [1103–1337] | 9.1 [8.4–9.3] |
+| 250 | 40.0 [40.0–40.0] | 114 [110–115] | 31.9 [30.7–32.2] | 1.5 [-0.0–1.7] | 1.9 [1.7–2.0] | 36.4 [33.8–37.0] | 18.2 [13.6–23.9] | 1410 [1277–1920] | 13.2 [12.1–13.3] |
+| 300 | 41.2 [41.2–41.2] | 130 [124–130] | 33.3 [32.0–33.6] | 1.4 [-0.0–1.5] | 1.9 [1.7–2.0] | 30.9 [25.2–36.6] | 22.6 [18.2–28.5] | 1538 [1409–1599] | 17.6 [16.2–18.0] |
+| 350 | 42.4 [42.4–42.4] | 144 [136–145] | 35.0 [33.4–36.0] | 1.2 [-0.0–1.6] | 1.9 [1.9–2.0] | 33.3 [29.5–37.2] | 23.5 [7.6–28.5] | 1642 [1443–2067] | 22.5 [20.5–23.6] |
+| 400 | 43.6 [43.6–43.6] | 156 [148–158] | 36.9 [36.2–38.5] | 1.1 [-0.0–1.2] | 2.0 [1.9–2.0] | 29.6 [28.6–30.2] | 11.6 [6.8–20.4] | 2188 [1966–2383] | 27.5 [25.2–29.2] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 97.3 [96.9–98.6] (σ 11.0 [9.5–11.4]) ; début de coloration 270 [270–271] ; fin de coloration 303 [303–304] ; arbre nu 323 [323–324] ; pleine floraison 98.7 [98.0–100] (σ 11.0 [8.3–11.4]) ; maturité des fruits 255 [254–256] ; première floraison à 18.0 [18.0–19.0] ans.
 
@@ -1158,22 +1157,22 @@ Mort du tronc (émergente) : 3/5 graines mortes en 400 ans, âges [82, 205, 290]
 | 10 | 7.4 [7.4–7.5] | 8.9 [8.5–9.1] | 4.4 [4.3–4.7] | 7.2 [6.8–7.3] | 1.2 [1.2–1.2] | 26.3 [17.9–27.1] | 16.2 [9.7–17.7] | 25.2 [21.8–30.4] | 0.0 [0.0–0.0] |
 | 15 | 10.9 [10.9–11.0] | 15.7 [15.0–16.2] | 5.2 [5.1–5.3] | 7.1 [6.3–7.2] | 1.4 [1.3–1.4] | 19.1 [18.6–26.7] | 9.5 [8.3–14.8] | 40.6 [31.0–49.9] | 0.1 [0.1–0.1] |
 | 20 | 13.9 [13.9–14.0] | 21.4 [20.5–22.0] | 5.8 [5.5–5.9] | 5.6 [5.5–6.0] | 1.5 [1.4–1.5] | 26.5 [22.6–27.8] | 11.6 [9.2–16.4] | 42.3 [40.0–52.3] | 0.1 [0.1–0.1] |
-| 25 | 16.4 [16.4–16.5] | 25.8 [25.4–26.8] | 6.2 [5.9–6.5] | 4.4 [4.3–4.9] | 1.5 [1.5–1.6] | 26.7 [25.2–33.8] | 9.2 [8.7–16.6] | 58.7 [40.2–69.5] | 0.2 [0.2–0.2] |
-| 30 | 18.4 [18.4–18.5] | 29.7 [29.2–31.3] | 7.0 [6.6–7.1] | 3.9 [3.6–4.6] | 1.6 [1.6–1.7] | 39.1 [33.7–45.0] | 18.1 [14.8–27.8] | 65.6 [37.8–84.2] | 0.3 [0.3–0.3] |
-| 40 | 21.4 [21.4–21.4] | 36.7 [36.2–37.8] | 9.2 [8.8–9.5] | 3.3 [3.1–3.7] | 1.8 [1.7–1.8] | 48.3 [47.4–48.5] | 26.0 [22.3–33.8] | 115 [108–159] | 0.5 [0.5–0.5] |
-| 50 | 23.2 [23.2–23.3] | 42.6 [42.0–43.8] | 11.4 [10.6–11.5] | 2.8 [2.6–3.1] | 2.0 [1.8–2.0] | 49.4 [49.1–50.8] | 28.9 [27.6–34.5] | 165 [130–220] | 0.7 [0.7–0.7] |
-| 60 | 24.3 [24.3–24.4] | 47.8 [47.2–49.6] | 13.2 [12.8–13.4] | 2.7 [2.5–2.8] | 2.1 [2.0–2.3] | 49.4 [48.6–50.3] | 29.8 [28.2–33.2] | 232 [192–263] | 1.0 [0.9–1.0] |
-| 70 | 24.9 [24.8–24.9] | 53.3 [51.5–54.6] | 15.3 [14.8–15.3] | 2.5 [1.7–2.7] | 2.1 [2.1–2.6] | 48.5 [47.7–49.4] | 31.1 [29.5–33.5] | 282 [203–347] | 1.3 [1.2–1.3] |
-| 80 | 25.2 [25.1–25.2] | 57.2 [55.9–59.5] | 16.7 [16.5–17.2] | 2.1 [1.8–2.7] | 2.1 [2.1–2.6] | 47.3 [46.8–48.0] | 29.9 [26.7–32.8] | 410 [290–441] | 1.6 [1.5–1.7] |
-| 100 | 25.6 [25.6–25.6] | 64.5 [63.9–66.4] | 19.2 [19.1–19.8] | 1.8 [-0.0–1.9] | 2.1 [2.1–2.1] | 45.3 [45.1–45.6] | 28.0 [25.3–31.4] | 468 [384–512] | 2.3 [2.2–2.4] |
-| 130 | 26.1 [26.0–26.1] | 74.5 [74.1–76.5] | 21.4 [21.0–21.9] | 1.5 [-0.0–1.6] | 2.1 [2.1–2.1] | 44.0 [43.5–44.8] | 30.4 [27.7–32.7] | 615 [540–663] | 3.3 [3.3–3.5] |
-| 144 | 26.3 [26.3–26.3] | 78.3 [77.8–80.0] | 21.5 [21.1–22.7] | 1.0 [-0.0–1.4] | 2.1 [2.1–2.1] | 44.0 [43.7–44.3] | 31.5 [30.2–35.2] | 556 [467–609] | 3.8 [3.7–3.9] |
-| 150 | 26.4 [26.4–26.4] | 79.9 [78.9–81.4] | 21.4 [20.3–22.7] | 1.0 [-0.0–1.5] | 2.1 [2.1–2.1] | 45.1 [44.1–47.3] | 32.3 [29.8–37.5] | 617 [606–707] | 3.9 [3.8–4.0] |
-| 200 | 27.2 [27.2–27.2] | 90.8 [89.1–92.4] | 22.0 [21.0–23.2] | 1.0 [-0.0–1.0] | 2.1 [2.1–2.1] | 50.0 [48.0–54.9] | 40.2 [34.4–44.0] | 689 [586–764] | 4.7 [4.3–5.1] |
-| 250 | 28.0 [27.9–28.0] | 98.6 [96.3–102] | 24.6 [21.1–24.9] | 0.7 [-0.0–0.8] | 2.1 [2.1–2.1] | 53.7 [48.5–58.6] | 38.7 [37.7–39.2] | 754 [710–912] | 5.3 [4.9–6.1] |
-| 300 | 28.8 [28.7–28.8] | 107 [105–109] | 24.9 [24.4–25.4] | -0.0 [-0.0–0.6] | 2.1 [2.1–2.1] | 49.9 [46.6–53.2] | 32.7 [31.1–34.3] | 827 [786–868] | 6.2 [6.0–6.5] |
-| 350 | 29.5 [29.5–29.6] | 112 [110–115] | 25.3 [24.5–26.1] | -0.0 [-0.0–0.7] | 2.1 [2.1–2.1] | 45.2 [41.7–48.6] | 31.4 [29.8–33.0] | 875 [813–937] | 6.9 [6.7–7.0] |
-| 400 | 30.3 [30.3–30.3] | 117 [114–120] | 24.4 [23.9–25.0] | -0.0 [-0.0–0.6] | 2.1 [2.1–2.1] | 50.9 [49.7–52.1] | 38.7 [35.7–41.6] | 861 [761–962] | 7.3 [7.0–7.7] |
+| 25 | 16.4 [16.4–16.5] | 25.8 [25.4–26.8] | 6.2 [5.9–6.5] | 4.4 [4.3–4.9] | 1.5 [1.5–1.6] | 25.5 [25.2–33.8] | 8.7 [7.9–16.6] | 58.7 [40.2–69.5] | 0.2 [0.2–0.2] |
+| 30 | 18.4 [18.4–18.5] | 29.7 [29.2–31.3] | 7.0 [6.6–7.1] | 3.9 [3.6–4.6] | 1.6 [1.6–1.7] | 31.9 [30.3–32.8] | 10.3 [8.1–13.8] | 65.6 [37.8–84.2] | 0.3 [0.3–0.3] |
+| 40 | 21.4 [21.4–21.4] | 36.7 [36.2–37.8] | 9.2 [8.8–9.5] | 3.3 [3.1–3.7] | 1.8 [1.7–1.8] | 39.6 [34.2–41.9] | 8.5 [6.7–12.1] | 115 [108–159] | 0.5 [0.5–0.5] |
+| 50 | 23.2 [23.2–23.3] | 42.6 [42.0–43.8] | 11.4 [10.6–11.5] | 2.8 [2.6–3.1] | 2.0 [1.8–2.0] | 41.3 [39.8–42.5] | 7.2 [6.0–7.9] | 165 [130–220] | 0.7 [0.7–0.7] |
+| 60 | 24.3 [24.3–24.4] | 47.8 [47.2–49.6] | 13.2 [12.8–13.4] | 2.7 [2.5–2.8] | 2.1 [2.0–2.3] | 48.6 [47.2–49.4] | 13.6 [7.0–15.4] | 232 [192–263] | 1.0 [0.9–1.0] |
+| 70 | 24.9 [24.8–24.9] | 53.3 [51.5–54.6] | 15.3 [14.8–15.3] | 2.5 [1.7–2.7] | 2.1 [2.1–2.6] | 48.5 [47.7–49.4] | 15.6 [8.3–25.7] | 282 [203–347] | 1.3 [1.2–1.3] |
+| 80 | 25.2 [25.1–25.2] | 57.2 [55.9–59.5] | 16.7 [16.5–17.2] | 2.1 [1.8–2.7] | 2.1 [2.1–2.6] | 47.3 [46.8–48.0] | 13.9 [11.5–19.4] | 410 [290–441] | 1.6 [1.5–1.7] |
+| 100 | 25.6 [25.6–25.6] | 64.5 [63.9–66.4] | 19.2 [19.1–19.8] | 1.8 [-0.0–1.9] | 2.1 [2.1–2.1] | 45.3 [45.1–45.6] | 23.0 [14.7–26.4] | 468 [384–512] | 2.3 [2.2–2.4] |
+| 130 | 26.1 [26.0–26.1] | 74.5 [74.1–76.5] | 21.4 [21.0–21.9] | 1.5 [-0.0–1.6] | 2.1 [2.1–2.1] | 44.0 [43.5–44.8] | 28.7 [19.2–32.7] | 615 [540–663] | 3.3 [3.3–3.5] |
+| 144 | 26.3 [26.3–26.3] | 78.3 [77.8–80.0] | 21.5 [21.1–22.7] | 1.0 [-0.0–1.4] | 2.1 [2.1–2.1] | 44.0 [43.7–44.3] | 31.5 [29.6–35.2] | 556 [467–609] | 3.8 [3.7–3.9] |
+| 150 | 26.4 [26.4–26.4] | 79.9 [78.9–81.4] | 21.4 [20.3–22.7] | 1.0 [-0.0–1.5] | 2.1 [2.1–2.1] | 45.1 [44.1–47.3] | 31.5 [28.9–37.5] | 617 [606–707] | 3.9 [3.8–4.0] |
+| 200 | 27.2 [27.2–27.2] | 90.8 [89.1–92.4] | 22.0 [21.0–23.2] | 1.0 [-0.0–1.0] | 2.1 [2.1–2.1] | 50.0 [48.0–51.4] | 24.2 [21.8–34.4] | 689 [586–764] | 4.7 [4.3–5.1] |
+| 250 | 28.0 [27.9–28.0] | 98.6 [96.3–102] | 24.6 [21.1–24.9] | 0.7 [-0.0–0.8] | 2.1 [2.1–2.1] | 48.5 [47.4–49.9] | 14.6 [7.7–26.7] | 754 [710–912] | 5.3 [4.9–6.1] |
+| 300 | 28.8 [28.7–28.8] | 107 [105–109] | 24.9 [24.4–25.4] | -0.0 [-0.0–0.6] | 2.1 [2.1–2.1] | 49.9 [46.6–53.2] | 31.1 [31.0–31.1] | 827 [786–868] | 6.2 [6.0–6.5] |
+| 350 | 29.5 [29.5–29.6] | 112 [110–115] | 25.3 [24.5–26.1] | -0.0 [-0.0–0.7] | 2.1 [2.1–2.1] | 45.2 [41.7–48.6] | 26.5 [23.2–29.8] | 875 [813–937] | 6.9 [6.7–7.0] |
+| 400 | 30.3 [30.3–30.3] | 117 [114–120] | 24.4 [23.9–25.0] | -0.0 [-0.0–0.6] | 2.1 [2.1–2.1] | 47.0 [44.4–49.5] | 10.7 [9.3–12.0] | 861 [761–962] | 7.3 [7.0–7.7] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 113 [112–114] (σ 11.3 [10.5–11.5]) ; début de coloration 273 [272–273] ; fin de coloration 312 [312–314] ; arbre nu 352 [351–353] ; pleine floraison 114 [114–115] (σ 11.3 [10.4–11.5]) ; maturité des fruits 279 [278–280] ; première floraison à 8.0 [8.0–9.0] ans.
 
@@ -1188,20 +1187,20 @@ Mort du tronc (émergente) : 4/5 graines mortes en 350 ans, âges [70, 206, 218,
 | 15 | 8.6 [8.5–8.6] | 13.9 [13.1–14.5] | 4.2 [4.1–4.2] | 6.1 [5.6–6.5] | 1.2 [1.2–1.3] | 30.1 [27.3–36.8] | 19.7 [16.0–29.7] | 24.9 [18.7–32.5] | 0.0 [0.0–0.0] |
 | 20 | 11.1 [11.1–11.1] | 19.1 [18.1–20.3] | 4.8 [4.6–4.9] | 5.3 [4.9–5.8] | 1.3 [1.3–1.3] | 30.7 [29.1–34.7] | 19.8 [13.8–25.1] | 30.4 [23.3–38.1] | 0.1 [0.1–0.1] |
 | 25 | 13.3 [13.3–13.4] | 23.8 [23.0–25.6] | 5.3 [5.1–5.6] | 4.9 [4.6–5.3] | 1.4 [1.4–1.4] | 36.8 [32.0–38.9] | 25.2 [15.9–26.2] | 40.1 [23.5–58.3] | 0.1 [0.1–0.2] |
-| 30 | 15.3 [15.3–15.3] | 27.6 [26.8–30.4] | 5.8 [5.5–6.9] | 4.1 [3.5–4.8] | 1.5 [1.4–1.5] | 39.6 [38.4–49.1] | 24.6 [19.9–35.5] | 48.2 [21.6–83.7] | 0.2 [0.2–0.2] |
-| 40 | 18.3 [18.3–18.4] | 35.6 [34.4–38.3] | 7.5 [7.4–9.2] | 3.7 [3.4–3.9] | 1.6 [1.5–1.7] | 51.2 [47.5–52.0] | 25.7 [22.9–36.1] | 100 [61.2–122] | 0.4 [0.3–0.4] |
-| 50 | 20.5 [20.5–20.5] | 42.8 [40.4–45.3] | 9.7 [9.1–10.9] | 3.5 [2.9–3.8] | 1.8 [1.5–1.9] | 54.3 [53.9–55.2] | 31.1 [26.3–39.4] | 135 [77.9–171] | 0.6 [0.5–0.7] |
-| 60 | 22.0 [22.0–22.0] | 49.6 [46.8–52.4] | 11.6 [10.6–12.5] | 3.2 [3.0–3.4] | 2.0 [1.5–2.3] | 55.2 [54.9–56.7] | 37.7 [34.7–38.5] | 159 [146–246] | 0.9 [0.8–1.0] |
-| 70 | 23.0 [23.0–23.0] | 55.3 [51.9–58.5] | 13.0 [12.4–13.4] | 2.9 [2.3–3.0] | 2.2 [1.5–2.6] | 56.2 [54.9–57.4] | 34.7 [30.6–54.9] | 217 [160–319] | 1.2 [1.0–1.3] |
-| 80 | 23.7 [23.7–23.7] | 60.5 [57.4–63.9] | 14.5 [14.0–15.0] | 2.7 [-0.0–2.9] | 2.3 [1.5–2.7] | 56.0 [55.3–56.2] | 34.7 [32.9–37.4] | 286 [228–413] | 1.5 [1.3–1.6] |
-| 100 | 24.4 [24.4–24.4] | 69.9 [67.3–73.9] | 17.2 [16.5–18.0] | 2.3 [-0.0–2.5] | 2.3 [1.8–2.7] | 54.4 [54.1–55.0] | 35.0 [30.7–40.5] | 405 [342–725] | 2.2 [2.0–2.4] |
-| 130 | 25.0 [25.0–25.0] | 82.4 [80.1–86.8] | 19.4 [18.9–20.2] | 1.9 [-0.0–2.0] | 2.4 [2.1–2.8] | 53.2 [52.0–53.6] | 35.4 [31.6–39.1] | 527 [430–604] | 3.3 [3.1–3.6] |
-| 144 | 25.3 [25.2–25.3] | 87.6 [85.5–92.0] | 19.9 [19.6–20.9] | 1.7 [-0.0–2.0] | 2.4 [2.1–2.8] | 53.2 [51.6–53.5] | 37.2 [35.2–42.1] | 460 [398–565] | 3.8 [3.6–4.2] |
-| 150 | 25.4 [25.4–25.4] | 89.7 [87.9–94.2] | 20.2 [19.9–21.1] | 1.7 [-0.0–1.9] | 2.4 [2.1–2.8] | 53.1 [51.4–53.6] | 38.6 [35.7–42.7] | 586 [445–637] | 4.1 [3.9–4.5] |
-| 200 | 26.3 [26.3–26.4] | 106 [103–111] | 21.7 [21.4–22.3] | 1.4 [-0.0–1.5] | 2.4 [2.1–2.8] | 53.4 [52.2–54.5] | 44.3 [43.3–45.4] | 675 [575–771] | 5.9 [5.5–6.5] |
-| 250 | 27.2 [27.2–27.2] | 115 [114–115] | 22.2 [22.0–22.3] | -0.0 [-0.0–1.1] | 2.1 [2.1–2.1] | 57.0 [54.5–59.5] | 47.9 [46.6–49.2] | 754 [618–890] | 6.9 [6.6–7.1] |
-| 300 | 28.1 [28.1–28.2] | 125 [124–125] | 22.2 [22.0–22.4] | -0.0 [-0.0–1.0] | 2.1 [2.1–2.1] | 61.3 [60.9–61.8] | 51.9 [51.0–52.9] | 615 [588–642] | 7.7 [7.5–7.8] |
-| 350 | 29.0 [29.0–29.0] | 133 [133–133] | 22.6 [22.6–22.6] | -0.0 [-0.0–0.8] | 2.1 [2.1–2.1] | 62.7 [60.9–64.5] | 56.7 [52.4–60.9] | 606 [521–690] | 8.6 [8.5–8.7] |
+| 30 | 15.3 [15.3–15.3] | 27.6 [26.8–30.4] | 5.8 [5.5–6.9] | 4.1 [3.5–4.8] | 1.5 [1.4–1.5] | 37.5 [35.8–39.6] | 19.7 [15.8–22.2] | 48.2 [21.6–83.7] | 0.2 [0.2–0.2] |
+| 40 | 18.3 [18.3–18.4] | 35.6 [34.4–38.3] | 7.5 [7.4–9.2] | 3.7 [3.4–3.9] | 1.6 [1.5–1.7] | 47.4 [44.6–50.7] | 18.9 [15.2–23.6] | 100 [61.2–122] | 0.4 [0.3–0.4] |
+| 50 | 20.5 [20.5–20.5] | 42.8 [40.4–45.3] | 9.7 [9.1–10.9] | 3.5 [2.9–3.8] | 1.8 [1.5–1.9] | 48.7 [48.3–50.0] | 19.3 [17.7–25.1] | 135 [77.9–171] | 0.6 [0.5–0.7] |
+| 60 | 22.0 [22.0–22.0] | 49.6 [46.8–52.4] | 11.6 [10.6–12.5] | 3.2 [3.0–3.4] | 2.0 [1.5–2.3] | 53.5 [48.6–56.2] | 15.6 [13.6–24.7] | 159 [146–246] | 0.9 [0.8–1.0] |
+| 70 | 23.0 [23.0–23.0] | 55.3 [51.9–58.5] | 13.0 [12.4–13.4] | 2.9 [2.3–3.0] | 2.2 [1.5–2.6] | 54.9 [53.3–57.4] | 19.4 [14.1–54.9] | 217 [160–319] | 1.2 [1.0–1.3] |
+| 80 | 23.7 [23.7–23.7] | 60.5 [57.4–63.9] | 14.5 [14.0–15.0] | 2.7 [-0.0–2.9] | 2.3 [1.5–2.7] | 56.0 [55.3–56.2] | 23.0 [18.4–28.3] | 286 [228–413] | 1.5 [1.3–1.6] |
+| 100 | 24.4 [24.4–24.4] | 69.9 [67.3–73.9] | 17.2 [16.5–18.0] | 2.3 [-0.0–2.5] | 2.3 [1.8–2.7] | 54.4 [54.1–55.0] | 26.4 [22.5–28.4] | 405 [342–725] | 2.2 [2.0–2.4] |
+| 130 | 25.0 [25.0–25.0] | 82.4 [80.1–86.8] | 19.4 [18.9–20.2] | 1.9 [-0.0–2.0] | 2.4 [2.1–2.8] | 53.2 [52.0–53.6] | 33.3 [31.4–39.1] | 527 [430–604] | 3.3 [3.1–3.6] |
+| 144 | 25.3 [25.2–25.3] | 87.6 [85.5–92.0] | 19.9 [19.6–20.9] | 1.7 [-0.0–2.0] | 2.4 [2.1–2.8] | 53.2 [51.6–53.5] | 35.4 [29.5–41.2] | 460 [398–565] | 3.8 [3.6–4.2] |
+| 150 | 25.4 [25.4–25.4] | 89.7 [87.9–94.2] | 20.2 [19.9–21.1] | 1.7 [-0.0–1.9] | 2.4 [2.1–2.8] | 53.1 [51.4–53.6] | 36.2 [31.2–38.1] | 586 [445–637] | 4.1 [3.9–4.5] |
+| 200 | 26.3 [26.3–26.4] | 106 [103–111] | 21.7 [21.4–22.3] | 1.4 [-0.0–1.5] | 2.4 [2.1–2.8] | 53.4 [52.2–54.5] | 41.4 [39.1–44.2] | 675 [575–771] | 5.9 [5.5–6.5] |
+| 250 | 27.2 [27.2–27.2] | 115 [114–115] | 22.2 [22.0–22.3] | -0.0 [-0.0–1.1] | 2.1 [2.1–2.1] | 55.9 [54.5–57.3] | 40.2 [34.1–46.4] | 754 [618–890] | 6.9 [6.6–7.1] |
+| 300 | 28.1 [28.1–28.2] | 125 [124–125] | 22.2 [22.0–22.4] | -0.0 [-0.0–1.0] | 2.1 [2.1–2.1] | 54.2 [46.6–61.8] | 38.9 [36.9–40.8] | 615 [588–642] | 7.7 [7.5–7.8] |
+| 350 | 29.0 [29.0–29.0] | 133 [133–133] | 22.6 [22.6–22.6] | -0.0 [-0.0–0.8] | 2.1 [2.1–2.1] | 62.7 [60.9–64.5] | 48.0 [35.1–60.9] | 606 [521–690] | 8.6 [8.5–8.7] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 122 [122–124] (σ 10.5 [10.1–10.6]) ; début de coloration 273 [272–273] ; fin de coloration 313 [312–313] ; arbre nu 352 [352–353] ; pleine floraison 133 [132–134] (σ 10.2 [9.8–10.2]) ; maturité des fruits 311 [310–312] ; première floraison à 13.0 [13.0–14.0] ans.
 
@@ -1218,19 +1217,19 @@ Mort du tronc (émergente) : 1/5 graines mortes en 400 ans, âges [23], 4 vivant
 | 25 | 11.4 [11.4–11.4] | 20.2 [19.8–20.4] | 4.1 [4.1–4.3] | 4.7 [4.4–5.0] | 1.3 [1.3–1.4] | 42.3 [42.0–45.0] | 31.3 [31.0–31.7] | 22.7 [16.8–25.4] | 0.1 [0.1–0.1] |
 | 30 | 13.4 [13.4–13.5] | 24.3 [24.0–24.7] | 4.3 [4.3–4.5] | 4.2 [-0.0–4.3] | 1.4 [1.4–1.4] | 44.4 [44.1–44.9] | 29.6 [28.4–30.9] | 21.9 [12.5–24.2] | 0.1 [0.1–0.1] |
 | 40 | 17.3 [17.3–17.4] | 32.1 [31.7–32.5] | 4.9 [4.8–5.1] | 3.8 [-0.0–3.9] | 1.5 [1.4–1.6] | 45.7 [44.7–46.3] | 25.8 [25.1–26.5] | 35.3 [28.9–40.9] | 0.2 [0.2–0.2] |
-| 50 | 20.8 [20.8–20.9] | 39.3 [38.2–40.5] | 5.9 [5.9–6.2] | 3.5 [-0.0–3.9] | 1.6 [1.5–1.7] | 51.9 [51.7–52.4] | 23.9 [23.0–25.2] | 47.6 [37.5–65.7] | 0.4 [0.4–0.4] |
-| 60 | 24.0 [24.0–24.0] | 46.2 [45.0–48.1] | 7.2 [6.9–7.3] | 3.4 [-0.0–3.7] | 1.7 [1.7–1.8] | 51.6 [48.8–52.4] | 25.0 [23.1–26.5] | 63.6 [59.7–77.2] | 0.6 [0.6–0.7] |
-| 70 | 26.8 [26.8–26.8] | 53.4 [51.3–55.4] | 8.1 [7.9–8.3] | 3.2 [-0.0–3.7] | 1.8 [1.8–1.9] | 54.0 [53.1–55.2] | 26.9 [24.5–39.3] | 79.9 [63.8–103] | 0.9 [0.9–1.0] |
-| 80 | 29.3 [29.3–29.4] | 60.1 [57.7–61.9] | 8.8 [8.6–9.2] | 3.1 [-0.0–3.4] | 1.9 [1.9–2.2] | 56.0 [55.1–56.4] | 29.1 [27.8–31.7] | 103 [93.9–125] | 1.3 [1.2–1.4] |
-| 100 | 33.6 [33.6–33.6] | 72.5 [69.7–74.0] | 10.2 [9.9–11.0] | 2.9 [-0.0–3.1] | 2.2 [2.1–2.5] | 57.7 [56.9–58.8] | 37.8 [28.7–42.7] | 134 [117–167] | 2.1 [1.9–2.2] |
-| 130 | 38.2 [38.2–38.3] | 88.8 [85.9–91.0] | 12.7 [12.1–13.6] | 2.5 [-0.0–2.8] | 2.2 [2.1–2.5] | 59.6 [57.5–60.3] | 44.1 [31.1–45.4] | 212 [178–272] | 3.6 [3.3–3.8] |
-| 144 | 39.9 [39.9–39.9] | 95.6 [92.9–98.5] | 14.1 [13.3–14.9] | 2.4 [-0.0–2.5] | 2.2 [2.1–2.5] | 60.0 [59.0–60.6] | 43.9 [41.2–45.2] | 215 [201–268] | 4.3 [4.0–4.6] |
-| 150 | 40.5 [40.5–40.5] | 98.5 [96.0–102] | 14.7 [14.0–15.3] | 2.5 [-0.0–2.7] | 2.2 [2.1–2.5] | 60.1 [59.3–60.7] | 44.3 [35.2–45.2] | 295 [225–353] | 4.6 [4.4–4.9] |
-| 200 | 44.2 [44.2–44.2] | 121 [119–124] | 18.3 [18.2–18.7] | 2.1 [-0.0–2.2] | 2.2 [2.1–2.5] | 58.9 [58.4–59.7] | 43.2 [42.4–44.1] | 468 [401–508] | 7.7 [7.5–8.1] |
-| 250 | 46.1 [46.0–46.1] | 141 [140–144] | 20.5 [20.0–20.6] | 1.9 [-0.0–2.1] | 2.2 [2.1–2.5] | 56.5 [55.9–57.1] | 42.5 [41.8–43.6] | 559 [505–693] | 11.6 [11.2–11.8] |
-| 300 | 47.0 [47.0–47.0] | 159 [158–162] | 21.9 [21.4–22.0] | 1.8 [-0.0–1.8] | 2.2 [2.1–2.5] | 55.0 [54.4–55.5] | 43.4 [41.9–43.9] | 597 [548–636] | 15.8 [15.4–16.2] |
-| 350 | 47.8 [47.8–47.8] | 176 [175–178] | 23.2 [23.0–23.4] | 1.6 [-0.0–1.6] | 2.2 [2.1–2.5] | 54.5 [53.5–54.7] | 44.1 [43.1–44.2] | 645 [568–800] | 20.5 [20.1–20.9] |
-| 400 | 48.5 [48.5–48.5] | 192 [190–193] | 24.5 [24.1–25.1] | 1.4 [-0.0–1.5] | 2.2 [2.1–2.5] | 54.4 [53.0–54.7] | 45.0 [44.4–45.6] | 880 [755–946] | 25.3 [25.0–25.7] |
+| 50 | 20.8 [20.8–20.9] | 39.3 [38.2–40.5] | 5.9 [5.9–6.2] | 3.5 [-0.0–3.9] | 1.6 [1.5–1.7] | 51.9 [51.7–52.4] | 23.4 [20.3–25.2] | 47.6 [37.5–65.7] | 0.4 [0.4–0.4] |
+| 60 | 24.0 [24.0–24.0] | 46.2 [45.0–48.1] | 7.2 [6.9–7.3] | 3.4 [-0.0–3.7] | 1.7 [1.7–1.8] | 50.2 [48.8–51.9] | 22.3 [19.7–24.4] | 63.6 [59.7–77.2] | 0.6 [0.6–0.7] |
+| 70 | 26.8 [26.8–26.8] | 53.4 [51.3–55.4] | 8.1 [7.9–8.3] | 3.2 [-0.0–3.7] | 1.8 [1.8–1.9] | 53.1 [52.0–54.2] | 19.3 [18.7–21.1] | 79.9 [63.8–103] | 0.9 [0.9–1.0] |
+| 80 | 29.3 [29.3–29.4] | 60.1 [57.7–61.9] | 8.8 [8.6–9.2] | 3.1 [-0.0–3.4] | 1.9 [1.9–2.2] | 52.3 [50.1–53.2] | 16.2 [14.7–17.7] | 103 [93.9–125] | 1.3 [1.2–1.4] |
+| 100 | 33.6 [33.6–33.6] | 72.5 [69.7–74.0] | 10.2 [9.9–11.0] | 2.9 [-0.0–3.1] | 2.2 [2.1–2.5] | 53.9 [50.8–54.5] | 21.8 [18.2–23.1] | 134 [117–167] | 2.1 [1.9–2.2] |
+| 130 | 38.2 [38.2–38.3] | 88.8 [85.9–91.0] | 12.7 [12.1–13.6] | 2.5 [-0.0–2.8] | 2.2 [2.1–2.5] | 54.6 [52.7–56.6] | 13.9 [11.4–20.2] | 212 [178–272] | 3.6 [3.3–3.8] |
+| 144 | 39.9 [39.9–39.9] | 95.6 [92.9–98.5] | 14.1 [13.3–14.9] | 2.4 [-0.0–2.5] | 2.2 [2.1–2.5] | 53.3 [50.6–54.1] | 18.3 [14.4–19.9] | 215 [201–268] | 4.3 [4.0–4.6] |
+| 150 | 40.5 [40.5–40.5] | 98.5 [96.0–102] | 14.7 [14.0–15.3] | 2.5 [-0.0–2.7] | 2.2 [2.1–2.5] | 53.6 [52.1–53.9] | 15.8 [10.4–17.1] | 295 [225–353] | 4.6 [4.4–4.9] |
+| 200 | 44.2 [44.2–44.2] | 121 [119–124] | 18.3 [18.2–18.7] | 2.1 [-0.0–2.2] | 2.2 [2.1–2.5] | 57.8 [55.2–58.5] | 8.5 [6.6–15.7] | 468 [401–508] | 7.7 [7.5–8.1] |
+| 250 | 46.1 [46.0–46.1] | 141 [140–144] | 20.5 [20.0–20.6] | 1.9 [-0.0–2.1] | 2.2 [2.1–2.5] | 56.1 [54.8–56.7] | 15.8 [10.0–20.6] | 559 [505–693] | 11.6 [11.2–11.8] |
+| 300 | 47.0 [47.0–47.0] | 159 [158–162] | 21.9 [21.4–22.0] | 1.8 [-0.0–1.8] | 2.2 [2.1–2.5] | 55.0 [54.4–55.5] | 25.0 [23.8–26.6] | 597 [548–636] | 15.8 [15.4–16.2] |
+| 350 | 47.8 [47.8–47.8] | 176 [175–178] | 23.2 [23.0–23.4] | 1.6 [-0.0–1.6] | 2.2 [2.1–2.5] | 54.5 [53.5–54.7] | 30.6 [28.3–32.1] | 645 [568–800] | 20.5 [20.1–20.9] |
+| 400 | 48.5 [48.5–48.5] | 192 [190–193] | 24.5 [24.1–25.1] | 1.4 [-0.0–1.5] | 2.2 [2.1–2.5] | 54.4 [53.0–54.7] | 33.5 [32.3–34.7] | 880 [755–946] | 25.3 [25.0–25.7] |
 
 Phénologie (jour de l'année moyen [min–max des graines], écart-type interannuel) : débourrement 120 [119–121] (σ 10.6 [6.9–11.0]) ; début de coloration 273 [272–273] ; fin de coloration 312 [312–315] ; arbre nu 352 [351–355] ; pleine floraison 128 [-0.0–130] (σ 10.4 [-0.0–10.8]) ; maturité des fruits 262 [-0.0–264] ; première floraison à 31.0 [31.0–32.0] ans.
 
@@ -1262,8 +1261,8 @@ Médianes des graines vivantes. Vitesses critiques (premier mode, m/s) avec fact
 | espèce | âge | f0 feuillé Hz | f0 défeuillé Hz | gain hiver % | 1re ruine hors feuilles | 1re ruine en feuilles | 35 m/s hiver | 38 m/s hiver | 35 m/s été |
 |---|---:|---:|---:|---:|---:|---:|---|---|---|
 | betula_pendula | 20 | 0.31 | 0.40 | 33.48 | 36.08 | 25.46 | —, —, —, stem, — | stem, —, stem, stem, stem | stem, stem, stem, stem, stem |
-| betula_pendula | 60 | 0.45 | 0.50 | 11.04 | 51.74 | 35.78 | —, —, — | —, —, — | top+limb, top, top |
-| betula_pendula | 100 | 0.57 | 0.66 | 13.58 | 55.22 | 41.84 | —, —, — | —, —, — | top, top, top |
+| betula_pendula | 60 | 0.45 | 0.50 | 11.04 | 51.74 | 27.57 | —, —, — | —, —, — | top+limb, top, top |
+| betula_pendula | 100 | 0.57 | 0.66 | 13.58 | 55.22 | 25.60 | —, —, — | —, —, — | top, top, top |
 | carpinus_betulus | 20 | 0.53 | 0.63 | 18.04 | 35.82 | 36.18 | —, —, —, —, — | top, top, —, —, top | top, top, top, —, — |
 | carpinus_betulus | 60 | 0.86 | 0.96 | 11.90 | 55.92 | 41.24 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
 | carpinus_betulus | 100 | 0.84 | 0.94 | 11.97 | 57.54 | 41.09 | —, —, —, — | —, —, —, — | —, —, —, — |
@@ -1276,9 +1275,9 @@ Médianes des graines vivantes. Vitesses critiques (premier mode, m/s) avec fact
 | quercus_robur | 100 | 0.58 | 0.69 | 18.53 | 45.21 | 29.40 | —, —, —, —, — | —, —, —, —, — | limb+limb+limb+limb+limb, uproot, uproot, limb+limb+limb, uproot |
 | quercus_robur | 150 | 0.47 | 0.54 | 15.34 | 42.16 | 32.17 | —, —, —, — | —, —, —, — | uproot, uproot, uproot, uproot |
 | quercus_petraea | 20 | 0.61 | 0.77 | 27.70 | 32.94 | 30.09 | top, —, top, top, top | top, —, top, top, top | top, —, top, top, top |
-| quercus_petraea | 60 | 0.70 | 0.77 | 11.70 | 50.06 | 33.16 | —, —, —, —, — | —, —, —, —, — | top+top, top+limb, top+top+limb+limb+limb, limb+limb+limb+limb+top+top, limb |
+| quercus_petraea | 60 | 0.70 | 0.77 | 11.70 | 50.06 | 33.08 | —, —, —, —, — | —, —, —, —, — | top+top, top+limb, top+top+limb+limb+limb, limb+limb+limb+limb+top+top, limb |
 | quercus_petraea | 100 | 0.60 | 0.69 | 13.75 | 48.82 | 35.60 | —, —, —, —, — | —, —, —, —, — | limb, —, uproot, top+limb, limb+limb+top+limb |
-| quercus_petraea | 150 | 0.56 | 0.62 | 11.20 | 47.64 | 35.18 | —, —, —, —, — | —, —, —, —, — | limb, —, uproot, top, limb |
+| quercus_petraea | 150 | 0.56 | 0.62 | 11.20 | 47.64 | 34.97 | —, —, —, —, — | —, —, —, —, — | limb, —, uproot, top, limb |
 | acer_pseudoplatanus | 20 | 0.25 | 0.32 | 27.79 | 28.61 | 23.12 | stem, stem, stem, stem, stem | stem, stem, stem, stem, stem | stem, stem, stem, stem, stem |
 | acer_pseudoplatanus | 60 | 0.42 | 0.49 | 14.74 | 41.09 | 24.31 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
 | acer_pseudoplatanus | 100 | 0.46 | 0.53 | 15.86 | 39.99 | 26.24 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
@@ -1288,12 +1287,12 @@ Médianes des graines vivantes. Vitesses critiques (premier mode, m/s) avec fact
 | fraxinus_excelsior | 100 | 0.36 | 0.43 | 15.22 | 42.51 | 26.94 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
 | fraxinus_excelsior | 150 | 0.40 | 0.45 | 12.78 | 41.32 | 25.73 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
 | fagus_sylvatica | 20 | 0.70 | 0.81 | 14.00 | 39.38 | 39.82 | —, —, —, —, — | —, —, top, —, — | —, —, —, —, top |
-| fagus_sylvatica | 60 | 0.70 | 0.73 | 5.35 | 58.67 | 43.94 | —, —, —, —, — | —, —, —, —, — | —, top, top, top, top |
+| fagus_sylvatica | 60 | 0.70 | 0.73 | 5.35 | 58.67 | 35.30 | —, —, —, —, — | —, —, —, —, — | —, top, top, top, top |
 | fagus_sylvatica | 100 | 0.74 | 0.78 | 5.07 | 60.94 | 46.48 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
-| fagus_sylvatica | 150 | 0.76 | 0.81 | 5.73 | 63.40 | 48.42 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
+| fagus_sylvatica | 150 | 0.76 | 0.81 | 5.73 | 63.40 | 42.61 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
 | prunus_avium | 20 | 0.72 | 1.01 | 37.60 | 37.91 | 31.88 | —, —, —, —, — | —, —, —, —, — | —, uproot, uproot, uproot, uproot |
-| prunus_avium | 60 | 0.98 | 1.14 | 18.02 | 47.83 | 37.49 | —, —, —, —, — | —, —, —, —, — | limb, —, limb, —, — |
-| prunus_avium | 100 | 0.97 | 1.18 | 17.65 | 52.82 | 42.79 | —, —, — | —, —, — | —, top, — |
+| prunus_avium | 60 | 0.98 | 1.14 | 18.02 | 47.83 | 37.34 | —, —, —, —, — | —, —, —, —, — | limb, —, limb, —, — |
+| prunus_avium | 100 | 0.97 | 1.18 | 17.65 | 52.82 | 42.66 | —, —, — | —, —, — | —, top, — |
 | tilia_cordata | 20 | 0.37 | 0.47 | 28.46 | 21.19 | 22.23 | stem, stem, top, top, top | stem, stem, stem, stem, stem | stem, stem, stem, stem, top |
 | tilia_cordata | 60 | 0.57 | 0.67 | 16.37 | 42.09 | 29.75 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
 | tilia_cordata | 100 | 0.57 | 0.68 | 17.86 | 39.78 | 27.54 | —, —, —, —, — | —, —, —, —, — | uproot, uproot, uproot, uproot, uproot |
@@ -1313,33 +1312,33 @@ Médianes des graines vivantes. Vitesses critiques (premier mode, m/s) avec fact
 | malus_domestica | 100 | 1.57 | 1.86 | 19.00 | 63.51 | 52.03 | —, — | —, — | —, — |
 | prunus_domestica | 20 | 2.63 | 2.97 | 13.14 | 80.00 | 80.00 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
 | pseudotsuga_menziesii | 20 | 0.43 | 0.68 | 53.42 | 27.47 | 9.89 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
-| pseudotsuga_menziesii | 60 | 0.31 | 0.43 | 39.20 | 42.43 | 19.04 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
-| pseudotsuga_menziesii | 100 | 0.26 | 0.42 | 57.61 | 48.18 | 31.50 | top, top, uproot, uproot, top | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
-| pseudotsuga_menziesii | 150 | 0.36 | 0.42 | 18.26 | 46.90 | 31.69 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
+| pseudotsuga_menziesii | 60 | 0.31 | 0.43 | 39.20 | 34.63 | 4.99 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
+| pseudotsuga_menziesii | 100 | 0.26 | 0.42 | 57.61 | 36.78 | 2.54 | top, top, uproot, uproot, top | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
+| pseudotsuga_menziesii | 150 | 0.36 | 0.42 | 18.26 | 45.77 | 17.85 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
 | picea_abies | 20 | 0.62 | 0.93 | 50.27 | 32.59 | 15.45 | stem, stem, stem, stem, top | stem, stem, stem, stem, stem | stem, stem, stem, stem, uproot |
-| picea_abies | 60 | 0.43 | 0.64 | 49.88 | 51.22 | 28.16 | top, top, top, uproot | uproot, uproot, uproot, uproot | top, uproot, uproot, uproot |
-| picea_abies | 100 | 0.24 | 0.63 | 157.98 | 58.38 | 40.99 | top, top, top, top | top, top, top, top | top, top, top, top |
-| picea_abies | 150 | 0.41 | 0.78 | 89.64 | 65.16 | 50.79 | top, top, top, top | top, top, top, top | top, top, top, top |
+| picea_abies | 60 | 0.43 | 0.64 | 49.88 | 41.58 | 7.87 | top, top, top, uproot | uproot, uproot, uproot, uproot | top, uproot, uproot, uproot |
+| picea_abies | 100 | 0.24 | 0.63 | 157.98 | 44.24 | 3.15 | top, top, top, top | top, top, top, top | top, top, top, top |
+| picea_abies | 150 | 0.41 | 0.78 | 89.64 | 53.31 | 5.23 | top, top, top, top | top, top, top, top | top, top, top, top |
 | taxus_baccata | 20 | 2.30 | 3.51 | 52.89 | 61.72 | 54.84 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
 | taxus_baccata | 60 | 1.33 | 2.31 | 77.58 | 44.05 | 30.84 | limb, —, limb, limb, limb+limb | limb+limb, limb, limb+limb+limb, limb, limb+limb | limb+limb, limb, limb+limb, limb, limb+limb |
 | taxus_baccata | 100 | 1.07 | 1.73 | 58.94 | 47.78 | 38.08 | —, —, —, —, limb | —, top, —, —, limb | —, —, —, —, limb |
 | taxus_baccata | 150 | 0.96 | 1.43 | 45.33 | 48.74 | 41.31 | —, —, —, —, — | —, —, —, —, — | —, —, —, —, — |
 | larix_decidua | 20 | 0.30 | 0.48 | 58.65 | 16.87 | 7.39 | stem, stem, stem, stem, stem | stem, stem, stem, stem, stem | stem, stem, stem, stem, stem |
-| larix_decidua | 60 | 0.33 | 0.45 | 38.31 | 40.61 | 18.07 | top, top, top, top | top, top, top, top | uproot, uproot, uproot, uproot |
-| larix_decidua | 100 | 0.39 | 0.49 | 23.73 | 40.38 | 18.38 | —, —, —, — | top, —, top, top | uproot, uproot, uproot, uproot |
-| larix_decidua | 150 | 0.44 | 0.50 | 13.65 | 37.46 | 22.08 | —, —, —, — | uproot, top, uproot, uproot | uproot, uproot, uproot, uproot |
+| larix_decidua | 60 | 0.33 | 0.45 | 38.31 | 29.39 | 4.72 | top, top, top, top | top, top, top, top | uproot, uproot, uproot, uproot |
+| larix_decidua | 100 | 0.39 | 0.49 | 23.73 | 35.87 | 6.37 | —, —, —, — | top, —, top, top | uproot, uproot, uproot, uproot |
+| larix_decidua | 150 | 0.44 | 0.50 | 13.65 | 37.27 | 15.63 | —, —, —, — | uproot, top, uproot, uproot | uproot, uproot, uproot, uproot |
 | pinus_pinaster | 20 | 0.39 | 0.78 | 96.66 | 26.54 | 11.60 | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
-| pinus_pinaster | 60 | 0.47 | 0.82 | 80.95 | 49.44 | 29.78 | top, top+limb+limb, top, top, top+limb+limb+limb | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
-| pinus_pinaster | 100 | 0.49 | 0.76 | 54.54 | 45.30 | 27.97 | top, top+limb+limb, top, top+limb | uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot |
-| pinus_pinaster | 150 | 0.53 | 0.77 | 44.59 | 45.13 | 32.28 | —, limb, —, — | limb, top+limb+limb+limb, —, uproot | limb+limb+limb, top+limb+limb+limb+limb, —, uproot |
+| pinus_pinaster | 60 | 0.47 | 0.82 | 80.95 | 48.60 | 13.55 | top, top+limb+limb, top, top, top+limb+limb+limb | uproot, uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot, uproot |
+| pinus_pinaster | 100 | 0.49 | 0.76 | 54.54 | 45.30 | 23.02 | top, top+limb+limb, top, top+limb | uproot, uproot, uproot, uproot | uproot, uproot, uproot, uproot |
+| pinus_pinaster | 150 | 0.53 | 0.77 | 44.59 | 45.13 | 31.54 | —, limb, —, — | limb, top+limb+limb+limb, —, uproot | limb+limb+limb, top+limb+limb+limb+limb, —, uproot |
 | pinus_sylvestris | 20 | 0.61 | 1.15 | 87.72 | 30.71 | 19.77 | top, top, uproot, top, top | top, uproot, uproot, top, top | top, uproot, uproot, top, top |
-| pinus_sylvestris | 60 | 0.57 | 1.04 | 80.33 | 55.22 | 37.65 | top, top, top, top, top | top, top, top, top, top | top, top, top, top, top |
-| pinus_sylvestris | 100 | 0.64 | 1.06 | 66.09 | 54.45 | 34.96 | top, top, top, top | top+limb, top, top, top+limb+limb | top+top+limb, top+limb, top, top+limb+limb+limb |
-| pinus_sylvestris | 150 | 0.76 | 1.03 | 36.04 | 53.10 | 38.59 | —, top, —, — | —, top, top, — | —, top, top, limb+limb |
+| pinus_sylvestris | 60 | 0.57 | 1.04 | 80.33 | 53.47 | 15.64 | top, top, top, top, top | top, top, top, top, top | top, top, top, top, top |
+| pinus_sylvestris | 100 | 0.64 | 1.06 | 66.09 | 54.45 | 26.44 | top, top, top, top | top+limb, top, top, top+limb+limb | top+top+limb, top+limb, top, top+limb+limb+limb |
+| pinus_sylvestris | 150 | 0.76 | 1.03 | 36.04 | 53.10 | 36.23 | —, top, —, — | —, top, top, — | —, top, top, limb+limb |
 | abies_alba | 20 | 1.18 | 1.53 | 31.54 | 44.88 | 32.30 | top, top, top, top, top | top, top, top, top, top | top, top, top, top, top |
-| abies_alba | 60 | 0.72 | 0.85 | 17.52 | 51.62 | 25.03 | top, top, top, top | top, top, top, top | top, top, top, top |
-| abies_alba | 100 | 0.60 | 0.70 | 17.01 | 57.68 | 37.84 | top, top, top, top | top, top, top, top | top, top, top, top |
-| abies_alba | 150 | 0.58 | 0.71 | 22.44 | 60.12 | 44.29 | top, top, top+top, top | top, top, top+top, top | top, top, top+top, top |
+| abies_alba | 60 | 0.72 | 0.85 | 17.52 | 50.24 | 22.29 | top, top, top, top | top, top, top, top | top, top, top, top |
+| abies_alba | 100 | 0.60 | 0.70 | 17.01 | 53.91 | 21.82 | top, top, top, top | top, top, top, top | top, top, top, top |
+| abies_alba | 150 | 0.58 | 0.71 | 22.44 | 53.60 | 15.81 | top, top, top+top, top | top, top, top+top, top | top, top, top+top, top |
 
 ### Acclimatation de la tige au vent (chêne, 40 ans)
 
@@ -1824,7 +1823,7 @@ Avec : H 16.94 m, DBH 32.8 cm, H/D 51.7, diamètre de la tige à mi-hauteur / DB
 | `fc34_el_yc10_dbh_50` | dbh_cm | 50 ans ; Britain, European larch plantation, General Yield Class 10, normal yie… | 31.0 cm (single) | 35.0 [33.9–35.1] (4 graines debout) — DBH à 50 ans | ℹ️ indicatif (+13 %) — valeur unique publiée : écart rapporté | simulé | Hamilton G.J., Christie J.M. 1971. Forest Management Tables … | handbook/table ●●○ (0.80) |
 | `andreozzi_larch` | anchorage_moment_knm | Britain, hybrid larch (Larix europaea x japonica), 22 tree-pulling tes… (failure moment 6-24 kNm at critical inclination 16) | qualitatif qualitative (range) | — | ⬜ non modélisé — mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron) | — | Andreozzi M. et al. 2025. On the uprooting stability of tree… | secondary/full ●●○ (0.60) |
 | `andreozzi_larch_tilt` | tilt_at_critical_moment_deg | Britain, hybrid larch, 22 pulling tests | 16.0–28.0 deg (range) | — | ⬜ non modélisé — mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron) | — | Andreozzi M. et al. 2025. On the uprooting stability of tree… | secondary/full ●●○ (0.60) |
-| `hale_larch` | critical_wind_ms | Scotland, ForestGALES parameterised species include European larch (CWS 20-40 m/s all species; the models tended to ov) | qualitatif qualitative (single) | 40.4 [40.1–40.7] (4 graines debout) — première rafale critique, houppier défeuillé, 100 ans | ℹ️ indicatif — valeur unique publiée : écart rapporté ; valeur de Virot et al. contestée (Albrecht et al. 2016) | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
+| `hale_larch` | critical_wind_ms | Scotland, ForestGALES parameterised species include European larch (CWS 20-40 m/s all species; the models tended to ov) | qualitatif qualitative (single) | 35.9 [35.0–40.0] (4 graines debout) — première rafale critique, houppier défeuillé, 100 ans | ℹ️ indicatif — valeur unique publiée : écart rapporté ; valeur de Virot et al. contestée (Albrecht et al. 2016) | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
 
 ### Pommier (Malus domestica)
 
@@ -1977,7 +1976,7 @@ Avec : H 16.94 m, DBH 32.8 cm, H/D 51.7, diamètre de la tige à mi-hauteur / DB
 | `stem_mass_best_predictor` | anchorage_moment_knm | Picea mariana, tests de traction | qualitatif qualitative (single) | moment critique d'ancrage = coefficient x masse de tige (ForestGALES) — moment d'ancrage ∝ masse de tige | ✅ conforme — moment critique d'ancrage = coefficient x masse de tige (ForestGALES) ; épicéa noir ; vrai par construction | par construction | Bergeron C., Ruel J.-C., Elie J.-G., Mitchell S.J. 2009. Roo… | primary/abstract ●●○ (0.70) |
 | `sim_curve_tilt_1deg` | tilt_at_critical_moment_deg | essais de traction non destructifs, méthode SIM | 1.00–2.50 deg (range) | — | ⬜ non modélisé — pas d'inclinaison de la souche | — | Open letter on the generalised tipping curve of the SIM pull… | secondary/abstract ●○○ (0.42) |
 | `leonardo_rule_eloy` | leonardo_rule | arbres botaniques, modèle théorique | qualitatif qualitative (single) | Σ sections filles / section mère aux fourches (rayon ≥ 1 cm) : chêne 100 ans 0.951, merisier 60 ans 0.935 (critère de travail 0,8-1,2, non publié) — règle de Léonard | ✅ conforme — Σ sections filles / section mère aux fourches (rayon ≥ 1 cm) : chêne 100 ans 0.951, merisier 60 ans 0.935 (critère de travail 0,8-1,2, non publié) | simulé | Titre « Leonardo's Rule, Self-Similarity, and Wind-Induced S… | primary/abstract ●●○ (0.70) |
-| `windthrow_age_mode` | failure_mode | générique | qualitatif qualitative (single) | chêne, premier mode défeuillé : 40 ans ["uproot", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) — mode de rupture selon l'âge | ❌ hors plage — chêne, premier mode défeuillé : 40 ans ["uproot", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) ; Wikipédia sans valeur chiffrée | simulé | Wikipedia (en), « Windthrow ». | wikipedia/via_wikipedia ●○○ (0.24) |
+| `windthrow_age_mode` | failure_mode | générique | qualitatif qualitative (single) | chêne, premier mode défeuillé : 40 ans ["stem", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) — mode de rupture selon l'âge | ✅ conforme — chêne, premier mode défeuillé : 40 ans ["stem", "stem", "uproot", "uproot", "stem"], 200 ans ["uproot", "uproot", "uproot", "uproot"] (critère : tronc chez les jeunes, déracinement chez les vieux, majorité des graines) ; Wikipédia sans valeur chiffrée | simulé | Wikipedia (en), « Windthrow ». | wikipedia/via_wikipedia ●○○ (0.24) |
 | `lothar_vivian_swiss_plots` | storm_damage_plot_fraction | Suisse, peuplements tous types, ~2/3 de la surface forestière | 0.370 fraction of plots (single) | — | ⬜ non modélisé — dégâts à l'échelle du peuplement ou du paysage | — | Influence of stand structure and site factors on wind damage… | primary/abstract ●●○ (0.70) |
 | `lothar_vivian_swiss_vivian` | storm_damage_plot_fraction | Suisse | 0.170 fraction of plots (single) | — | ⬜ non modélisé — dégâts à l'échelle du peuplement ou du paysage | — | Influence of stand structure and site factors on wind damage… | primary/abstract ●●○ (0.70) |
 | `bock_storm_acid_soils` | storm_damage_predictors | 969 sites, France/Allemagne du Sud/Suisse, dégâts surtout dispersés | qualitatif qualitative (single) | — | ⬜ non modélisé — dégâts à l'échelle du peuplement ou du paysage | — | Forest storm damage is more frequent on acidic soils. Ann Fo… | primary/abstract ●●○ (0.70) |
@@ -2062,7 +2061,7 @@ Avec : H 16.94 m, DBH 32.8 cm, H/D 51.7, diamètre de la tige à mi-hauteur / DB
 | `kall_h54` | height_m | 54 ans ; Southern Finland, boreal mixed forest mature stand (sampled tree, stum… | 22.6 m (single) | 27.8 [27.8–27.9] (4 graines debout) — hauteur à 54 ans | ℹ️ indicatif (+23 %) — valeur unique publiée : écart rapporté | simulé | Kalliokoski T. 2011. Root system traits of Norway spruce, Sc… | primary/full ●●● (1.00) |
 | `schutz_return` | storm_damage_return_time_years | Swiss Midlands, 332 pure even-aged spruce stands, storm Lothar 1999 | 86.0–113 years (range) | — | ⬜ non modélisé — dégâts de tempête à l'échelle du peuplement ou du paysage | — | Schütz et al. 2006, study of the vulnerability of spruce and… | primary/snippet ●●○ (0.50) |
 | `zub_uproot` | uprooted_share_of_damaged_pct | Western Finland, Norway spruce among damaged trees: Pyry (33 %) and Mi… | 33.0–60.0 % (range) | — | ⬜ non modélisé — dégâts de tempête à l'échelle du peuplement ou du paysage | — | Zubizarreta-Gerendiain A., Pellikka P., Garcia-Gonzalo J., I… | primary/full ●●● (1.00) |
-| `hale_cws` | critical_wind_ms | Scotland, forest district, ForestGALES 2.3 outputs for all parameteris… | 20.0–40.0 m/s (range) | 41.0 [38.9–42.2] (4 graines debout) — première rafale critique, houppier en feuilles (persistant), 100 ans | ⚠️ limite (+37 %) — hors plage, dans 1,5 fois sa demi-largeur | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
+| `hale_cws` | critical_wind_ms | Scotland, forest district, ForestGALES 2.3 outputs for all parameteris… | 20.0–40.0 m/s (range) | 3.15 [2.46–4.32] (4 graines debout) — première rafale critique, houppier en feuilles (persistant), 100 ans | ❌ hors plage (-90 %) — hors plage (1.7 demi-largeurs au-delà du bord) | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
 | `andreozzi_sitka` | anchorage_moment_knm | Britain, Picea sitchensis (proxy for spruce), 368 winching tests, Fras… (failure moment ML 16-53 kNm at critical inclinatio) | qualitatif qualitative (range) | — | ⬜ non modélisé — mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron) | — | Andreozzi M. et al. 2025. On the uprooting stability of tree… | secondary/full ●●○ (0.60) |
 | `andreozzi_tilt` | tilt_at_critical_moment_deg | Britain, Picea sitchensis, 368 winching tests (Fraser & Gardiner 1967) | 10.0–25.0 deg (range) | — | ⬜ non modélisé — mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron) | — | Andreozzi M. et al. 2025. On the uprooting stability of tree… | secondary/full ●●○ (0.60) |
 | `moore_damping` | damping_ratio | conifers, review of sway studies (602 trees, 8 species) | ≤ 0.050 ratio (max_record) | — | ⬜ non modélisé — mécanique dynamique ou essai de traction : pas de protocole par espèce dans le banc (voir physics.ron) | — | Moore J.R., Maguire D.A. 2004. Natural sway frequencies and … | review/snippet ●○○ (0.45) |
@@ -2166,7 +2165,7 @@ Avec : H 16.94 m, DBH 32.8 cm, H/D 51.7, diamètre de la tige à mi-hauteur / DB
 | `fc34_sp_yc12_dbh_50` | dbh_cm | 50 ans ; Britain, Scots pine plantation, General Yield Class 12, normal yield s… | 27.0 cm (single) | 42.8 [40.4–45.3] — DBH à 50 ans | ℹ️ indicatif (+58 %) — valeur unique publiée : écart rapporté | simulé | Hamilton G.J., Christie J.M. 1971. Forest Management Tables … | handbook/table ●●○ (0.80) |
 | `fc34_sp_yc12_dbh_60` | dbh_cm | 60 ans ; Britain, Scots pine plantation, General Yield Class 12, normal yield s… | 33.0 cm (single) | 49.6 [46.8–52.4] — DBH à 60 ans | ℹ️ indicatif (+50 %) — valeur unique publiée : écart rapporté | simulé | Hamilton G.J., Christie J.M. 1971. Forest Management Tables … | handbook/table ●●○ (0.80) |
 | `klemmt_increment` | mai_m3_ha_yr | Bavaria, old pine stands (high age), periodic volume increment VfmD | 7.00–8.00 m3/ha/yr (range) | — | ⬜ non modélisé — grandeur de peuplement ou de gestion : le moteur simule un arbre isolé | — | Klemmt H.-J., Uhl E., Biber P., Pretzsch H. 2005. Zum Wachst… | handbook/full ●●○ (0.80) |
-| `hale_species` | critical_wind_ms | Scotland, ForestGALES parameterised species include Scots pine (critical wind speeds 20-40 m/s (all species), no p) | qualitatif qualitative (single) | 35.0 [30.7–40.5] (4 graines debout) — première rafale critique, houppier en feuilles (persistant), 100 ans | ℹ️ indicatif — valeur unique publiée : écart rapporté | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
+| `hale_species` | critical_wind_ms | Scotland, ForestGALES parameterised species include Scots pine (critical wind speeds 20-40 m/s (all species), no p) | qualitatif qualitative (single) | 26.4 [22.5–28.4] (4 graines debout) — première rafale critique, houppier en feuilles (persistant), 100 ans | ℹ️ indicatif — valeur unique publiée : écart rapporté | simulé | Hale S.E., Gardiner B., Peace A., Nicoll B., Taylor P., Pizz… | primary/full ●●● (1.00) |
 
 ### Merisier (Prunus avium)
 

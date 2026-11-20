@@ -1000,7 +1000,7 @@ picea_abies	kall_h16	height_m	indicatif	10.148748397827148	1.000	1.2553
 picea_abies	kall_h54	height_m	indicatif	27.829763412475586	1.000	0.2314
 picea_abies	schutz_return	storm_damage_return_time_years	non modélisé		0.500	
 picea_abies	zub_uproot	uprooted_share_of_damaged_pct	non modélisé		1.000	
-picea_abies	hale_cws	critical_wind_ms	limite	40.99017333984375	1.000	0.3663
+picea_abies	hale_cws	critical_wind_ms	hors plage	3.1473388671875	1.000	-0.8951
 picea_abies	andreozzi_sitka	anchorage_moment_knm	non modélisé		0.600	
 picea_abies	andreozzi_tilt	tilt_at_critical_moment_deg	non modélisé		0.600	
 picea_abies	moore_damping	damping_ratio	non modélisé		0.450	
@@ -1092,7 +1092,7 @@ larix_decidua	fc34_el_yc10_dbh_45	dbh_cm	indicatif	32.024739265441895	0.800	0.14
 larix_decidua	fc34_el_yc10_dbh_50	dbh_cm	indicatif	34.973533630371094	0.800	0.1282
 larix_decidua	andreozzi_larch	anchorage_moment_knm	non modélisé		0.600	
 larix_decidua	andreozzi_larch_tilt	tilt_at_critical_moment_deg	non modélisé		0.600	
-larix_decidua	hale_larch	critical_wind_ms	indicatif	40.37774658203125	1.000	
+larix_decidua	hale_larch	critical_wind_ms	indicatif	35.871337890625	1.000	
 pinus_pinaster	atlas_height	height_m	conforme	26.846622467041016	0.900	0.0739
 pinus_pinaster	atlas_needle_length	needle_length_cm	conforme	17	0.900	-0.0286
 pinus_pinaster	atlas_needle_longevity	needle_longevity_years	conforme	2.5	0.900	0.0000
@@ -1176,7 +1176,7 @@ pinus_sylvestris	fc34_sp_yc12_dbh_40	dbh_cm	indicatif	35.59062194824219	0.800	0.
 pinus_sylvestris	fc34_sp_yc12_dbh_50	dbh_cm	indicatif	42.781925201416016	0.800	0.5845
 pinus_sylvestris	fc34_sp_yc12_dbh_60	dbh_cm	indicatif	49.57167434692383	0.800	0.5022
 pinus_sylvestris	klemmt_increment	mai_m3_ha_yr	non modélisé		0.800	
-pinus_sylvestris	hale_species	critical_wind_ms	indicatif	34.96282958984375	1.000	
+pinus_sylvestris	hale_species	critical_wind_ms	indicatif	26.4405517578125	1.000	
 abies_alba	atlas_height	height_m	conforme	48.51718521118164	0.900	-0.1914
 abies_alba	atlas_longevity	longevity_years	non mesurable		0.900	
 abies_alba	atlas_first_flowering	age_first_flowering_years	conforme	31	0.900	-0.1143
@@ -1282,7 +1282,7 @@ physics	anchorage_sitka_wet	anchorage_moment_knm	non mesurable		0.700
 physics	stem_mass_best_predictor	anchorage_moment_knm	conforme		0.700	
 physics	sim_curve_tilt_1deg	tilt_at_critical_moment_deg	non modélisé		0.420	
 physics	leonardo_rule_eloy	leonardo_rule	conforme		0.700	
-physics	windthrow_age_mode	failure_mode	hors plage		0.240	
+physics	windthrow_age_mode	failure_mode	conforme		0.240	
 physics	lothar_vivian_swiss_plots	storm_damage_plot_fraction	non modélisé		0.700	
 physics	lothar_vivian_swiss_vivian	storm_damage_plot_fraction	non modélisé		0.700	
 physics	bock_storm_acid_soils	storm_damage_predictors	non modélisé		0.700	
