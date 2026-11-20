@@ -331,7 +331,7 @@
     biotic: (
         // Mean of the standing-dead spruce mortality of the Lower Saxony
         // forest condition survey in the bark-beetle years 2019 (6.1 %) and
-        // 2020 (4.6 %), against 0-0.5 %/year from 1984 to 2018
+        // 2020 (4.6 %), against 0-0.5 %/year up to 2018
         // [wzb_ni_2020_spruce_mortality_2019] [..._2020]
         // [..._1984_2018]. A lower bound of the beetle kill: trees removed
         // by sanitation felling count in the "Ausfallrate" (22.4 % of the
@@ -340,7 +340,8 @@
         // Model choice: crisis years are seasons ending with reserves
         // <= 0.2, 3.0 % of the living years from 60 y on (20 seeds x 400 y,
         // examples/life_dist.rs, before this block), the closest of the
-        // tested levels to the survey's 2 crisis years in 37 (5.4 %).
+        // tested levels to the survey's 2 crisis intervals in 29-36
+        // (5.6-6.9 %).
         crisis_reserve: 0.2,
         // Predisposition by stand age (Netherer et al. 2019, Table 4,
         // after Netherer & Nopp-Mayr 2005) [netherer2019_pas_age_*]:

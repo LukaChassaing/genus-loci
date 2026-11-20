@@ -66,7 +66,7 @@
 //!    « Scolytes ») : the rate in a crisis year is the standing-dead spruce
 //!    mortality of the Lower Saxony forest condition survey in the bark
 //!    beetle years 2019-2020 (6.1 and 4.6 %/year, against 0-0.5 %/year
-//!    from 1984 to 2018; Waldzustandsbericht Niedersachsen 2020, NW-FVA,
+//!    up to 2018; Waldzustandsbericht Niedersachsen 2020, NW-FVA,
 //!    read); the age weights are those of the predisposition index of
 //!    Netherer et al. 2019 (Front For Glob Change 2:39, Table 4, read,
 //!    after Netherer & Nopp-Mayr 2005, not read): < 60 y 0.2, 60-79 y 0.6,

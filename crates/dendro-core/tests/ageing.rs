@@ -285,7 +285,10 @@ fn bark_beetle_hazard_follows_reserves_and_age() {
 /// seasons (`set_drought`: no rain, +40 % evaporative demand) run its
 /// reserves down to a crisis year, where the yearly beetle death
 /// probability becomes > 0, while the same tree in the generator's weather
-/// has none.
+/// has none. The risk follows the reserves, which integrate several
+/// seasons: seed 1 at 120 y needs 2 forced dry seasons (reserves 0.17 after
+/// the second); one dry season alone raises the risk only for a tree whose
+/// reserves were already low.
 #[test]
 fn drought_raises_bark_beetle_risk() {
     let g = Genome::by_id("picea_abies").unwrap();
