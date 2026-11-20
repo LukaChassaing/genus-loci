@@ -23,6 +23,27 @@ pub struct SpeciesCtx {
     pub transp_age: u32,
     /// Age of the critical gust read for `critical_wind_ms` (bench choice).
     pub crit_age: u32,
+    /// Runs of the seeds after those of `runs` (seeds `runs.len() + 1` ..),
+    /// simulated only for the entries that ask for more seeds than the run
+    /// (`Entry::seeds`).
+    pub extra_runs: Vec<TreeRun>,
+}
+
+impl SpeciesCtx {
+    /// The same species read on the first `n` seeds (`runs` then
+    /// `extra_runs`), for an entry with `seeds: Some(n)`.
+    fn with_seeds(&self, n: usize) -> SpeciesCtx {
+        SpeciesCtx {
+            id: self.id.clone(),
+            genome: self.genome.clone(),
+            runs: self.runs.iter().chain(&self.extra_runs).take(n).cloned().collect(),
+            gley: self.gley.clone(),
+            mature_age: self.mature_age,
+            transp_age: self.transp_age,
+            crit_age: self.crit_age,
+            extra_runs: Vec::new(),
+        }
+    }
 }
 
 pub struct Ctx {
@@ -216,6 +237,16 @@ const STAND: &str = "peuplement (le moteur simule un arbre isolé)";
 /// grows an own-rooted seedling tree (no grafting, no rootstock), so the
 /// grafted-orchard entries are not comparable.
 pub fn species_entry(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
+    if let Some(n) = e.seeds.map(|n| n as usize).filter(|&n| n > sp.runs.len()) {
+        let wide = sp.with_seeds(n);
+        let mut m = species_entry_seeded(&wide, cx, e);
+        m.what = format!("{} — sur {} graines (1-{}, champ `seeds` de l'entrée)", m.what, wide.runs.len(), wide.runs.len());
+        return m;
+    }
+    species_entry_seeded(sp, cx, e)
+}
+
+fn species_entry_seeded(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
     let m = species_entry_raw(sp, cx, e);
     let extra = e.conditions.extra.as_deref().map(|x| x.trim_start().to_lowercase()).unwrap_or_default();
     if extra.starts_with("verger greffé") && m.comparable() {
@@ -639,6 +670,15 @@ fn species_entry_raw(sp: &SpeciesCtx, cx: &Ctx, e: &Entry) -> Measured {
         }
         "shoot_length_cm" => Measured::one(g.architecture.max_shoot_length_m as f64 * 100.0, "paramètre max_shoot_length_m", Nature::Param),
         "frost_kill_new_foliage_c" => Measured::one(g.tolerances.frost_c as f64, "paramètre tolerances.frost_c", Nature::Param).calib(),
+        // Bark beetles and stand mortality (spruce, 2026-11-20): the inputs
+        // of `BioticTraits` and the shape of the response; compared off the
+        // bench (examples/life_dist.rs, docs/sources.md « Scolytes »).
+        "annual_mortality_pct" | "annual_removal_pct" | "bark_beetle_crisis_year_fraction" | "bark_beetle_predisposition_weight" => Measured::not_measurable(
+            "donnée d'inventaire ou d'indice de peuplement, entrée du génome (biotic) ; taux de mort par an simulés en années de crise et hors crise : examples/life_dist.rs",
+        ),
+        "bark_beetle_attacked_stand_pct" | "bark_beetle_successful_attack_fraction" | "bark_beetle_risk_qmd_plateau_cm" | "bark_beetle_host_age_years" => {
+            Measured::not_modeled("ni population de scolytes, ni attaques, ni peuplement : seule la mort de l'hôte est tirée (vitality.rs)")
+        }
         // Stand-scale quantities.
         "basal_area_m2_ha" | "stem_density_per_ha" | "yield_class_m3_ha_yr" | "mai_m3_ha_yr" | "stand_volume_m3_ha" | "rotation_years" => {
             Measured::not_modeled("grandeur de peuplement ou de gestion : le moteur simule un arbre isolé")

@@ -34,7 +34,8 @@ pub fn domain(q: &str) -> &'static str {
         }
         "dry_density_kg_m3" | "green_density_kg_m3" | "mor_mpa" | "moe_gpa" | "compressive_strength_mpa" | "tensile_strength_mpa" | "shrinkage_tangential_pct"
         | "sapwood_width_cm" | "sapwood_diameter_fraction" | "sapwood_rings" | "bark_thickness_mm" | "bark_area_fraction" => "Bois et écorce",
-        "longevity_years" | "heart_rot_onset_years" | "heart_rot_fraction" | "dormant_bud_longevity_years" => "Longévité et santé",
+        "longevity_years" | "heart_rot_onset_years" | "heart_rot_fraction" | "dormant_bud_longevity_years" | "annual_mortality_pct" | "annual_removal_pct" => "Longévité et santé",
+        q if q.starts_with("bark_beetle_") => "Longévité et santé",
         "shade_tolerance" | "drought_tolerance" | "waterlogging_tolerance" | "frost_tolerance" | "frost_kill_new_foliage_c" | "frost_kill_acorn_c" | "soil_ph_range"
         | "max_altitude_m" | "mycorrhiza_type" => "Tolérances, station, symbioses",
         "epicormic_response" | "dead_branch_persistence" | "stump_sprouting" | "pruning_season" | "wound_closure_mm_yr" | "pruning_wound_rot_fraction"

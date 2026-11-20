@@ -620,7 +620,9 @@ func update_from(sim: TreeSim) -> void:
 ## « État » line from `TreeSim.get_vitality()`: vigour class and reserves while the trunk lives; once it is dead,
 ## age and cause of death, the standing dead stem (snag) and its expected collapse, stump sprouts. "" when the
 ## species has no carbon balance (genome without `maintenance_per_m`). The vigour classes are display
-## conventions (thresholds of the vigour index and reserves), not published categories.
+## conventions (thresholds of the vigour index and reserves), not published categories. A host of a bark
+## beetle (spruce) in a crisis year (reserves depleted) also shows its yearly risk of a beetle attack
+## (`bark_beetle_probability`, `dendro_core::vitality`); a beetle death reads « Cause : scolytes … ».
 static func vitality_text(d: Dictionary) -> String:
 	if not bool(d.get("modelled", false)):
 		return ""
@@ -633,7 +635,11 @@ static func vitality_text(d: Dictionary) -> String:
 			cls = "dépérissant"
 		elif v < 0.7 or r < 0.6:
 			cls = "en déclin"
-		return "État : %s — réserves %d %%" % [cls, roundi(100.0 * r)]
+		var txt_alive: String = "État : %s — réserves %d %%" % [cls, roundi(100.0 * r)]
+		var bb: float = float(d.get("bark_beetle_probability", 0.0))
+		if bb > 0.0:
+			txt_alive += "\nRisque de scolytes : %s %% par an (arbre affaibli)" % ("%.1f" % (100.0 * bb)).replace(".", ",")
+		return txt_alive
 	var cause: String = String(d.get("cause", ""))
 	var txt: String = "État : tronc mort à %d ans" % death
 	if cause != "":

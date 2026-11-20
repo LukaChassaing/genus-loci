@@ -59,6 +59,9 @@ pub(crate) const S_BUD: u64 = 11;
 pub(crate) const S_RETRENCH: u64 = 12;
 /// Whole-tree mortality and post-mortem resprouting, see `crate::vitality`.
 pub(crate) const S_MORTALITY: u64 = 13;
+/// Death of a host tree by a cambium-feeding bark beetle, see
+/// `crate::vitality` (`BioticTraits`).
+pub(crate) const S_BARK_BEETLE: u64 = 14;
 pub(crate) const S_ROOT: u64 = 20;
 pub(crate) const S_LEAF: u64 = 30;
 pub(crate) const S_FLOWER: u64 = 31;

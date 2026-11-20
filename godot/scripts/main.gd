@@ -1668,6 +1668,13 @@ func _run_selftest() -> void:
 	var age_vd: Dictionary = sim.get_vitality()
 	_check("vitality: modelled, trunk alive at the start", bool(age_vd["modelled"]) and bool(age_vd["trunk_alive"]) and int(age_vd["death_age"]) == -1, str(age_vd))
 	_check("HUD state: vigorous young tree", Hud.vitality_text(age_vd).begins_with("État : vigoureux"), Hud.vitality_text(age_vd))
+	# Bark-beetle risk and death (host in a crisis year, dendro_core::vitality): the HUD lines, on a
+	# synthetic state (the core tests the mechanism, tests/ageing.rs).
+	var bb_live: String = Hud.vitality_text({"modelled": true, "death_age": -1, "reserve": 0.1, "vigour": 0.2, "bark_beetle_probability": 0.05})
+	_check("HUD state: bark-beetle risk of a weakened host", bb_live.contains("Risque de scolytes : 5,0 % par an"), bb_live)
+	_check("HUD state: no beetle line without risk", not Hud.vitality_text(age_vd).contains("scolytes"), Hud.vitality_text(age_vd))
+	var bb_dead: String = Hud.vitality_text({"modelled": true, "death_age": 233, "cause": "scolytes (attaque d'un arbre affaibli)", "standing_dead": true, "collapse_in": 20})
+	_check("HUD state: bark-beetle death, standing snag", bb_dead.contains("Cause : scolytes") and bb_dead.contains("Mort sur pied"), bb_dead)
 	_advance_days_direct(25.0 * 365.0)
 	hud.speed_slider.value = hud.speed_slider.max_value
 	hud.set_playing(true)

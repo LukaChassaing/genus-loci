@@ -204,11 +204,25 @@ fn main() {
                     .collect()
             })
             .collect();
+        // Extra seeds of the entries that ask for more than the run's seeds
+        // (`Entry::seeds`, FORMAT.md): seeds n_seeds + 1 ..= the largest
+        // request of the species, same run length.
+        let ex: Vec<Vec<_>> = species
+            .iter()
+            .zip(&cfgs)
+            .map(|((g, f), c)| {
+                let want = f.entries.iter().filter_map(|e| e.seeds).max().unwrap_or(0) as u64;
+                (n_seeds + 1..=want).map(|sd| s.spawn({ let g = g.clone(); let y = c.0; move || measure::run_tree(&g, sd, y) })).collect()
+            })
+            .collect();
         let cl: Vec<_> = seeds.iter().map(|&sd| s.spawn(move || measure::climate_stats(sd, clim_years))).collect();
         let det = s.spawn(move || determinism_check(&det_genome));
         (
             tr.into_iter().map(|v| v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()).collect::<Vec<_>>(),
-            gl.into_iter().map(|v| v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()).collect::<Vec<_>>(),
+            gl.into_iter()
+                .zip(ex)
+                .map(|(v, x)| (v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>(), x.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()))
+                .collect::<Vec<_>>(),
             cl.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>(),
             det.join().unwrap(),
         )
@@ -217,8 +231,8 @@ fn main() {
 
     let mut files = Vec::new();
     let mut ctxs = Vec::new();
-    for (((g, f), c), (r, gl)) in species.into_iter().zip(&cfgs).zip(runs.into_iter().zip(gleys)) {
-        ctxs.push(SpeciesCtx { id: g.id.clone(), genome: g, runs: r, gley: gl, mature_age: c.1, transp_age: c.2, crit_age: c.3 });
+    for (((g, f), c), (r, (gl, ex))) in species.into_iter().zip(&cfgs).zip(runs.into_iter().zip(gleys)) {
+        ctxs.push(SpeciesCtx { id: g.id.clone(), genome: g, runs: r, gley: gl, mature_age: c.1, transp_age: c.2, crit_age: c.3, extra_runs: ex });
         files.push(f);
     }
     files.extend(physics);

@@ -33,6 +33,12 @@ pub struct Entry {
     pub language: String,
     pub quote: Option<String>,
     pub note: Option<String>,
+    /// Number of seeds (1..=N) the bench uses for this entry when it is
+    /// more than the run's `--seeds` (FORMAT.md, « Graines par entrée »):
+    /// the extra seeds are simulated for that species only. None: the
+    /// run's seeds.
+    #[serde(default)]
+    pub seeds: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -64,7 +70,7 @@ pub const KNOWN_UNITS: &[&str] = &[
     "-", "%", "% crown mass", "0-5 scale", "Ellenberg L (1-9)", "GPa", "Hz", "L/day", "L/day/m2", "MJ/m2/yr", "MPa", "bendings/day",
     "category", "cm", "cm DBH", "cm/yr", "contestation", "d", "day of year", "days", "days/yr", "degC", "deg", "doy", "flushes", "fraction",
     "fraction of plots", "fraction of sample trees", "g", "g/m2", "g/m2/yr", "h/yr", "hours", "kNm", "kg/m3", "l/day", "m", "m/s", "m2/ha", "m2/m2", "m3",
-    "m3/ha", "m3/ha/yr", "mm", "mm/day", "mm/yr", "pH", "qualitative", "ratio", "relation (pente non obtenue)", "relation qualitative",
+    "m3/ha", "m3/ha/yr", "%/yr", "mm", "mm/day", "mm/yr", "pH", "qualitative", "ratio", "relation (pente non obtenue)", "relation qualitative",
     "rings", "t", "trees/ha", "um", "years",
 ];
 

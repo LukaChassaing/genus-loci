@@ -48,7 +48,7 @@ pub use climate::{ClimateParams, Weather};
 pub use flux::{Compartment, Flow, FlowUnit, FluxBudget, FluxGeometry, FluxPolyline, FluxSnapshot, GasSite, GasSiteKind};
 pub use genome::{FruitKind, LeafType, MechanicsTraits, MycorrhizaType, SpeciesCategory, SymbiosisTraits};
 pub use genome::{
-    Architecture, BarkTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
+    Architecture, BarkTraits, BioticTraits, Genome, GenomeError, LeafTraits, LongevityTraits, PhenologyTraits, Pigments, ReproductionTraits, RootTraits,
     Tolerances, WoodTraits,
 };
 pub use mechanics::{CriticalSpeeds, DynamicFactor, Dynamics, FailureMode, MechSegment, MechSite, MechanicsModel, MechanicsSnapshot, SegmentRole, WeakPoint, WindLoad};

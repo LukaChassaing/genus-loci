@@ -26,8 +26,25 @@ fn life(id: &str, seed: u64, years: u32) -> (Option<u32>, f32) {
 }
 
 fn lives(id: &'static str, years: u32) -> Vec<(Option<u32>, f32)> {
-    let h: Vec<_> = SEEDS.iter().map(|&s| std::thread::spawn(move || life(id, s, years))).collect();
+    lives_seeds(id, years, &SEEDS)
+}
+
+fn lives_seeds(id: &'static str, years: u32, seeds: &[u64]) -> Vec<(Option<u32>, f32)> {
+    let h: Vec<_> = seeds.iter().map(|&s| std::thread::spawn(move || life(id, s, years))).collect();
     h.into_iter().map(|h| h.join().unwrap()).collect()
+}
+
+/// Seeds of the Norway spruce checks: 20 seeds fixed in advance (1-20, as
+/// `examples/life_dist.rs`). The spruce's death age hangs on surviving a
+/// string of drought crises (reserves collapse every 10-20 years in the
+/// Rennes climate), so 5 seeds do not fix a median (interquartile range
+/// from 165 to more than 400 years); the move from 5 to 20 seeds was
+/// approved by the user (2026-11-20); the published bands are unchanged.
+const SPRUCE_SEEDS: [u64; 20] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+fn spruce() -> &'static Vec<(Option<u32>, f32)> {
+    static R: OnceLock<Vec<(Option<u32>, f32)>> = OnceLock::new();
+    R.get_or_init(|| lives_seeds("picea_abies", 350, &SPRUCE_SEEDS))
 }
 
 fn median(mut v: Vec<f32>) -> f32 {
@@ -228,11 +245,68 @@ fn hazel_stem_dies_within_its_published_longevity() {
 }
 
 /// Norway spruce: "rarely more than 150 cm" [atlas_dbh_max]; before the
-/// emergent ageing the stem reached 166 cm at 350 y. Median over the seeds
-/// (one seed still reaches ~163 cm: the record is a typical maximum).
+/// emergent ageing the stem reached 166 cm at 350 y. Median over the 20
+/// seeds `SPRUCE_SEEDS` (several seeds still exceed 150 cm: the record is a
+/// typical maximum).
 #[test]
 fn spruce_lifetime_dbh_stays_below_the_record() {
-    let r = lives("picea_abies", 350);
-    let dbh = median(r.iter().map(|x| x.1).collect());
+    let dbh = median(spruce().iter().map(|x| x.1).collect());
     assert!(dbh <= 150.0, "spruce median lifetime DBH {dbh:.1} cm, record 150 cm");
+}
+
+/// Bark-beetle hazard (`vitality::bark_beetle_hazard`, traits of
+/// `data/species/picea_abies.ron`): none outside a crisis year (reserves
+/// above `crisis_reserve`) nor for a non-host; in a crisis year the
+/// crisis rate times the age weight, so a young tree (< 60 y, weight 0.2)
+/// is less at risk than an old one (> 100 y, weight 1) with the same
+/// reserves. The sources give no size or age below which a spruce is never
+/// attacked (the predisposition index keeps 0.2 below 60 years), so none is
+/// tested.
+#[test]
+fn bark_beetle_hazard_follows_reserves_and_age() {
+    use dendro_core::vitality::bark_beetle_hazard;
+    let b = Genome::by_id("picea_abies").unwrap().biotic;
+    assert!(b.host());
+    let crisis = b.crisis_reserve;
+    assert_eq!(bark_beetle_hazard(&b, 120.0, crisis + 0.01), 0.0);
+    let old = bark_beetle_hazard(&b, 120.0, crisis);
+    let young = bark_beetle_hazard(&b, 30.0, crisis);
+    assert!((old - b.crisis_kill_rate).abs() < 1e-6, "{old}");
+    assert!(young > 0.0 && young < old, "young {young}, old {old}");
+    assert!((young / old - 0.2).abs() < 1e-6);
+    assert!(bark_beetle_hazard(&b, 70.0, 0.0) < bark_beetle_hazard(&b, 90.0, 0.0));
+    // A species without the block is not a host.
+    let oak = Genome::by_id("quercus_petraea").unwrap().biotic;
+    assert!(!oak.host());
+    assert_eq!(bark_beetle_hazard(&oak, 200.0, 0.0), 0.0);
+}
+
+/// A dry spell raises the beetle risk of an old spruce: forced drought
+/// seasons (`set_drought`: no rain, +40 % evaporative demand) run its
+/// reserves down to a crisis year, where the yearly beetle death
+/// probability becomes > 0, while the same tree in the generator's weather
+/// has none.
+#[test]
+fn drought_raises_bark_beetle_risk() {
+    let g = Genome::by_id("picea_abies").unwrap();
+    let mut wet = Simulation::new(g.clone(), 1);
+    wet.advance_years(120);
+    let mut dry = Simulation::new(g, 1);
+    dry.advance_years(120);
+    let v0 = wet.vitality();
+    assert!(wet.trunk_alive() && v0.reserve > dry.genome().biotic.crisis_reserve, "{v0:?}");
+    assert_eq!(v0.bark_beetle_probability, 0.0);
+    let mut seasons = 0;
+    while dry.vitality().bark_beetle_probability == 0.0 && seasons < 6 {
+        dry.set_drought(true);
+        dry.advance_years(1);
+        dry.set_drought(false);
+        wet.advance_years(1);
+        seasons += 1;
+        assert!(dry.trunk_alive(), "drought killed the spruce outright: {:?}", dry.vitality());
+    }
+    let (vd, vw) = (dry.vitality(), wet.vitality());
+    assert!(vd.reserve < vw.reserve, "dry {vd:?} wet {vw:?}");
+    assert!(vd.bark_beetle_probability > vw.bark_beetle_probability, "after {seasons} dry seasons: dry {vd:?} wet {vw:?}");
+    assert!(vd.bark_beetle_probability > 0.0);
 }
