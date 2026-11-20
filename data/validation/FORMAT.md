@@ -78,6 +78,31 @@ ou les déclare non modélisés dans `docs/validation/report.md`.
   `pruning_max_branch_diameter_mm`, `pruning_season`, `dead_branch_persistence`, `gummosis`, `stump_sprouting`,
   `shoot_length_cm`, `ring_width_trend`.
 
+## Observables ajoutés pour les scolytes de l'épicéa (2026-11-20)
+
+`picea_abies.ron` ; entrées du trait `biotic` du génome ou forme de la réponse, non comparées par le banc (voir
+`docs/sources.md`, « Scolytes de l'épicéa ») :
+
+- `annual_mortality_pct` (unité `%/yr`) : part des arbres d'un inventaire morts sur pied dans l'année ;
+- `annual_removal_pct` (`%/yr`) : part des arbres d'un inventaire exploités comme bois de chablis ou de
+  scolytes dans l'année (« Ausfallrate ») ;
+- `bark_beetle_crisis_year_fraction` (`fraction`) : part des années d'une série où la mortalité sort du fond ;
+- `bark_beetle_predisposition_weight` (`-`) : poids relatif d'une classe dans un indice de prédisposition ;
+- `bark_beetle_attacked_stand_pct` (`%`) : part des peuplements attaqués (présence/absence, pas une part d'arbres) ;
+- `bark_beetle_successful_attack_fraction` (`fraction`) : part des attaques réussies sur des arbres vivants ;
+- `bark_beetle_host_age_years` (`years`) : âges des arbres préférentiellement attaqués ;
+- `bark_beetle_risk_qmd_plateau_cm` (`cm`) : diamètre quadratique moyen du peuplement au-delà duquel le risque
+  ne croît plus.
+
+## Graines par entrée (`seeds`, 2026-11-20)
+
+Champ facultatif d'une entrée : `seeds: Some(20)` fait lire cette entrée sur les graines 1 à 20 au lieu des
+graines du banc (`--seeds`, 5 par défaut) ; les graines manquantes ne sont simulées que pour l'espèce concernée,
+avec la même durée. Le champ ne réduit jamais l'échantillon (une valeur inférieure à `--seeds` est ignorée) et ne
+change ni la bande ni la règle de verdict (médiane, censure). Utilisé, avec l'accord de l'utilisateur
+(2026-11-20), pour la longévité et le DBH maximal de l'épicéa, dont l'âge de mort est mal conditionné sur
+5 graines (voir `docs/sources.md`, « Écarts connus »).
+
 ## Conventions constatées et vérifiées par le banc
 
 - `spread_kind: "sd"` : `min` et `max` valent valeur ± 1 écart-type (le banc en tire la tolérance ± 2 sd). Quand la

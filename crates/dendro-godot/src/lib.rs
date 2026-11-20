@@ -4,6 +4,8 @@ mod backend;
 mod prune_api;
 /// Save / load (« Sauvegarder », « Charger ») functions of `TreeSim`.
 mod save_api;
+/// Wind (« Tempête », history, sway) functions of `TreeSim`.
+mod wind_api;
 /// Godot surfaces encoded in Rust; mesh worker thread.
 mod surface;
 
@@ -158,7 +160,8 @@ impl TreeSim {
     /// Vitality (« État » of the HUD, see `dendro_core::vitality`): `modelled` (bool), `reserve`,
     /// `vigour`, `death_probability` (per year), `cost_ratio`, `dieback` (branches killed last season),
     /// `trunk_alive`, `alive` (stump sprouts count), `death_age` (years, -1 while alive), `cause` (French
-    /// label, "" while alive), `standing_dead`, `collapse_in` (years, -1), `collapsed`, `resprouted`.
+    /// label, "" while alive), `standing_dead`, `collapse_in` (years, -1), `collapsed`, `resprouted`,
+    /// `bark_beetle_probability` (per year; > 0 only for a host in a crisis year, see `BioticTraits`).
     #[func]
     fn get_vitality(&self) -> VarDictionary {
         let v = self.backend.vitality();
@@ -168,6 +171,7 @@ impl TreeSim {
         put("reserve", (v.reserve as f64).to_variant());
         put("vigour", (v.vigour as f64).to_variant());
         put("death_probability", (v.death_probability as f64).to_variant());
+        put("bark_beetle_probability", (v.bark_beetle_probability as f64).to_variant());
         put("cost_ratio", (v.cost_ratio as f64).to_variant());
         put("dieback", (v.dieback_branches as i64).to_variant());
         put("trunk_alive", self.backend.trunk_alive().to_variant());
@@ -599,6 +603,11 @@ impl TreeSim {
         put("crown_area_m2", (s.crown_frontal_area_m2 as f64).to_variant());
         put("crown_cd", (s.crown_drag_coefficient as f64).to_variant());
         put("buckling_safety", (s.buckling_safety as f64).to_variant());
+        put("natural_frequency_hz", (s.natural_frequency_hz as f64).to_variant());
+        put("damping_ratio", (s.damping_ratio as f64).to_variant());
+        put("dynamic_factor", (s.dynamic_factor as f64).to_variant());
+        put("top_deflection_m", (s.top_deflection_m as f64).to_variant());
+        put("critical_pending", self.backend.mechanics_pending().to_variant());
         d
     }
     /// Safety factor of every shoot segment (node order) of the last `get_mechanics` speed.

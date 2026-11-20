@@ -270,6 +270,13 @@ fn pow_k(x: f32, k: f32) -> f32 {
     }
 }
 
+/// A stem section under unmet wind demand may grow a ring up to this many
+/// times the usual cap (`max_dr`): stems bent at the intensity of the
+/// strongest wind strains grew at least 80 % more (Bonnesoeur et al. 2016,
+/// New Phytol 210:850-860, abstract seen through a search engine, not
+/// read); 1.8 = that figure.
+pub const WIND_RING_BOOST: f32 = 1.8;
+
 /// Leaf area of a leafy shoot unit relative to the reference (a full-length
 /// unit of about a voxel): short, weak units carry fewer leaves.
 #[inline]
@@ -771,6 +778,42 @@ impl ShootSystem {
             nd.term_bud = false;
             nd.lat_buds = 0;
             nd.sprout = 0.0;
+        }
+    }
+
+    /// An uprooted tree falls (`Simulation::uproot`): every node turns about
+    /// the collar by `FALL_ANGLE_DEG` towards `azimuth_deg` (the direction
+    /// the wind blows towards, `mechanics::WindLoad` convention), so the
+    /// stem lies on the ground; what would then lie below the ground (the
+    /// crown on the near side of the stem) is folded up onto it,
+    /// `y -> FOLD x |y|` (crushed branches; stylisation for display, the
+    /// mapping stays continuous so the axes stay connected). Lengths and
+    /// radii are unchanged except where folded.
+    pub fn lay_down(&mut self, azimuth_deg: f32) {
+        const FALL_ANGLE_DEG: f32 = 86.0;
+        const FOLD: f32 = 0.15;
+        let (sa, ca) = azimuth_deg.to_radians().dsin_cos();
+        let towards = Vec3::new(ca, 0.0, sa);
+        // Axis: rotating +Y towards `towards` is a rotation about Y x towards.
+        let axis = Vec3::Y.cross(towards).normalize_or(Vec3::new(1.0, 0.0, 0.0));
+        let q = crate::math::Quat::from_axis_angle(axis, FALL_ANGLE_DEG.to_radians());
+        let pivot = self.nodes.first().map(|n| n.start).unwrap_or(Vec3::ZERO);
+        let map = |p: Vec3| {
+            let r = pivot + q.rotate(p - pivot);
+            Vec3::new(r.x, if r.y < 0.0 { -FOLD * r.y } else { r.y }, r.z)
+        };
+        let ext = self.ext;
+        for n in self.nodes.iter_mut() {
+            let (a, b) = (map(n.start), map(n.end(ext)));
+            let l = (b - a).length();
+            let old = (n.end(ext) - n.start).length().max(1e-6);
+            n.start = a;
+            n.dir = (b - a).normalize_or(n.dir);
+            // Keep the drawn length (the extension rule of leafy nodes is
+            // unchanged: dead nodes are not leafy).
+            let k = l / old;
+            n.length *= k;
+            n.grow_from *= k;
         }
     }
 
@@ -1386,29 +1429,52 @@ impl ShootSystem {
     ///
     /// When no segment is over its stress set-point (or the response is
     /// off), this is exactly the pure Pressler allocation.
-    pub fn thicken(&mut self, g: &Genome, factor: f32, max_dr: f32) -> f32 {
+    ///
+    /// `wind`: per node (index order), the stem's bending stress under the
+    /// tree's reference winds over its set-point (`crate::wind`: the stress
+    /// of the stem at 1.3 m); empty = no wind acclimation.
+    pub fn thicken(&mut self, g: &Genome, factor: f32, max_dr: f32, wind: &[f32]) -> f32 {
+        let wind = if wind.len() == self.nodes.len() { wind } else { &[] };
         let mut k = self.area_per_foliage(g.wood.growth_coefficient) * factor;
-        let extra = self.adaptive_demand(g, k, max_dr);
+        let extra = self.adaptive_demand(g, k, max_dr, wind);
         if !extra.is_empty() {
-            // Zero-sum: the mechanical wood comes out of the phase's budget
-            // `k x sum F L` (Pressler's share shrinks in proportion).
+            // Self-weight response, zero-sum: the mechanical wood comes out
+            // of the phase's budget `k x sum F L` (Pressler's share shrinks
+            // in proportion).
             let budget = k * self.foliage_path;
-            let want: f32 = extra.iter().map(|&(i, da)| da * self.nodes[i].length).sum();
             let cap = budget * g.wood.adaptive_max_budget_share.clamp(0.0, 1.0);
+            let want: f32 = extra.iter().map(|&(i, da, _)| da * self.nodes[i].length).sum();
             let scale = if want > cap && want > 0.0 { cap / want } else { 1.0 };
             let used = want * scale;
             if budget > 0.0 {
                 k *= ((budget - used) / budget).max(0.0);
             }
-            for &(i, da) in &extra {
-                self.nodes[i].area += da * scale;
+            // Wind response, on top of the budget: stems strained like the
+            // strongest winds grow more secondary wood, not the same wood
+            // elsewhere (Bonnesoeur et al. 2016: at least +80 %, abstract),
+            // up to a share of the phase's budget (below). Not a carbon balance (the
+            // extra wood is not paid by height growth or the roots:
+            // docs/sources.md, « Écarts connus »). Taking it from the budget
+            // instead lowered the DBH and moved three calibrated growth
+            // tests out of their bands (oak height at 200 y 34.05 m for
+            // 28-34, 11 scaffold limbs for 3-10, cherry rings at 105-115 y).
+            let want_w: f32 = extra.iter().map(|&(i, _, dw)| dw * self.nodes[i].length).sum();
+            // Whorled conifer stems (the leader up to its tip, `crate::wind`):
+            // up to the "+80 % at least" of Bonnesoeur et al. 2016; other
+            // trees keep the self-weight share (user decision, 2026-11-20:
+            // the 80 % cap gave the 100-year oak 11 scaffold limbs).
+            let cap_w = if g.architecture.whorled { budget * (WIND_RING_BOOST - 1.0) } else { cap };
+            let scale_w = if want_w > cap_w && want_w > 0.0 { cap_w / want_w } else { 1.0 };
+            for &(i, da, dw) in &extra {
+                self.nodes[i].area += da * scale + dw * scale_w;
             }
         }
         let mut collar = 0.0;
         for (i, n) in self.nodes.iter_mut().enumerate() {
             let r0 = n.radius();
             let a1 = n.area + k * n.foliage;
-            let r1 = (a1 / PI).sqrt().min(r0 + max_dr);
+            let cap = if wind.get(i).is_some_and(|&x| x > 1.0) { max_dr * WIND_RING_BOOST } else { max_dr };
+            let r1 = (a1 / PI).sqrt().min(r0 + cap);
             let new_area = PI * r1 * r1;
             if i == 0 {
                 collar = new_area - n.area;
@@ -1447,13 +1513,23 @@ impl ShootSystem {
     /// ONE 9:e93535, read) and by the near-constant stress along primary
     /// branches of 40 species (Evans et al. 2008, Trees 22:283-289,
     /// abstract). The static self-weight load stands in for the strain
-    /// history (wind sway is not simulated): a stylisation.
+    /// history of the limbs: a stylisation.
+    ///
+    /// **Wind (stem only).** `wind[i]` = stress of stem section i under the
+    /// tree's reference winds / the stress of the stem at 1.3 m under the
+    /// same winds (`crate::wind`, full mechanics: weight, crown drag,
+    /// dynamics, large deflections): the uniform stress hypothesis along the
+    /// stem above the butt swell (Morgan & Cannell 1994). The required
+    /// diameter is the larger of the weight and wind cases; a section in
+    /// wind deficit may lay a ring up to `WIND_RING_BOOST` times the usual
+    /// cap.
     ///
     /// Cost: one O(n) pass (a few vector operations per segment, one
     /// `dpowf` per overstressed segment).
-    fn adaptive_demand(&self, g: &Genome, k: f32, max_dr: f32) -> Vec<(usize, f32)> {
+    fn adaptive_demand(&self, g: &Genome, k: f32, max_dr: f32, wind: &[f32]) -> Vec<(usize, f32, f32)> {
         let w = &g.wood;
-        if w.adaptive_stress_mpa <= 0.0 || w.adaptive_max_budget_share <= 0.0 || k <= 0.0 {
+        let wind_on = wind.len() == self.nodes.len();
+        if (w.adaptive_stress_mpa <= 0.0 && !wind_on) || w.adaptive_max_budget_share <= 0.0 || k <= 0.0 {
             return Vec::new();
         }
         let n = self.nodes.len();
@@ -1491,27 +1567,43 @@ impl ShootSystem {
         let min_r = 0.5 * w.adaptive_min_diameter_cm * 0.01;
         let mut out = Vec::new();
         for (i, nd) in self.nodes.iter().enumerate() {
-            if nd.leafy || nd.is_snag() {
+            // The wind case reaches the leader shoots of the stem that carry
+            // needles (`crate::wind`: order-0 stem of a whorled conifer);
+            // the self-weight case leaves leafy shoots alone.
+            let windy = wind_on && wind[i] > 1.0;
+            if nd.is_snag() || (nd.leafy && !windy) {
                 continue;
             }
             let r = nd.radius();
-            if r < min_r {
+            if r < min_r && !windy {
                 continue;
             }
-            let m = qsum[i] - nd.start.cross(fsum[i]);
-            let mb = (m - nd.dir * m.dot(nd.dir)).length();
-            let d = 2.0 * r;
-            let sigma = 32.0 * mb / (PI * d * d * d);
-            if sigma <= sigma_t {
+            // Stress / set-point of the weight case and of the wind case.
+            let mut ratio = 0.0f32;
+            if sigma_t > 0.0 && r >= min_r && !nd.leafy {
+                let m = qsum[i] - nd.start.cross(fsum[i]);
+                let mb = (m - nd.dir * m.dot(nd.dir)).length();
+                let d = 2.0 * r;
+                ratio = 32.0 * mb / (PI * d * d * d) / sigma_t;
+            }
+            let ratio_w = if windy { ratio.max(wind[i]) } else { ratio };
+            if ratio_w <= 1.0 {
                 continue;
             }
-            let r_req = r * (sigma / sigma_t).dpowf(1.0 / 3.0);
             let a_pressler = nd.area + k * nd.foliage;
-            let a_req = PI * r_req * r_req;
-            let a_cap = PI * (r + max_dr) * (r + max_dr);
-            let da = a_req.min(a_cap) - a_pressler;
-            if da > 0.0 {
-                out.push((i, da));
+            let need = |x: f32, cap: f32| {
+                if x <= 1.0 {
+                    return 0.0;
+                }
+                let r_req = r * x.dpowf(1.0 / 3.0);
+                let a_cap = PI * (r + cap) * (r + cap);
+                ((PI * r_req * r_req).min(a_cap) - a_pressler).max(0.0)
+            };
+            // Self-weight part, then what the wind adds beyond it.
+            let da = need(ratio, max_dr);
+            let dw = if windy { (need(ratio_w, max_dr * WIND_RING_BOOST) - da).max(0.0) } else { 0.0 };
+            if da > 0.0 || dw > 0.0 {
+                out.push((i, da, dw));
             }
         }
         out
@@ -1729,16 +1821,57 @@ impl ShootSystem {
         if self.nodes[0].end(self.ext).y >= y {
             return Some(0);
         }
-        for i in 1..self.nodes.len() {
-            let n = &self.nodes[i];
-            if n.parent as usize == cur && n.terminal {
-                cur = i;
-                if n.end(self.ext).y >= y {
-                    return Some(i);
+        // A cut stem end below `y` (coppice cut, wind break): its sprouts
+        // are laterals, not a terminal continuation.
+        if !self.nodes[0].cut_end {
+            for i in 1..self.nodes.len() {
+                let n = &self.nodes[i];
+                if n.parent as usize == cur && n.terminal {
+                    cur = i;
+                    if n.end(self.ext).y >= y {
+                        return Some(i);
+                    }
+                    if n.cut_end {
+                        break;
+                    }
                 }
             }
         }
-        None
+        // The stem was cut or broken below `y` (coppice cut, wind break,
+        // stump sprouts) or its leader died: the stem is now the thickest
+        // living shoot growing from what is left, as a forester measures a
+        // coppice stool. Before, the walk stopped at the stump and returned
+        // None (DBH 0) or ran up a thin sprout flagged terminal (DBH 1.4 cm
+        // on a 16 m coppice shoot).
+        self.living_stem_node_at(y)
+    }
+
+    /// The node at height `y` on the path of the thickest living shoots
+    /// from the collar (the stem of a coppice stool or of the sprouts of a
+    /// windthrown stump); None when no living shoot reaches `y`.
+    pub fn living_stem_node_at(&self, y: f32) -> Option<usize> {
+        let n = self.nodes.len();
+        let mut thickest = vec![NONE; n];
+        for i in 1..n {
+            let nd = &self.nodes[i];
+            if nd.is_snag() {
+                continue;
+            }
+            let p = nd.parent as usize;
+            let t = thickest[p];
+            if t == NONE || nd.area > self.nodes[t as usize].area {
+                thickest[p] = i as u32;
+            }
+        }
+        let mut c = 0usize;
+        while self.nodes[c].end(self.ext).y < y {
+            let t = thickest[c];
+            if t == NONE {
+                return None;
+            }
+            c = t as usize;
+        }
+        Some(c)
     }
 
     /// Architecture metrics (see [`crate::sim::ShapeMetrics`]).

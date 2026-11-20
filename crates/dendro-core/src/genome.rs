@@ -88,6 +88,12 @@ pub struct Genome {
     /// [`crate::mechanics`]). Read-only: no effect on growth.
     #[serde(default)]
     pub mechanics: MechanicsTraits,
+    /// Biotic mortality: a cambium-feeding bark beetle that kills its host
+    /// in crisis years (see [`crate::vitality`]). Neutral default: not a
+    /// host, no draw (genomes written before this block, and every species
+    /// for which no rate was found).
+    #[serde(default)]
+    pub biotic: BioticTraits,
 }
 
 /// Above-ground architecture (bud/shoot model, after Palubicki et al. 2009,
@@ -1007,6 +1013,14 @@ pub struct MechanicsTraits {
     /// rooting on a freely draining soil (`Creg` of Gardiner et al. 2000
     /// and ForestGALES; Nicoll et al. 2006, Can J For Res 36:1871-1883).
     pub anchorage_nm_per_kg: f32,
+    /// Damping ratio of the fundamental sway in still air, leafless
+    /// (structural damping: wood, roots, branch interactions) and the share
+    /// added by a full summer crown (leaf drag). Jackson et al. 2019, J R Soc
+    /// Interface 16:20190116 (pull-and-release, four broadleaves, article
+    /// read): 3.9 +- 1.3 % in winter, 8.6 +- 2.2 % in summer. The same values
+    /// for every species (estimated: no measurement for these species).
+    pub damping_leafless: f32,
+    pub damping_leaves: f32,
 }
 
 impl Default for MechanicsTraits {
@@ -1018,7 +1032,51 @@ impl Default for MechanicsTraits {
             crown_drag_coefficient: 0.2,
             vogel_exponent: -1.0,
             anchorage_nm_per_kg: 178.1,
+            damping_leafless: 0.039,
+            damping_leaves: 0.047,
         }
+    }
+}
+
+/// Mortality caused by a cambium-feeding bark beetle (spruce: *Ips
+/// typographus*), see [`crate::vitality`]. The yearly probability that the
+/// beetle kills the trunk is `crisis_kill_rate x age weight` in a crisis
+/// year (reserves at or below `crisis_reserve`), 0 otherwise. Every value is
+/// sourced in the species RON file and `docs/sources.md`. Default: not a
+/// host (`crisis_kill_rate` 0): no draw, the tree is unchanged.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BioticTraits {
+    /// Yearly probability that a fully susceptible host (age weight 1) is
+    /// killed by the beetle in a crisis year. 0 = not a host.
+    pub crisis_kill_rate: f32,
+    /// Reserve level (0..1, `vitality.rs`) at or below which the season
+    /// counts as a crisis year (host defences weakened by depleted
+    /// reserves after drought).
+    pub crisis_reserve: f32,
+    /// Susceptibility by age: `(lower bound in years, weight 0..1)`, in
+    /// ascending order of age; the weight of the last bound not above the
+    /// age applies (0 below the first bound).
+    pub age_weights: Vec<(f32, f32)>,
+}
+
+impl Default for BioticTraits {
+    fn default() -> Self {
+        BioticTraits { crisis_kill_rate: 0.0, crisis_reserve: 0.0, age_weights: Vec::new() }
+    }
+}
+
+impl BioticTraits {
+    /// The species is a host of a cambium-feeding bark beetle.
+    pub fn host(&self) -> bool {
+        self.crisis_kill_rate > 0.0
+    }
+
+    /// Susceptibility weight (0..1) at `age` years (whole years, as the
+    /// age classes of the sources).
+    pub fn age_weight(&self, age: f32) -> f32 {
+        let a = age.floor();
+        self.age_weights.iter().take_while(|(b, _)| *b <= a).last().map_or(0.0, |&(_, w)| w.clamp(0.0, 1.0))
     }
 }
 

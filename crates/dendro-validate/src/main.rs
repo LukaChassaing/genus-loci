@@ -10,7 +10,6 @@
 //! `--cherry-years N` kept), `--climate-years N` (400 per seed),
 //! `--compare-with TSV` (append a verdict diff against an earlier run),
 //! `--title TEXT`, `--check` (only load and check the reference files),
-//! `--no-wind-damage` (feature `vent` only: sound trees, no breakage).
 
 use dendro_core::{Genome, Simulation, SoilProfile};
 use dendro_validate::data;
@@ -72,8 +71,6 @@ fn main() {
             }
             "--title" => title = val(),
             "--check" => check_only = true,
-            #[cfg(feature = "vent")]
-            "--no-wind-damage" => dendro_validate::vent::NO_DAMAGE.store(true, std::sync::atomic::Ordering::Relaxed),
             _ => panic!("unknown argument {a}"),
         }
     }
@@ -207,11 +204,25 @@ fn main() {
                     .collect()
             })
             .collect();
+        // Extra seeds of the entries that ask for more than the run's seeds
+        // (`Entry::seeds`, FORMAT.md): seeds n_seeds + 1 ..= the largest
+        // request of the species, same run length.
+        let ex: Vec<Vec<_>> = species
+            .iter()
+            .zip(&cfgs)
+            .map(|((g, f), c)| {
+                let want = f.entries.iter().filter_map(|e| e.seeds).max().unwrap_or(0) as u64;
+                (n_seeds + 1..=want).map(|sd| s.spawn({ let g = g.clone(); let y = c.0; move || measure::run_tree(&g, sd, y) })).collect()
+            })
+            .collect();
         let cl: Vec<_> = seeds.iter().map(|&sd| s.spawn(move || measure::climate_stats(sd, clim_years))).collect();
         let det = s.spawn(move || determinism_check(&det_genome));
         (
             tr.into_iter().map(|v| v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()).collect::<Vec<_>>(),
-            gl.into_iter().map(|v| v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()).collect::<Vec<_>>(),
+            gl.into_iter()
+                .zip(ex)
+                .map(|(v, x)| (v.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>(), x.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()))
+                .collect::<Vec<_>>(),
             cl.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>(),
             det.join().unwrap(),
         )
@@ -220,15 +231,14 @@ fn main() {
 
     let mut files = Vec::new();
     let mut ctxs = Vec::new();
-    for (((g, f), c), (r, gl)) in species.into_iter().zip(&cfgs).zip(runs.into_iter().zip(gleys)) {
-        ctxs.push(SpeciesCtx { id: g.id.clone(), genome: g, runs: r, gley: gl, mature_age: c.1, transp_age: c.2, crit_age: c.3 });
+    for (((g, f), c), (r, (gl, ex))) in species.into_iter().zip(&cfgs).zip(runs.into_iter().zip(gleys)) {
+        ctxs.push(SpeciesCtx { id: g.id.clone(), genome: g, runs: r, gley: gl, mature_age: c.1, transp_age: c.2, crit_age: c.3, extra_runs: ex });
         files.push(f);
     }
     files.extend(physics);
     let cx = Ctx {
         species: ctxs,
         climate,
-        #[cfg(feature = "vent")]
         vent: dendro_validate::vent::extra(&seeds),
     };
     let mut rows: Vec<Row> = Vec::new();
@@ -244,7 +254,6 @@ fn main() {
 
     #[allow(unused_mut)]
     let mut extra = vec![dendro_validate::summary::climate_section(&cx), dendro_validate::summary::trees_section(&cx)];
-    #[cfg(feature = "vent")]
     extra.push(dendro_validate::vent::section(&cx));
     let tsv = report::tsv(&rows);
     if let Some((p, name)) = &compare {
@@ -271,10 +280,7 @@ fn main() {
         duration_s: t0.elapsed().as_secs_f64(),
         determinism,
         extra_sections: extra,
-        #[cfg(not(feature = "vent"))]
         notes: dendro_validate::notes::MAIN.to_string(),
-        #[cfg(feature = "vent")]
-        notes: dendro_validate::notes::VENT.to_string(),
     };
     let md = report::markdown(&rows, &meta);
     if let Some(dir) = out.parent() {

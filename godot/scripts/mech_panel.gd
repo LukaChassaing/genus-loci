@@ -4,7 +4,8 @@ extends PanelContainer
 ## dendro_core::mechanics): wind slider 0-50 m/s with km/h and Beaufort, lowest safety factor, weak point, expected
 ## failure, critical speed of each failure mode, masses and moments. While it is open the wood can be drawn coloured
 ## by safety factor (red <= 1, green >= 4) instead of bark. A dockable side panel (Hud.layout_side_panels).
-## The mechanics is a reading of the tree: nothing breaks.
+## The slider is a reading of the tree (nothing breaks); the « Tempête » button blows a real gust: what fails breaks
+## (logged, replayed on load). Below: today's wind, sway of the first mode, wind history (dendro_core::wind).
 
 signal tint_changed(on: bool)
 
@@ -32,6 +33,14 @@ var _key: Array = []
 var _dirty: bool = true
 var _stale_note: bool = false  # time runs and the values are those of the last pause
 var mesh_dirty: bool = true   # the tinted wood mesh must be rebuilt (read and cleared by main)
+var storm_slider: HSlider
+var storm_button: Button
+var storm_speed: float = 40.0
+var _storm_l: Label
+var _wind_day: Label
+var _sway_l: Label
+var _hist: Label
+var _hist_n: int = -1
 var _head: Button
 var _body: VBoxContainer       # everything below the slider (hidden when folded)
 var _summary: Label            # one-line summary shown when folded
@@ -80,6 +89,8 @@ func _ready() -> void:
 	col.add_child(slider)
 	_summary = Label.new()
 	_summary.add_theme_font_size_override("font_size", 13)
+	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_summary.custom_minimum_size = Vector2(300, 0)
 	col.add_child(_summary)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 3)
@@ -91,7 +102,8 @@ func _ready() -> void:
 	_body.add_child(grid)
 	for r: Array in [["safety", "Sécurité minimale"], ["weak", "Point faible"], ["mode", "Ruine attendue"],
 			["c_stem", "Vent critique · tronc"], ["c_limb", "· charpentière"], ["c_uproot", "· déracinement"],
-			["mass", "Masse aérienne"], ["moment", "Moment au collet"], ["drag", "Poussée du vent"]]:
+			["mass", "Masse aérienne"], ["moment", "Moment au collet"], ["drag", "Poussée du vent"],
+		["dyn", "Facteur dynamique"]]:
 		var k: Label = Label.new()
 		k.text = r[1]
 		k.add_theme_font_size_override("font_size", 13)
@@ -133,8 +145,71 @@ func _ready() -> void:
 	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_foot.custom_minimum_size = Vector2(300, 0)
 	_body.add_child(_foot)
+	# Real wind: today's, the sway, a storm on demand, the history of damage.
+	_body.add_child(HSeparator.new())
+	_wind_day = Label.new()
+	_wind_day.add_theme_font_size_override("font_size", 13)
+	_wind_day.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_wind_day.custom_minimum_size = Vector2(300, 0)
+	_body.add_child(_wind_day)
+	_sway_l = Label.new()
+	_sway_l.add_theme_font_size_override("font_size", 13)
+	_sway_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_sway_l.custom_minimum_size = Vector2(300, 0)
+	_sway_l.tooltip_text = "Premier mode de balancement : fréquence propre (méthode de Rayleigh sur l'arbre simulé) et amortissement en air calme"
+	_sway_l.mouse_filter = Control.MOUSE_FILTER_PASS
+	_body.add_child(_sway_l)
+	var srow: HBoxContainer = HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 6)
+	storm_button = Button.new()
+	storm_button.text = "Tempête"
+	storm_button.focus_mode = Control.FOCUS_NONE
+	storm_button.tooltip_text = "Une rafale de cette vitesse frappe l'arbre maintenant : ce qui cède casse (inscrit au journal)"
+	storm_button.pressed.connect(func() -> void: blow_storm())
+	srow.add_child(storm_button)
+	storm_slider = HSlider.new()
+	storm_slider.focus_mode = Control.FOCUS_NONE
+	storm_slider.min_value = 15.0
+	storm_slider.max_value = 60.0
+	storm_slider.step = 1.0
+	storm_slider.value = storm_speed
+	storm_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	storm_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	storm_slider.custom_minimum_size = Vector2(90, 0)
+	storm_slider.value_changed.connect(func(v: float) -> void:
+		storm_speed = v
+		_update_storm_label())
+	srow.add_child(storm_slider)
+	_storm_l = Label.new()
+	_storm_l.add_theme_font_size_override("font_size", 13)
+	_storm_l.custom_minimum_size = Vector2(110, 0)
+	srow.add_child(_storm_l)
+	_body.add_child(srow)
+	_hist = Label.new()
+	_hist.add_theme_font_size_override("font_size", 12)
+	_hist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hist.custom_minimum_size = Vector2(300, 0)
+	_body.add_child(_hist)
+	_update_storm_label()
 	_update_wind_label()
 	_apply_collapse()
+
+
+func _update_storm_label() -> void:
+	if _storm_l != null:
+		_storm_l.text = "%s m/s (%d km/h)" % [num(storm_speed, 0), roundi(storm_speed * 3.6)]
+
+
+## « Tempête »: a gust of `storm_speed` m/s strikes now (TreeSim.storm through the main scene).
+func blow_storm() -> int:
+	var n: int = 0
+	if host != null and host.has_method("storm"):
+		n = int(host.call("storm", storm_speed))
+	else:
+		n = sim.storm(storm_speed)
+	_hist_n = -1
+	refresh()
+	return n
 
 
 func is_collapsed() -> bool:
@@ -156,7 +231,7 @@ func _apply_collapse() -> void:
 	var c: bool = is_collapsed()
 	_body.visible = not c
 	_summary.visible = c
-	_head.text = ("▸ " if c else "▾ ") + "MÉCANIQUE · VENT CONSTANT"
+	_head.text = ("▸ " if c else "▾ ") + "MÉCANIQUE · VENT ET TEMPÊTES"
 
 
 ## Display colour of a safety factor (same stops as dendro_core::mechanics::safety_color).
@@ -226,6 +301,11 @@ func _process_panel(delta: float, playing: bool) -> void:
 		_stale_note = playing and key != _key
 		_show(values)
 	if not _dirty:
+		# The critical speeds are computed on a worker thread: poll a few times a second (labels only).
+		if bool(values.get("critical_pending", false)) and _age > 0.3:
+			_age = 0.0
+			values = sim.get_mechanics(wind)
+			_show(values)
 		return
 	_dirty = false
 	_age = 0.0
@@ -233,9 +313,47 @@ func _process_panel(delta: float, playing: bool) -> void:
 	values = sim.get_mechanics(wind)
 	mesh_dirty = true
 	_show(values)
+	_show_wind()
+
+
+## Today's wind, the sway and the history (refreshed with the panel, the list when the history grows).
+func _show_wind() -> void:
+	if _wind_day == null:
+		return
+	var w: Vector3 = sim.get_wind_today()
+	_wind_day.text = "Vent du jour : moyen %s m/s, rafale %s m/s (%d km/h)" % [num(w.x), num(w.y), roundi(w.y * 3.6)]
+	var f: float = float(values.get("natural_frequency_hz", 0.0))
+	_sway_l.text = "Balancement : f₀ = %s Hz (période %s s), amortissement %s %%" % [num(f, 2), num(1.0 / maxf(f, 0.01), 1),
+		num(100.0 * float(values.get("damping_ratio", 0.0)), 0)]
+	var hist: Array = sim.get_wind_history()
+	if hist.size() == _hist_n:
+		return
+	_hist_n = hist.size()
+	if hist.is_empty():
+		_hist.text = "Dégâts du vent : aucun."
+		return
+	var lines: PackedStringArray = PackedStringArray(["Dégâts du vent (%d) :" % hist.size()])
+	for i: int in range(maxi(0, hist.size() - 6), hist.size()):
+		var e: Dictionary = hist[i]
+		var where: String = "" if int(e["kind"]) == 3 else " à %s m" % num(float(e["height_m"]))
+		lines.append("· an %d, j %d — %s%s, Ø %s cm, rafale %s m/s%s" % [int(e["year"]), int(e["doy"]), String(e["label"]), where,
+			num(float(e["diameter_cm"]), 0), num(float(e["gust_ms"]), 0), " (tempête)" if bool(e["storm"]) else ""])
+	if hist.size() > 6:
+		lines.append("  … et %d plus anciens" % (hist.size() - 6))
+	_hist.text = "\n".join(lines)
 
 
 func _show(d: Dictionary) -> void:
+	if sim.get_uprooted().x >= 0.0:
+		# The tree is down: no load case applies any more.
+		for k: String in _rows:
+			(_rows[k] as Label).text = "—"
+			(_rows[k] as Label).add_theme_color_override("font_color", UiStyle.TEXT_DIM)
+		var day: int = int(sim.get_uprooted().x)
+		_summary.text = "Arbre déraciné (chablis) l'an %d : le tronc est à terre et mort, plus de facteur de sécurité." % (day / 365)
+		_summary.add_theme_color_override("font_color", Color(0.95, 0.55, 0.35))
+		_foot.text = "Le moment au collet a dépassé l'ancrage de la motte. La simulation continue ; la souche peut rejeter selon l'essence."
+		return
 	var g: Callable = func(k: String) -> float: return float(d.get(k, -1.0))
 	var sf: float = g.call("min_safety")
 	_rows["safety"].text = ("≥ 999" if sf >= 999.0 else num(sf, 2)) + ("  — rupture !" if sf < 1.0 else "")
@@ -260,10 +378,15 @@ func _show(d: Dictionary) -> void:
 	_rows["mass"].text = ("%s t" % num(t, 2)) if t < 10.0 else ("%s t" % num(t, 1))
 	_rows["moment"].text = "%s / %s kN·m" % [num(g.call("base_moment_knm"), 0), num(g.call("critical_moment_knm"), 0)]
 	_rows["drag"].text = "%s kN à %s m" % [num(g.call("drag_kn")), num(g.call("pressure_height_m"))]
+	_rows["dyn"].text = "%s (amort. %s %%, flèche %s m)" % [num(g.call("dynamic_factor"), 2), num(100.0 * g.call("damping_ratio"), 0),
+		num(g.call("top_deflection_m"), 2)]
+	if bool(d.get("critical_pending", false)):
+		for k: String in ["c_stem", "c_limb", "c_uproot"]:
+			(_rows[k] as Label).text = "calcul…"
 	var first_v: float = g.call("first_speed")
 	_summary.text = "Sécurité %s · 1re ruine : %s" % ["≥ 999" if sf >= 999.0 else num(sf, 2),
 		(first + " à " + speed_text(first_v)) if first != "" else "aucune sous 80 m/s"]
 	_summary.add_theme_color_override("font_color", safety_color(sf))
 	var leaf: int = roundi(g.call("leaf_fraction") * 100.0)
-	_foot.text = ("Valeurs de l'arbre à la dernière pause (recalculées à l'arrêt). " if _stale_note else "") + ("Feuillage %d %% · rafale à 10 m appliquée en charge statique (sans balancement) ; " % leaf
+	_foot.text = ("Valeurs de l'arbre à la dernière pause (recalculées à l'arrêt). " if _stale_note else "") + ("Feuillage %d %% · rafale à 10 m avec facteur dynamique du balancement et grandes flèches du tronc ; " % leaf
 		+ "le moment au collet est comparé à l'ancrage de la motte. Premier mode : %s." % (first if first != "" else "aucun sous 80 m/s"))

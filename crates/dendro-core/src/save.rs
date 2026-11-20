@@ -11,8 +11,12 @@
 //! when the engine's calibration changed between the two builds: the file
 //! is still valid, the tree is regrown under the new rules).
 //!
-//! Format: RON, versioned (`version: 1`). Unknown versions and unknown
-//! species / soils are reported as [`SaveError`]s, never panics.
+//! Format: RON, versioned. Version 2 (this build) adds the player's storms
+//! to the log (`SavedAction::Storm`); version 1 files (no storms) are still
+//! read. Unknown versions and unknown species / soils are reported as
+//! [`SaveError`]s, never panics. A v1 file replayed by this build grows
+//! under the new rules (daily wind, breakage, acclimation): its saved hash
+//! will not match, as after any calibration change.
 //!
 //! ```no_run
 //! use dendro_core::{save::SaveFile, Genome, Simulation};
@@ -34,7 +38,9 @@ use std::fmt;
 use std::path::Path;
 
 /// Version of the save format written by this build.
-pub const SAVE_VERSION: u32 = 1;
+pub const SAVE_VERSION: u32 = 2;
+/// Oldest version this build still reads.
+pub const SAVE_VERSION_MIN: u32 = 1;
 
 /// Longest history accepted from a file (years): a guard against corrupt
 /// days that would make the replay run for hours.
@@ -64,7 +70,7 @@ impl fmt::Display for SaveError {
             SaveError::Io(e) => write!(f, "fichier illisible ou inaccessible ({e})"),
             SaveError::Parse(e) => write!(f, "sauvegarde corrompue ({e})"),
             SaveError::UnsupportedVersion(v) => {
-                write!(f, "format de sauvegarde v{v} non pris en charge (cette version lit la v{SAVE_VERSION})")
+                write!(f, "format de sauvegarde v{v} non pris en charge (cette version lit les v{SAVE_VERSION_MIN} à v{SAVE_VERSION})")
             }
             SaveError::UnknownSpecies(s) => write!(f, "espèce inconnue : « {s} »"),
             SaveError::UnknownSoil(s) => write!(f, "sol inconnu : « {s} »"),
@@ -92,6 +98,8 @@ pub enum SavedAction {
     Cut { node: u32, t: f32, flush: bool },
     /// Forced drought switched on / off.
     Drought(bool),
+    /// A storm asked for by the player: gust at 10 m (m/s). Format v2.
+    Storm { gust_ms: f32 },
 }
 
 /// A logged intervention: applied at the start of day `day`.
@@ -106,6 +114,7 @@ impl From<&LogEvent> for SavedEvent {
         let action = match e.action {
             Action::Cut(c) => SavedAction::Cut { node: c.node_id, t: c.t, flush: c.flush },
             Action::Drought(on) => SavedAction::Drought(on),
+            Action::Storm(g) => SavedAction::Storm { gust_ms: g },
         };
         SavedEvent { day: e.day, action }
     }
@@ -116,6 +125,7 @@ impl From<&SavedEvent> for LogEvent {
         let action = match e.action {
             SavedAction::Cut { node, t, flush } => Action::Cut(CutSpec { node_id: node, t, flush }),
             SavedAction::Drought(on) => Action::Drought(on),
+            SavedAction::Storm { gust_ms } => Action::Storm(gust_ms),
         };
         LogEvent { day: e.day, action }
     }
@@ -137,7 +147,7 @@ pub struct SaveMeta {
     pub state_hash: String,
 }
 
-/// A saved tree (format v1).
+/// A saved tree (format v2; v1 is the same without storms).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SaveFile {
     pub version: u32,
@@ -197,7 +207,7 @@ impl SaveFile {
     /// the species or soil: see [`SaveFile::genome`], [`SaveFile::soil_profile`].
     pub fn from_ron(text: &str) -> Result<SaveFile, SaveError> {
         let probe: VersionProbe = ron::from_str(text).map_err(|e| SaveError::Parse(e.to_string()))?;
-        if probe.version != SAVE_VERSION {
+        if !(SAVE_VERSION_MIN..=SAVE_VERSION).contains(&probe.version) {
             return Err(SaveError::UnsupportedVersion(probe.version));
         }
         let file: SaveFile = ron::from_str(text).map_err(|e| SaveError::Parse(e.to_string()))?;
@@ -221,6 +231,14 @@ impl SaveFile {
             if let SavedAction::Cut { t, .. } = e.action {
                 if !(0.0..=1.0).contains(&t) {
                     return Err(SaveError::Invalid(format!("position de coupe {t}")));
+                }
+            }
+            if let SavedAction::Storm { gust_ms } = e.action {
+                if self.version < 2 {
+                    return Err(SaveError::Invalid("tempête dans un fichier v1".into()));
+                }
+                if !(0.0..=crate::mechanics::MAX_SEARCH_SPEED_MS).contains(&gust_ms) {
+                    return Err(SaveError::Invalid(format!("rafale de tempête {gust_ms} m/s")));
                 }
             }
             prev = e.day;
@@ -435,7 +453,7 @@ impl Simulation {
         // sub-systems without widening their visibility.
         let _ = write!(
             h,
-            "{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            "{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
             self.day,
             self.seed,
             self.drought,
@@ -448,6 +466,7 @@ impl Simulation {
             self.p_prev.to_bits(),
             self.stress_prev.to_bits(),
             self.vit,
+            self.wind,
         );
         h.0
     }

@@ -27,7 +27,8 @@ var backdrop: Backdrop
 var guides: Guides
 var leaf_fall: GPUParticles3D
 var leaf_fall_mat: StandardMaterial3D
-var bark_mat: StandardMaterial3D
+var bark_mat: StandardMaterial3D   # the bark look (tuned by species / age); drawn through bark_shader (sway)
+var bark_shader: ShaderMaterial    # WindSway.make_bark_shader, parameters copied from bark_mat
 var root_mat: ShaderMaterial
 var flux_panel: FluxPanel        # per-kind flux toggles, legend and live values (shown with Flux)
 var prune_tool: PruneTool         # pruning tool « Taille » (T), wounds, control ghost
@@ -35,6 +36,19 @@ var save_flow: SaveFlow           # save / load: F5 / F9, autosave, loading card
 var flux: RootFlux               # root material + water / nutrient flux (dashes, motes)
 var mech_panel: MechPanel         # static mechanics « Mécanique » (M): wind slider, safety, critical speeds
 var mech_mi: MeshInstance3D       # the wood coloured by safety factor, shown instead of the bark while the panel is open
+# Wind (wind_sway.gd): smoothed mean wind of the display, sway phases, sway parameters of the tree (TreeSim.get_sway).
+var _wind_u: float = 0.0
+var _wind_az: float = 0.0
+var _sway_phase: float = 0.0
+var _flutter_phase: float = 0.0
+var _sway: Dictionary = {}
+var _sway_age: float = 10.0
+var _storm_show: float = 0.0       # a storm asked for now: shown as a gust for a few seconds (m/s, decays)
+var _debris: Array[Dictionary] = []   # falling / fallen branches: {node, pivot, axis, t}
+var _fallen: bool = false         # the tree is uprooted: drawn lying down
+var _root_plate: MeshInstance3D
+const DEBRIS_FALL_S: float = 1.4
+const DEBRIS_LIFE_S: float = 25.0
 var _mech_mesh_age: float = 10.0
 const MECH_MESH_INTERVAL: float = 0.15  # tinted wood rebuilt at most ~7 times a second while the slider moves
 var _last_water_q: int = -1
@@ -95,6 +109,7 @@ func _ready() -> void:
 	var soil_env: String = OS.get_environment("DENDRO_SOIL")
 	if soil_env != "":
 		sim.set_soil(int(soil_env))
+
 	var species_env: String = OS.get_environment("DENDRO_SPECIES")
 	if species_env != "":
 		sim.set_species(_species_from_env(species_env))
@@ -196,6 +211,7 @@ func _species_from_env(v: String) -> int:
 ## without resetting the simulation.
 func on_tree_loaded() -> void:
 	seed_value = sim.get_seed()
+	_clear_debris()
 	if "_peak_h" in self:
 		set("_peak_h", 0.0)
 	if prune_tool != null:
@@ -218,6 +234,13 @@ func on_tree_loaded() -> void:
 	_rebuild_meshes(true)
 	_settle_view()
 	on_mechanics_stale()
+
+
+func _clear_debris() -> void:
+	for d: Dictionary in _debris:
+		(d["node"] as Node3D).queue_free()
+	_debris.clear()
+	sim.take_wind_debris()
 
 
 func _new_seed() -> void:
@@ -277,6 +300,8 @@ func _apply_species_look() -> void:
 	bark_mat.normal_texture = bt[1]
 	_bark_fissures = fis
 	ProcTextures.set_bark_look(bark_mat, sim.get_bark_gloss(), fis)
+	if bark_shader != null:
+		WindSway.sync_bark(bark_shader, bark_mat)
 	hud.select_species(sim.get_species())
 	hud.set_bark_color(sim.get_bark_color())
 
@@ -305,6 +330,7 @@ func _apply_fruit_look(kind: int) -> void:
 func _apply_seed(new_seed: int) -> void:
 	seed_value = new_seed
 	sim.reset(seed_value)
+	_clear_debris()
 	_peak_h = 0.0
 	if prune_tool != null:
 		prune_tool.on_reset()
@@ -373,7 +399,10 @@ func _build_tree_nodes() -> void:
 	print("[dendro] procedural textures generated in %d ms" % (Time.get_ticks_msec() - t0))
 	wood_mi = MeshInstance3D.new()
 	bark_mat = ProcTextures.make_bark_material(bark_tex)
-	wood_mi.material_override = bark_mat
+	WindSway.setup()
+	bark_shader = WindSway.make_bark_shader()
+	WindSway.sync_bark(bark_shader, bark_mat)
+	wood_mi.material_override = bark_shader
 	add_child(wood_mi)
 	leaf_mi = MeshInstance3D.new()
 	leaf_mat = ProcTextures.make_leaf_material(leaf_tex)
@@ -399,10 +428,7 @@ func _build_tree_nodes() -> void:
 	add_child(fine_root_mi)
 	mech_mi = MeshInstance3D.new()
 	mech_mi.name = "MechanicsWood"
-	var mm: StandardMaterial3D = StandardMaterial3D.new()
-	mm.vertex_color_use_as_albedo = true
-	mm.roughness = 0.85
-	mech_mi.material_override = mm
+	mech_mi.material_override = WindSway.make_vertex_color_shader(0.85, false, false)
 	mech_mi.visible = false
 	add_child(mech_mi)
 	_build_leaf_fall()
@@ -602,6 +628,123 @@ func _install_meshes(r: Array) -> void:
 	mesh_dirty = false
 
 
+## Wind of the display: today's mean wind (smoothed; in time-lapse the yearly average) or a storm just asked for,
+## sway of the tree in the shaders (wind_sway.gd), falling branches, the tree lying down once uprooted.
+func _update_wind(delta: float) -> void:
+	var w: Vector3 = sim.get_wind_today()  # mean, gust, direction (towards)
+	var target: float = w.x
+	if _storm_show > 0.0:
+		target = maxf(target, _storm_show / 1.49)  # mean wind of the gust (EN 1991-1-4 peak factor at 10 m)
+		_storm_show = maxf(0.0, _storm_show - delta * 6.0)
+	var tau: float = 2.0 if _timelapse() else 0.6
+	_wind_u = lerpf(_wind_u, target, 1.0 - exp(-delta / tau))
+	_wind_az = w.z
+	_sway_age += delta
+	if _sway.is_empty() or (_sway_age > 2.0 and not _timelapse()) or _sway_age > 8.0:
+		_sway_age = 0.0
+		_sway = sim.get_sway()
+	var f: float = clampf(float(_sway.get("freq_hz", 0.3)), 0.05, 3.0)
+	_sway_phase = fmod(_sway_phase + TAU * f * delta, TAU * 1000.0)
+	_flutter_phase = fmod(_flutter_phase + TAU * f * WindSway.FLUTTER_RATIO * delta, TAU * 1000.0)
+	WindSway.apply(_wind_az, 0.0 if _fallen else _wind_u, _sway, _sway_phase, _flutter_phase)
+	_update_debris(delta)
+	_update_fallen()
+
+
+## Broken parts (TreeSim.take_wind_debris): each falls from its break point to the ground, rotating about the break,
+## then lies there for a while (a display effect, not simulated).
+func _update_debris(delta: float) -> void:
+	for d: Dictionary in sim.take_wind_debris():
+		var mesh: ArrayMesh = d["mesh"]
+		if mesh == null or mesh.get_surface_count() == 0:
+			continue
+		var pivot: Vector3 = d["pivot"]
+		var holder: Node3D = Node3D.new()
+		holder.name = "WindDebris"
+		holder.position = pivot
+		var mi: MeshInstance3D = MeshInstance3D.new()
+		mi.mesh = mesh
+		mi.material_override = bark_mat
+		mi.position = -pivot
+		holder.add_child(mi)
+		add_child(holder)
+		var a: float = deg_to_rad(_wind_az)
+		var wd: Vector3 = Vector3(cos(a), 0.0, sin(a))
+		var axis: Vector3 = Vector3.UP.cross(wd).normalized()
+		# Shots and fast time-lapse: no animation, the branch lies on the ground at once.
+		var t0: float = DEBRIS_FALL_S if (_timelapse() or OS.get_environment("DENDRO_SHOT") != "") else 0.0
+		_debris.append({"node": holder, "pivot": pivot, "axis": axis, "drift": wd, "t": t0})
+	var keep: Array[Dictionary] = []
+	for d: Dictionary in _debris:
+		var holder: Node3D = d["node"]
+		d["t"] = float(d["t"]) + delta
+		var t: float = float(d["t"])
+		var k: float = clampf(t / DEBRIS_FALL_S, 0.0, 1.0)
+		var fall: float = k * k  # accelerating fall
+		var pivot: Vector3 = d["pivot"]
+		holder.position = Vector3(pivot.x, lerpf(pivot.y, 0.15, fall), pivot.z) + (d["drift"] as Vector3) * (1.5 * fall)
+		holder.basis = Basis(d["axis"] as Vector3, 1.35 * fall)
+		if t > DEBRIS_LIFE_S:
+			holder.queue_free()
+		else:
+			keep.append(d)
+	_debris = keep
+
+
+## Uprooted (chablis): the core already lays the dead stem on the ground (`ShootSystem::lay_down`, towards where the
+## wind blew); the display adds the torn-out root plate standing on its edge at the base. Stump sprouts, when the
+## species has them, grow upright from the collar.
+func _update_fallen() -> void:
+	var up: Vector2 = sim.get_uprooted()
+	var fallen: bool = up.x >= 0.0
+	if fallen == _fallen:
+		return
+	_fallen = fallen
+	if fallen:
+		var a: float = deg_to_rad(up.y)
+		var wd: Vector3 = Vector3(cos(a), 0.0, sin(a))
+		var axis: Vector3 = Vector3.UP.cross(wd).normalized()
+		var plate_r: float = clampf(0.025 * sim.get_collar_diameter_cm(), 0.8, 3.0)
+		# The plate turned with the stem (86 deg, as in the core), hinged at the collar.
+		var rot: Basis = Basis(axis, deg_to_rad(86.0))
+		var xf: Transform3D = Transform3D(rot, Vector3.ZERO)
+		if _root_plate == null:
+			_root_plate = MeshInstance3D.new()
+			_root_plate.name = "RootPlate"
+			var cyl: CylinderMesh = CylinderMesh.new()
+			cyl.top_radius = 1.0
+			cyl.bottom_radius = 0.85
+			cyl.height = 1.0
+			_root_plate.mesh = cyl
+			var pm: StandardMaterial3D = StandardMaterial3D.new()
+			pm.albedo_color = Color(0.36, 0.28, 0.20)
+			pm.roughness = 1.0
+			_root_plate.material_override = pm
+			add_child(_root_plate)
+		_root_plate.visible = true
+		var depth: float = clampf(0.25 * plate_r, 0.3, 0.8)
+		# The plate: a disc of soil and roots torn out with the stump, now standing on its edge.
+		_root_plate.transform = xf * Transform3D(Basis.from_scale(Vector3(plate_r, depth, plate_r)), Vector3(0.0, -0.5 * depth, 0.0))
+	elif _root_plate != null:
+		_root_plate.visible = false
+	hud.set_fallen(fallen)
+
+
+## A storm now (« Tempête » of the mechanics panel): the gust tests the tree, what fails breaks (logged, replayed).
+func storm(gust_ms: float) -> int:
+	var n: int = sim.storm(gust_ms)
+	_storm_show = gust_ms
+	mesh_dirty = true
+	_wood_ver = -1
+	_leaf_ver = -1
+	_flower_ver = -1
+	_stats_dirty = true
+	if prune_tool != null:
+		prune_tool.on_external_change()
+	on_mechanics_stale()
+	return n
+
+
 ## The tree was cut, rewound, undone or replaced: the mechanics panel recomputes (now if open, else when opened)
 ## and the tinted wood follows. The binding drops its own cache on the same paths.
 func on_mechanics_stale() -> void:
@@ -682,6 +825,9 @@ func _process(delta: float) -> void:
 	t = Time.get_ticks_usec()
 	_update_view_state(delta)
 	Prof.add("gd.view_state", t)
+	t = Time.get_ticks_usec()
+	_update_wind(delta)
+	Prof.add("gd.wind", t)
 	t = Time.get_ticks_usec()
 	_frame_camera(delta)
 	Prof.add("gd.frame_camera", t)
@@ -776,6 +922,7 @@ func _update_view_state(delta: float) -> void:
 	var rough_k: float = clampf(_bark_fissures / 0.85, 0.0, 1.0)  # smooth bark barely darkens / roughens
 	bark_mat.albedo_color = Color(1.0, 1.0, 1.0).lerp(Color(0.68, 0.64, 0.60), age_t * rough_k)
 	bark_mat.normal_scale = lerpf(0.35, 1.0, rough_k) * (1.0 + 1.0 * age_t * rough_k)
+	WindSway.sync_bark(bark_shader, bark_mat)
 
 	# Blossom / fruit visibility (per-card hash thresholds in the shader).
 	var bloom: float = sim.get_bloom_progress()
@@ -886,6 +1033,8 @@ func _simulate() -> void:
 #   DENDRO_FLUX_KINDS=all|none|water,minerals,sugar,o2,co2,vapour,myco   flux kinds shown (panel toggles)
 #   DENDRO_MECA=32        « Mécanique » panel open at that gust speed (m/s), wood coloured by safety factor;
 #                         DENDRO_MECA_TINT=0 keeps the bark
+#   DENDRO_STORM="year:doy:speed;..."  storms asked for (gust m/s at 10 m) on those days (prune_tool.gd, merged with
+#                         DENDRO_PRUNE); the daily wind never breaks anything
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
 #   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
@@ -1412,6 +1561,7 @@ func _run_selftest() -> void:
 	_check("paused after time-lapse: the true leaf mesh of today is back, shader season off", not _leaf_tl
 		and (leaf_mat.get_shader_parameter("tl_on") as float) == 0.0 and _leaf_ver == sim.get_leaf_version(), "%d frames" % waited)
 	var ref: TreeSim = TreeSim.new()
+
 	ref.set_species(sim.get_species())
 	ref.set_soil(sim.get_soil())
 	ref.reset(seed_value)
@@ -1518,6 +1668,13 @@ func _run_selftest() -> void:
 	var age_vd: Dictionary = sim.get_vitality()
 	_check("vitality: modelled, trunk alive at the start", bool(age_vd["modelled"]) and bool(age_vd["trunk_alive"]) and int(age_vd["death_age"]) == -1, str(age_vd))
 	_check("HUD state: vigorous young tree", Hud.vitality_text(age_vd).begins_with("État : vigoureux"), Hud.vitality_text(age_vd))
+	# Bark-beetle risk and death (host in a crisis year, dendro_core::vitality): the HUD lines, on a
+	# synthetic state (the core tests the mechanism, tests/ageing.rs).
+	var bb_live: String = Hud.vitality_text({"modelled": true, "death_age": -1, "reserve": 0.1, "vigour": 0.2, "bark_beetle_probability": 0.05})
+	_check("HUD state: bark-beetle risk of a weakened host", bb_live.contains("Risque de scolytes : 5,0 % par an"), bb_live)
+	_check("HUD state: no beetle line without risk", not Hud.vitality_text(age_vd).contains("scolytes"), Hud.vitality_text(age_vd))
+	var bb_dead: String = Hud.vitality_text({"modelled": true, "death_age": 233, "cause": "scolytes (attaque d'un arbre affaibli)", "standing_dead": true, "collapse_in": 20})
+	_check("HUD state: bark-beetle death, standing snag", bb_dead.contains("Cause : scolytes") and bb_dead.contains("Mort sur pied"), bb_dead)
 	_advance_days_direct(25.0 * 365.0)
 	hud.speed_slider.value = hud.speed_slider.max_value
 	hud.set_playing(true)
@@ -1859,6 +2016,62 @@ func _run_selftest() -> void:
 	await get_tree().process_frame
 	_update_mech_overlay(0.0)
 	_check("key M again: panel closed, bark back", not mech_panel.visible and wood_mi.visible and not mech_mi.visible)
+
+	# 13. Wind (dendro_core::wind): today's wind in the HUD, sway uniforms, storm on demand, history, debris, uprooting.
+	var wt: Vector3 = sim.get_wind_today()
+	_check("wind of the day: mean and gust, gust >= mean", wt.y >= wt.x and wt.x >= 0.0 and hud._wind.text.begins_with("Vent"), str(wt))
+	_update_wind(0.1)
+	var wa: Vector4 = WindSway.last_a
+	var wb: Vector4 = WindSway.last_b
+	_check("sway: uniforms set (direction, tree height), natural frequency known", absf(Vector2(wa.x, wa.y).length() - 1.0) < 1e-3
+		and wb.y > 1.0 and float(_sway.get("freq_hz", 0.0)) > 0.05, "%s %s %s" % [wa, wb, _sway])
+	_check("sway: wood, wound and overlay materials share the shader sway", wood_mi.material_override is ShaderMaterial
+		and prune_tool.wound_mi.material_override is ShaderMaterial and mech_mi.material_override is ShaderMaterial)
+	# A known tree for the storm: an 80-year oak in winter (seed 7).
+	sim.set_species(sim.find_species("quercus_robur"))
+	_apply_seed(7)
+	_advance_days_direct(80.0 * 365.0 + 20.0)
+	_check("daily wind: no damage without a storm (80 years)", sim.get_wind_history().is_empty(), "%d entries" % sim.get_wind_history().size())
+	var h_standing: float = sim.get_height_m()
+	_rebuild_meshes(true)
+	await get_tree().process_frame
+	var n_hist: int = sim.get_wind_history().size()
+	_press_key(KEY_M)
+	await get_tree().process_frame
+	mech_panel.storm_slider.value = 60.0
+	var hits: int = mech_panel.blow_storm()
+	for i: int in 3:
+		await get_tree().process_frame
+	var hist: Array = sim.get_wind_history()
+	_check("storm 60 m/s: something breaks, logged in the history", hits > 0 and hist.size() == n_hist + hits
+		and bool((hist[hist.size() - 1] as Dictionary)["storm"]), "%d entries" % hits)
+	_check("storm: listed in the panel", mech_panel._hist.text.contains("tempête"), mech_panel._hist.text)
+	var falling: bool = false
+	for d: Dictionary in _debris:
+		falling = falling or (d["node"] as Node3D).is_inside_tree()
+	var down: bool = sim.get_uprooted().x >= 0.0
+	_check("storm: broken wood falls (debris) or the tree is down", falling or down, "debris %d, uprooted %s" % [_debris.size(), down])
+	if not down:
+		for i: int in 6:
+			if sim.get_uprooted().x >= 0.0:
+				break
+			mech_panel.blow_storm()
+	await get_tree().process_frame
+	_update_wind(0.0)
+	if sim.get_uprooted().x >= 0.0:
+		_check("uprooted: tree lying down (core geometry), root plate shown, HUD says so", _fallen and sim.get_height_m() < 0.7 * h_standing
+			and _root_plate != null and _root_plate.visible and hud._fallen_lbl.visible, "height %.1f m (standing %.1f m)" % [sim.get_height_m(), h_standing])
+		mech_panel.refresh()
+		_check("uprooted: the mechanics panel shows a state, no safety factor", mech_panel._summary.text.begins_with("Arbre déraciné")
+			and (mech_panel._rows["safety"] as Label).text == "—", mech_panel._summary.text)
+	var log_n: int = sim.get_prune_journal().size()
+	var breaks: int = 0
+	for e: Dictionary in sim.get_wind_history():
+		breaks += 1 if int(e["kind"]) != 3 else 0
+	_check("storm breaks enter the cut journal as torn wounds (uprooting: none)", log_n >= breaks and (breaks == 0) == (log_n == 0),
+		"%d breaks, %d journal entries" % [breaks, log_n])
+	_press_key(KEY_M)
+	await get_tree().process_frame
 
 	await UiSelftest.run(self, _check)  # shell screens: title, setup, plates, options, pause, settings, HUD fit
 

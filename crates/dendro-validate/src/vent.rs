@@ -1,7 +1,7 @@
-//! Measurements that need the dynamic-wind API of the `m1-vent-dynamique`
-//! branch (daily wind and gusts, natural frequency and damping, wind damage,
-//! wind acclimation). Compiled only with `--features vent`, i.e. in a
-//! checkout of that branch; main has none of these functions.
+//! Wind measurements (milestone M1, second step): daily wind and gusts,
+//! natural frequency and damping, storms asked for on a copy of the tree,
+//! stem acclimation to the wind. The daily wind never breaks anything in
+//! the engine (only storms asked for do, `dendro_core::wind`).
 
 use crate::data::Entry;
 use crate::eval::{Ctx, SpeciesCtx};
@@ -9,6 +9,9 @@ use crate::measure::{self, TreeRun, MONTH_START};
 use crate::verdict::{median, Measured, Nature};
 use dendro_core::{DamageKind, Genome, Simulation, WindLoad};
 use std::fmt::Write;
+
+/// Ages at which storms are tried on a copy of the tree (cost).
+const STORM_AGES: [u32; 4] = [20, 60, 100, 150];
 
 /// Sway and storm response at a sample age.
 #[derive(Clone, Debug, Default)]
@@ -19,10 +22,14 @@ pub struct AgeDyn {
     pub damping_leafless: f64,
     /// DBH / H² (m / m²).
     pub d_over_h2: f64,
-    /// Damage of a single leafless storm gust on a copy of the tree (35 and
-    /// 38 m/s: Lothar and the October 1987 storm at Rennes).
+    /// Damage of a single storm gust asked for on a copy of the tree, in
+    /// winter (leafless; the needles of an evergreen) and in summer (full
+    /// crown), 35 and 38 m/s (Lothar and the October 1987 storm at Rennes).
+    /// Empty when not tried at this age.
     pub storm35: Vec<&'static str>,
     pub storm38: Vec<&'static str>,
+    pub storm35_leafy: Vec<&'static str>,
+    pub tried: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -30,24 +37,32 @@ pub struct RunDyn {
     pub history: Vec<dendro_core::WindDamage>,
 }
 
-/// `--no-wind-damage`: grow sound trees (no breakage, no uprooting; the
-/// acclimation still runs), as the growth calibration tests of the branch do.
-pub static NO_DAMAGE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-pub fn configure(sim: &mut Simulation) {
-    // Wind damage is on by default on the branch: the trees can break and
-    // be uprooted while they grow, as in the game.
-    if NO_DAMAGE.load(std::sync::atomic::Ordering::Relaxed) {
-        sim.set_wind_damage_enabled(false);
-    }
-}
+/// Nothing to configure: the daily wind does not damage trees.
+pub fn configure(_sim: &mut Simulation) {}
 
 fn kind(k: DamageKind) -> &'static str {
     match k {
         DamageKind::Uprooted => "uproot",
         DamageKind::Stem => "stem",
-        _ => "limb",
+        DamageKind::Top => "top",
+        DamageKind::Limb => "limb",
     }
+}
+
+/// The damage of a storm of `gust` m/s on a copy of `sim`, with the given
+/// leaf fraction (the storm uses today's foliage: the copy is moved to a
+/// winter or a summer day of the same year without growing).
+fn storm_on_copy(sim: &Simulation, gust: f32, leafy: bool) -> Vec<&'static str> {
+    let mut c = sim.clone();
+    // Storms test the crown as it is today; the sample ages are taken at the
+    // end of the season (leafless for a deciduous tree). For the summer
+    // case, a copy is advanced to mid-July of the next year.
+    if leafy {
+        let doy = c.day_of_year() as u64;
+        let to = if doy < 196 { 196 - doy } else { 365 - doy + 196 };
+        c.advance_days(to as u32);
+    }
+    c.storm(gust).into_iter().map(|x| kind(x.kind)).collect()
 }
 
 pub fn age_dyn(sim: &Simulation) -> AgeDyn {
@@ -56,18 +71,19 @@ pub fn age_dyn(sim: &Simulation) -> AgeDyn {
     let d = |lf: f32| model.dynamics(&WindLoad { leaf_fraction: Some(lf), azimuth_deg: az, ..WindLoad::new(0.0) });
     let (a, b) = (d(1.0), d(0.0));
     let h = sim.height_m() as f64;
-    let storm = |g: f32| {
-        let mut c = sim.clone();
-        c.storm(g).into_iter().map(|x| kind(x.kind)).collect::<Vec<_>>()
-    };
+    let age = sim.age_years().round() as u32;
+    let tried = STORM_AGES.contains(&age) && sim.is_alive();
+    let st = |g: f32, leafy: bool| if tried { storm_on_copy(sim, g, leafy) } else { Vec::new() };
     AgeDyn {
         f0_leafy: a.natural_frequency_hz as f64,
         f0_leafless: b.natural_frequency_hz as f64,
         damping_leafy: a.damping_ratio as f64,
         damping_leafless: b.damping_ratio as f64,
         d_over_h2: sim.dbh_cm() as f64 / 100.0 / (h * h).max(1e-9),
-        storm35: storm(35.0),
-        storm38: storm(38.0),
+        storm35: st(35.0, false),
+        storm38: st(38.0, false),
+        storm35_leafy: st(35.0, true),
+        tried,
     }
 }
 
@@ -141,30 +157,49 @@ pub struct WindStats {
     pub record_month_45y: [f64; 12],
 }
 
-/// Extra protocol runs of the branch: the same oaks without wind acclimation.
+/// Extra protocol runs: the same oaks without wind acclimation.
 #[derive(Clone, Debug, Default)]
 pub struct Extra {
-    /// (height m, DBH cm) at 40 years, with and without acclimation, per seed.
-    pub with: Vec<(f64, f64)>,
-    pub without: Vec<(f64, f64)>,
+    /// (height m, DBH cm, stem diameter at half height / DBH) at 40 years,
+    /// with and without acclimation, per seed.
+    pub with: Vec<(f64, f64, f64)>,
+    pub without: Vec<(f64, f64, f64)>,
+}
+
+/// Stem diameter at half the height over the DBH.
+fn taper_half(sim: &Simulation) -> f64 {
+    let (segs, _) = sim.mechanics_inputs();
+    let h = sim.height_m();
+    let model = sim.mechanics_model();
+    let s = model.evaluate(&WindLoad::new(0.0));
+    let mut best = (f32::MAX, 0.0f32);
+    for (seg, role) in segs.iter().zip(&s.segment_role) {
+        if *role == dendro_core::SegmentRole::Trunk {
+            let dh = (seg.start[1] - 0.5 * h).abs();
+            if dh < best.0 {
+                best = (dh, 2.0 * seg.radius_m);
+            }
+        }
+    }
+    let dbh = sim.dbh_cm() as f64 / 100.0;
+    if dbh > 0.0 {
+        best.1 as f64 / dbh
+    } else {
+        0.0
+    }
 }
 
 pub fn extra(seeds: &[u64]) -> Extra {
     let g = Genome::quercus_robur();
-    let mut off = g.clone();
-    off.wood.wind_acclimation_stress_mpa = 0.0;
-    off.wood.wind_acclimation_stem_stress_mpa = 0.0;
-    off.wood.wind_elongation_reduction = 0.0;
-    let grow = |g: &Genome, s: u64| {
-        // Without wind damage, so that breakage does not confound the
-        // comparison (the acclimation still runs, see `without_wind_damage`).
-        let mut sim = Simulation::new(g.clone(), s).without_wind_damage();
+    let grow = |g: &Genome, s: u64, accl: bool| {
+        let mut sim = Simulation::new(g.clone(), s);
+        sim.set_wind_acclimation_enabled(accl);
         sim.advance_years(40);
-        (sim.height_m() as f64, sim.dbh_cm() as f64)
+        (sim.height_m() as f64, sim.dbh_cm() as f64, taper_half(&sim))
     };
     std::thread::scope(|sc| {
-        let a: Vec<_> = seeds.iter().map(|&s| sc.spawn({ let g = g.clone(); move || grow(&g, s) })).collect();
-        let b: Vec<_> = seeds.iter().map(|&s| sc.spawn({ let g = off.clone(); move || grow(&g, s) })).collect();
+        let a: Vec<_> = seeds.iter().map(|&s| sc.spawn({ let g = g.clone(); move || grow(&g, s, true) })).collect();
+        let b: Vec<_> = seeds.iter().map(|&s| sc.spawn({ let g = g.clone(); move || grow(&g, s, false) })).collect();
         Extra { with: a.into_iter().map(|h| h.join().unwrap()).collect(), without: b.into_iter().map(|h| h.join().unwrap()).collect() }
     })
 }
@@ -195,7 +230,7 @@ fn f0_points(sp: &SpeciesCtx) -> Vec<(f64, f64)> {
 
 pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
     let w = |f: fn(&crate::measure::ClimateStats) -> f64, what: &str| Measured::values(cx.climate.iter().map(f).collect(), what.to_string(), Nature::Emergent);
-    let oak = &cx.oak;
+    let oak = cx.oak();
     let v = |f: fn(&measure::AgeRec) -> f64| oak.at(100, f);
     match e.id.as_str() {
         "rennes_wind_mean_annual" => w(|s| s.wind.mean, "vent moyen journalier à 10 m").calib(),
@@ -211,7 +246,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
         "conifers_f0_linear_dbh_h2" | "dfir_f0_linear_dbh_h2_both_states" => {
             let p = f0_points(oak);
             let r = pearson(&p);
-            let rc = pearson(&f0_points(&cx.cherry));
+            let rc = cx.cherry().map(|c| pearson(&f0_points(c))).unwrap_or(f64::NAN);
             Measured::rule(r > 0.8, format!("corrélation f0 (défeuillé) / (DBH/H²), 10-150 ans, toutes graines : chêne r = {r:.2}, merisier r = {rc:.2} (critère de physics.md : r > 0,8, pente > 0)"), "f0 linéaire en DBH/H²", Nature::Emergent)
                 .warn("conifères ; aucune pente feuillue publiée")
         }
@@ -230,7 +265,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
         "dfir_damping_unpruned" => Measured::values(v(|r| r.vent.damping_leafy), "amortissement feuillé (chêne 100 ans)", Nature::Param).warn("douglas, 9 arbres"),
         "jackson_f0_winter_gain" => Measured::values(v(|r| (r.vent.f0_leafless / r.vent.f0_leafy - 1.0) * 100.0), "gain de f0 hiver / été (%), chêne 100 ans", Nature::Emergent)
             .warn("valeur recopiée de docs/sources.md, non relue"),
-        "thigmo_jaffe1973" => thigmo(cx, |x| x.0, "hauteur", "la stimulation freine l'élongation").warn("plantes herbacées (via Wikipédia)"),
+        "thigmo_jaffe1973" => thigmo(cx, |x| x.0, "hauteur", "la stimulation freine l'élongation").warn("plantes herbacées (via Wikipédia) ; le moteur ne réduit pas l'élongation"),
         "thigmo_beech_guyed" => thigmo(cx, |x| 100.0 * x.0 / x.1, "H/D (test 13 de physics.md : plus faible)", "contrôle mécanique de la croissance radiale"),
         "thigmo_beech_stem_vs_roots" => Measured::not_measurable("le moteur n'acclimate pas l'ancrage : renforcement tige / racines non comparable"),
         "thigmo_hydrangea_dose" => Measured::not_modeled("pas de nombre de flexions par jour"),
@@ -240,7 +275,7 @@ pub fn physics_entry(cx: &Ctx, e: &Entry) -> Measured {
 
 /// Acclimated vs non-acclimated oaks at 40 years, seed by seed: the rule
 /// passes when the acclimated value is lower for every seed.
-fn thigmo(cx: &Ctx, f: fn(&(f64, f64)) -> f64, what: &str, rule: &str) -> Measured {
+fn thigmo(cx: &Ctx, f: fn(&(f64, f64, f64)) -> f64, what: &str, rule: &str) -> Measured {
     let a: Vec<f64> = cx.vent.with.iter().map(f).collect();
     let b: Vec<f64> = cx.vent.without.iter().map(f).collect();
     let lower = a.iter().zip(&b).filter(|(x, y)| x < y).count();
@@ -254,22 +289,24 @@ fn thigmo(cx: &Ctx, f: fn(&(f64, f64)) -> f64, what: &str, rule: &str) -> Measur
     )
 }
 
-/// Lothar-like gust on the leafless 100-year-old oak (copy of the tree).
+/// A Lothar-class storm (35 m/s, winter) asked for on a copy of the tree at
+/// 60 years (100 for the oaks): share of seeds whose stem broke or which
+/// were uprooted.
 pub fn storm_fraction(sp: &SpeciesCtx) -> Measured {
     let a = if sp.genome.species.starts_with("Quercus") { 100 } else { 60 };
     let v = sp.at(a, |r| if r.vent.storm35.iter().any(|k| *k == "stem" || *k == "uproot") { 1.0 } else { 0.0 });
     let any = sp.at(a, |r| if r.vent.storm35.is_empty() { 0.0 } else { 1.0 });
     let n = v.len();
     let frac = v.iter().sum::<f64>() / n.max(1) as f64;
-    Measured::one(frac, format!("arbres isolés de {a} ans cassés au tronc ou déracinés par une rafale de 35 m/s défeuillée ({} graines ; tout dégât compris : {:.0} %)", n, 100.0 * any.iter().sum::<f64>() / n.max(1) as f64), Nature::Emergent)
+    Measured::one(frac, format!("arbres isolés de {a} ans cassés au tronc ou déracinés par une tempête de 35 m/s demandée en hiver ({} graines ; tout dégât compris : {:.0} %)", n, 100.0 * any.iter().sum::<f64>() / n.max(1) as f64), Nature::Emergent)
         .nc("arbres de peuplement (inventaire) contre arbre isolé")
 }
 
 type StatFn = fn(&crate::measure::ClimateStats) -> f64;
 
-/// Report section: wind climate, sway, storms and survival.
+/// Report section: wind climate, sway, storms, acclimation.
 pub fn section(cx: &Ctx) -> String {
-    let mut o = String::from("## Branche vent : climat de vent, oscillation, tenue mécanique\n\n");
+    let mut o = String::from("## Vent : climat, oscillation, tempêtes demandées\n\nLe vent quotidien ne casse rien (seules les tempêtes demandées cassent ou déracinent, décision de l'utilisateur du 2026-11-19) ; il nourrit l'acclimatation de la tige.\n\n");
     let c = &cx.climate;
     let mm = |v: Vec<f64>| {
         let lo = v.iter().copied().fold(f64::MAX, f64::min);
@@ -293,48 +330,27 @@ pub fn section(cx: &Ctx) -> String {
         let _ = writeln!(o, "| {n} | {} | {r} |", mm(c.iter().map(f).collect()));
     }
     let _ = writeln!(o, "\nMaxima mensuels de rafale sur 45 ans (médiane des fenêtres) : {}.\n", (0..12).map(|m| format!("{:.1}", median(&c.iter().map(|s| s.wind.record_month_45y[m]).collect::<Vec<_>>()))).collect::<Vec<_>>().join(" ; "));
-    for (name, sp) in [("Chêne", &cx.oak), ("Merisier", &cx.cherry)] {
-        let dmg = if NO_DAMAGE.load(std::sync::atomic::Ordering::Relaxed) { "dégâts au vent désactivés (--no-wind-damage)" } else { "dégâts au vent activés, comme dans le jeu" };
-        let _ = writeln!(o, "### {name} : tenue mécanique pendant la croissance ({dmg})\n");
-        let _ = writeln!(o, "| graine | debout en fin de simulation | déraciné à (ans) | casses de branches | casses du tronc | plus gros diamètre cassé (cm) | rafale la plus forte ayant cassé (m/s) |\n|---:|---|---:|---:|---:|---:|---:|");
-        for r in &sp.runs {
-            let h = &r.vent.history;
-            let limb = h.iter().filter(|d| kind(d.kind) == "limb").count();
-            let stem = h.iter().filter(|d| kind(d.kind) == "stem").count();
-            let dmax = h.iter().map(|d| d.diameter_cm as f64).fold(0.0, f64::max);
-            let gmax = h.iter().map(|d| d.gust_ms as f64).fold(0.0, f64::max);
-            let _ = writeln!(
-                o,
-                "| {} | {} | {} | {} | {} | {:.1} | {:.1} |",
-                r.seed,
-                if r.death_age.is_none() { "oui" } else { "non" },
-                r.death_age.map(|a| a.to_string()).unwrap_or("—".into()),
-                limb,
-                stem,
-                dmax,
-                gmax
-            );
-        }
-        let _ = writeln!(o, "\nAprès la mort d'un arbre, ses années ne sont plus utilisées par les verdicts (médianes sur les graines encore debout).\n");
-        let _ = writeln!(o, "| âge | f0 feuillé Hz | f0 défeuillé Hz | gain hiver % | amortissement feuillé | défeuillé | DBH/H² | rafale 35 m/s (défeuillé) | 38 m/s |\n|---:|---:|---:|---:|---:|---:|---:|---|---|");
-        for &a in measure::sample_ages(&sp.genome.species).iter().filter(|&&a| a >= 10) {
+    let _ = writeln!(o, "### Oscillation et tempêtes demandées (copie de l'arbre, rafale à 10 m depuis l'OSO)\n");
+    let _ = writeln!(o, "Médianes des graines vivantes. Vitesses critiques (premier mode, m/s) avec facteur dynamique et grandes flèches. Tempêtes : dégâts par graine (`stem` tronc cassé, `top` cime cassée, `limb` charpentière, `uproot` déracinement, `—` rien) ; hiver = défeuillé (aiguilles des persistants), été = mi-juillet de l'année suivante.\n");
+    let _ = writeln!(o, "| espèce | âge | f0 feuillé Hz | f0 défeuillé Hz | gain hiver % | 1re ruine hors feuilles | 1re ruine en feuilles | 35 m/s hiver | 38 m/s hiver | 35 m/s été |\n|---|---:|---:|---:|---:|---:|---:|---|---|---|");
+    for sp in &cx.species {
+        for &a in STORM_AGES.iter() {
+            let alive = |r: &&TreeRun| r.death_age.is_none_or(|d| a < d);
+            if !sp.runs.iter().filter(alive).any(|r| r.ages.get(&a).is_some_and(|x| x.vent.tried)) {
+                continue;
+            }
             let f = |g: fn(&measure::AgeRec) -> f64| {
-                let v = sp.at(a, g);
+                let v: Vec<f64> = sp.runs.iter().filter(alive).filter_map(|r| r.ages.get(&a)).map(g).filter(|x| x.is_finite()).collect();
                 if v.is_empty() {
                     "—".to_string()
                 } else {
-                    let m = median(&v);
-                    if m.abs() < 0.01 {
-                        format!("{m:.2e}")
-                    } else {
-                        format!("{m:.3}")
-                    }
+                    format!("{:.2}", median(&v))
                 }
             };
             let st = |g: fn(&AgeDyn) -> &Vec<&'static str>| {
                 sp.runs
                     .iter()
-                    .filter(|r| r.death_age.is_none_or(|d| a < d))
+                    .filter(alive)
                     .filter_map(|r| r.ages.get(&a))
                     .map(|x| {
                         let k = g(&x.vent);
@@ -349,29 +365,33 @@ pub fn section(cx: &Ctx) -> String {
             };
             let _ = writeln!(
                 o,
-                "| {a} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                "| {} | {a} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                sp.id,
                 f(|r| r.vent.f0_leafy),
                 f(|r| r.vent.f0_leafless),
                 f(|r| (r.vent.f0_leafless / r.vent.f0_leafy - 1.0) * 100.0),
-                f(|r| r.vent.damping_leafy),
-                f(|r| r.vent.damping_leafless),
-                f(|r| r.vent.d_over_h2),
+                f(|r| r.first_crit_leafless.unwrap_or(80.0)),
+                f(|r| r.first_crit_leafy.unwrap_or(80.0)),
                 st(|d| &d.storm35),
-                st(|d| &d.storm38)
+                st(|d| &d.storm38),
+                st(|d| &d.storm35_leafy)
             );
         }
-        o.push('\n');
     }
-    let hd = |v: &[(f64, f64)]| median(&v.iter().map(|x| 100.0 * x.0 / x.1).collect::<Vec<_>>());
+    o.push('\n');
+    let hd = |v: &[(f64, f64, f64)]| median(&v.iter().map(|x| 100.0 * x.0 / x.1).collect::<Vec<_>>());
+    let col = |v: &[(f64, f64, f64)], k: usize| median(&v.iter().map(|x| [x.0, x.1, x.2][k]).collect::<Vec<_>>());
     let _ = writeln!(
         o,
-        "### Acclimatation au vent (chêne, 40 ans)\n\nAvec : H {:.2} m, DBH {:.1} cm, H/D {:.1}. Sans (génome copié en mémoire, `wind_acclimation_*` et `wind_elongation_reduction` à 0) : H {:.2} m, DBH {:.1} cm, H/D {:.1}. Les deux séries sont cultivées sans dégâts au vent (`without_wind_damage`) pour que la casse ne brouille pas la comparaison.\n",
-        median(&cx.vent.with.iter().map(|x| x.0).collect::<Vec<_>>()),
-        median(&cx.vent.with.iter().map(|x| x.1).collect::<Vec<_>>()),
+        "### Acclimatation de la tige au vent (chêne, 40 ans)\n\nAvec : H {:.2} m, DBH {:.1} cm, H/D {:.1}, diamètre de la tige à mi-hauteur / DBH {:.3}. Sans (`set_wind_acclimation_enabled(false)`) : H {:.2} m, DBH {:.1} cm, H/D {:.1}, {:.3}.\n",
+        col(&cx.vent.with, 0),
+        col(&cx.vent.with, 1),
         hd(&cx.vent.with),
-        median(&cx.vent.without.iter().map(|x| x.0).collect::<Vec<_>>()),
-        median(&cx.vent.without.iter().map(|x| x.1).collect::<Vec<_>>()),
-        hd(&cx.vent.without)
+        col(&cx.vent.with, 2),
+        col(&cx.vent.without, 0),
+        col(&cx.vent.without, 1),
+        hd(&cx.vent.without),
+        col(&cx.vent.without, 2)
     );
     o
 }

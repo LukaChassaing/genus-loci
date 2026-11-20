@@ -256,7 +256,12 @@
         // the trunk dies, emergently, within the published longevity,
         // 80-90 y (Atlas) (data/validation/corylus_avellana.ron).
         // While > 0 the age-scheduled decline_* values above are ignored.
-        maintenance_per_m: 0.0145,
+        // Recalibrated 0.0145 -> 0.0147 (2026-11-20, approved by the user):
+        // the wind acclimation of the stem (wind.rs) perturbed the
+        // trajectories and seed 4 lived 99 y instead of 90, moving the median
+        // of seeds 1-5 to 97 y; with 0.0147 the seeds die at 80, 97, 85, 99,
+        // 71 y (median 85).
+        maintenance_per_m: 0.0147,
     ),
     symbiosis: (
         // ECTOMYCORRHIZAL (Tuber, Amanita rubescens, Boletus edulis, Cenococcum, Laccaria,

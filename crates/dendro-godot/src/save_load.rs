@@ -137,6 +137,7 @@ impl Backend {
                 let millis = l.started.elapsed().as_millis() as u64;
                 let day = res.sim.days_elapsed();
                 self.sim = res.sim;
+                self.sim.set_record_wind_debris(true);
                 self.mechanics_stale();
                 self.carry_days = 0.0;
                 self.drought = self.sim.drought();

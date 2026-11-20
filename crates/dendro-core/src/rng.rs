@@ -52,11 +52,16 @@ pub(crate) const S_YEAR: u64 = 1;
 pub(crate) const S_TEMP: u64 = 2;
 pub(crate) const S_RAIN: u64 = 3;
 pub(crate) const S_RAIN_AMT: u64 = 4;
+/// Daily wind (`climate.rs`).
+pub(crate) const S_WIND: u64 = 5;
 pub(crate) const S_SHOOT: u64 = 10;
 pub(crate) const S_BUD: u64 = 11;
 pub(crate) const S_RETRENCH: u64 = 12;
 /// Whole-tree mortality and post-mortem resprouting, see `crate::vitality`.
 pub(crate) const S_MORTALITY: u64 = 13;
+/// Death of a host tree by a cambium-feeding bark beetle, see
+/// `crate::vitality` (`BioticTraits`).
+pub(crate) const S_BARK_BEETLE: u64 = 14;
 pub(crate) const S_ROOT: u64 = 20;
 pub(crate) const S_LEAF: u64 = 30;
 pub(crate) const S_FLOWER: u64 = 31;

@@ -143,18 +143,45 @@ pub struct Backend {
     load: save_load::LoadState,
     /// Mechanics of the shown tree (« Mécanique » panel), see `mechanics`.
     mech: Option<MechCache>,
+    /// Sway parameters for the shader (see `sway`).
+    sway: Sway,
 }
 
 /// The mechanics model and critical speeds of one state of the tree (they do not depend on the wind
 /// speed of the panel slider): rebuilt when the day or the wood changes, so moving the slider costs
-/// one O(n) evaluation, and the ~80-pass critical speed search runs once per state.
+/// one O(n) evaluation. The critical speed search (~80 passes with the dynamics and the large
+/// deflections: up to ~1 s on an old oak) runs on a worker thread; until it is done the snapshot
+/// reports none (`critical_pending`).
 struct MechCache {
     day: u64,
     wood_version: u64,
     model: dendro_core::MechanicsModel,
-    critical: dendro_core::CriticalSpeeds,
+    critical: Option<dendro_core::CriticalSpeeds>,
+    worker: Option<std::thread::JoinHandle<dendro_core::CriticalSpeeds>>,
     /// Last evaluation (slider speed) and its snapshot.
     last: Option<(f32, dendro_core::MechanicsSnapshot)>,
+}
+
+impl Drop for MechCache {
+    /// A critical speed search still running is waited for: a detached worker could still be running
+    /// Rust code when Godot unloads the library at exit.
+    fn drop(&mut self) {
+        if let Some(w) = self.worker.take() {
+            let _ = w.join();
+        }
+    }
+}
+
+/// Sway parameters for the shader, cached per (year, leaves on/off) (see `Backend::sway`).
+#[derive(Clone, Copy, Default)]
+pub struct Sway {
+    /// Natural frequency (Hz) and still-air damping ratio, with today's foliage.
+    pub freq_hz: f32,
+    pub damping: f32,
+    /// Static displacement of the stem top under a 10 m/s gust (m): scaled by (U/10)² for the mean bend.
+    pub top_per_10ms: f32,
+    pub height: f32,
+    key: (u32, bool),
 }
 
 impl Backend {
@@ -171,8 +198,9 @@ impl Backend {
         let genomes = Genome::registry();
         let species = if species < genomes.len() { species } else { Genome::default_index() };
         let genome = genomes[species].clone();
-        let sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
-        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default(), mech: None };
+        let mut sim = Simulation::with_site(genome, seed, ClimateParams::default(), profile);
+        sim.set_record_wind_debris(true);
+        let mut b = Self { sim, carry_days: 0.0, drought: false, soil, species, timeline: prune::Timeline::default(), load: save_load::LoadState::default(), mech: None, sway: Sway::default() };
         b.timeline_reset();
         b
     }
@@ -609,24 +637,64 @@ impl Backend {
     /// undo or rewind, a load), where (day, wood version) alone could repeat for a different tree.
     pub(crate) fn mechanics_stale(&mut self) {
         self.mech = None;
+        self.sway.freq_hz = 0.0;
     }
 
     /// Static mechanics of the tree today under a steady gust of `speed` m/s at 10 m (today's foliage,
     /// see `dendro_core::mechanics`), with the critical speeds; cached per (day, wood version, speed).
     pub fn mechanics(&mut self, speed: f32) -> &dendro_core::MechanicsSnapshot {
         let (day, wv) = (self.sim.days_elapsed(), self.sim.wood_version());
+        let az = self.sim.climate_params().wind_towards_deg;
         if !self.mech.as_ref().is_some_and(|c| c.day == day && c.wood_version == wv) {
             let model = self.sim.mechanics_model();
-            let critical = model.critical_speeds(&dendro_core::WindLoad::new(0.0));
-            self.mech = Some(MechCache { day, wood_version: wv, model, critical, last: None });
+            let m2 = model.clone();
+            // The prevailing direction of the climate's winds (storms blow from it too).
+            let worker = std::thread::spawn(move || m2.critical_speeds(&dendro_core::WindLoad { azimuth_deg: az, ..dendro_core::WindLoad::new(0.0) }));
+            self.mech = Some(MechCache { day, wood_version: wv, model, critical: None, worker: Some(worker), last: None });
         }
         let c = self.mech.as_mut().expect("mechanics cache just filled");
+        if c.worker.as_ref().is_some_and(|w| w.is_finished()) {
+            c.critical = c.worker.take().and_then(|w| w.join().ok());
+            c.last = None;
+        }
         if !c.last.as_ref().is_some_and(|l| l.0 == speed) {
-            let mut snap = c.model.evaluate(&dendro_core::WindLoad::new(speed));
-            snap.critical = c.critical;
+            let mut snap = c.model.evaluate(&dendro_core::WindLoad { azimuth_deg: az, ..dendro_core::WindLoad::new(speed) });
+            snap.critical = c.critical.unwrap_or_default();
             c.last = Some((speed, snap));
         }
         &c.last.as_ref().expect("mechanics snapshot just computed").1
+    }
+
+    /// The critical speed search of the cached state is still running.
+    pub fn mechanics_pending(&self) -> bool {
+        self.mech.as_ref().is_some_and(|c| c.critical.is_none())
+    }
+
+    /// The parts the wind broke off since the last call.
+    pub fn take_wind_debris(&mut self) -> Vec<dendro_core::WindDebris> {
+        self.sim.take_wind_debris()
+    }
+
+    /// A storm now (« Tempête »): a gust of `gust` m/s at 10 m tests the tree; logged, rewindable
+    /// like a cut (a checkpoint is kept before it). Returns the number of damage entries.
+    pub fn storm(&mut self, gust: f32) -> usize {
+        self.checkpoint_before_event();
+        self.mechanics_stale();
+        self.sim.storm(gust).len()
+    }
+
+    /// Sway parameters of the tree for the shader, recomputed once per year and when the foliage
+    /// turns on or off (one model build and one evaluation).
+    pub fn sway(&mut self) -> Sway {
+        let leafy = self.sim.leaf_density() > 0.5;
+        let key = (self.sim.year(), leafy);
+        if self.sway.key != key || self.sway.freq_hz <= 0.0 {
+            let az = self.sim.climate_params().wind_towards_deg;
+            let m = self.sim.mechanics_model();
+            let snap = m.evaluate(&dendro_core::WindLoad { azimuth_deg: az, leaf_fraction: Some(if leafy { 1.0 } else { 0.0 }), ..dendro_core::WindLoad::new(10.0) });
+            self.sway = Sway { freq_hz: snap.natural_frequency_hz, damping: snap.damping_ratio, top_per_10ms: snap.top_deflection_m, height: self.sim.height_m(), key };
+        }
+        self.sway
     }
 
     /// Wood mesh coloured by the safety factor of each segment under `speed` m/s.

@@ -56,7 +56,6 @@ pub struct AgeRec {
     /// Mean daily transpiration in July (L/day), from the flux snapshot.
     pub july_transp_l_day: f64,
     pub clear_bole_m: f64,
-    #[cfg(feature = "vent")]
     pub vent: crate::vent::AgeDyn,
 }
 
@@ -85,7 +84,6 @@ pub struct TreeRun {
     pub death_age: Option<u32>,
     /// Length of the simulated run (years), `death_age` or the full run.
     pub run_years: u32,
-    #[cfg(feature = "vent")]
     pub vent: crate::vent::RunDyn,
 }
 
@@ -164,7 +162,6 @@ fn age_rec(sim: &Simulation, july_transp: f64) -> AgeRec {
         area_ratio_n: n,
         july_transp_l_day: july_transp,
         clear_bole_m: m.clear_bole_m as f64,
-        #[cfg(feature = "vent")]
         vent: crate::vent::age_dyn(sim),
     }
 }
@@ -177,7 +174,6 @@ pub fn run_tree(genome: &Genome, seed: u64, years: u32) -> TreeRun {
 
 pub fn run_tree_on(genome: &Genome, seed: u64, years: u32, soil: SoilProfile, detailed: bool) -> TreeRun {
     let mut sim = Simulation::with_site(genome.clone(), seed, ClimateParams::default(), soil);
-    #[cfg(feature = "vent")]
     crate::vent::configure(&mut sim);
     let ages = if detailed { sample_ages(years) } else { Vec::new() };
     let mut run = TreeRun { seed, ..Default::default() };
@@ -263,7 +259,6 @@ pub fn run_tree_on(genome: &Genome, seed: u64, years: u32, soil: SoilProfile, de
             }
         }
         prev_dbh = y.dbh_cm;
-        #[cfg(feature = "vent")]
         crate::vent::year_end(&sim, &mut run, age);
         run.years.push(y);
         if run.death_age.is_none() && !sim.trunk_alive() {
@@ -308,7 +303,6 @@ pub struct ClimateStats {
     pub record_tx_june_80y: f64,
     pub record_tn_80y: f64,
     pub record_rain_80y: f64,
-    #[cfg(feature = "vent")]
     pub wind: crate::vent::WindStats,
 }
 
@@ -335,7 +329,6 @@ pub fn climate_stats(seed: u64, years: u32) -> ClimateStats {
     let mut c = Climate::new(ClimateParams::default(), seed);
     let mut s = ClimateStats { years, ..Default::default() };
     let (mut tx_y, mut txj_y, mut tn_y, mut rain_y) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    #[cfg(feature = "vent")]
     let mut wacc = crate::vent::WindAcc::default();
     for y in 0..years {
         let (mut tx, mut txj, mut tn, mut rmax) = (f64::MIN, f64::MIN, f64::MAX, 0.0f64);
@@ -366,7 +359,6 @@ pub fn climate_stats(seed: u64, years: u32) -> ClimateStats {
             }
             tn = tn.min(mn);
             rmax = rmax.max(p);
-            #[cfg(feature = "vent")]
             wacc.day(&w, m, y);
         }
         tx_y.push(tx);
@@ -396,7 +388,6 @@ pub fn climate_stats(seed: u64, years: u32) -> ClimateStats {
     s.record_tx_june_80y = win(&txj_y, f64::max);
     s.record_tn_80y = win(&tn_y, f64::min);
     s.record_rain_80y = win(&rain_y, f64::max);
-    #[cfg(feature = "vent")]
     {
         s.wind = wacc.finish(years);
     }

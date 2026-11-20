@@ -57,7 +57,7 @@ fn save_then_load_by_replay_gives_the_same_state_hash() {
 
     // (b) Through the RON text and the sliced replay.
     let text = file.to_ron();
-    assert!(text.contains("version: 1"), "{text}");
+    assert!(text.contains(&format!("version: {SAVE_VERSION}")), "{text}");
     let back = SaveFile::from_ron(&text).expect("parse");
     assert_eq!(back, file, "RON round-trip");
     let mut r = dendro_core::Replay::new(&back, 4).expect("replay");
@@ -143,7 +143,7 @@ fn unknown_version_fails_cleanly() {
     let text = SaveFile::capture(&s, "x", 0).to_ron().replacen(&format!("version: {SAVE_VERSION}"), "version: 99", 1);
     assert_eq!(SaveFile::from_ron(&text), Err(SaveError::UnsupportedVersion(99)));
     // A future format with fields this build does not know still reports the version.
-    assert_eq!(SaveFile::from_ron("(version: 2, tree: (dna: \"ACGT\"))"), Err(SaveError::UnsupportedVersion(2)));
+    assert_eq!(SaveFile::from_ron("(version: 3, tree: (dna: \"ACGT\"))"), Err(SaveError::UnsupportedVersion(3)));
     assert!(SaveError::UnsupportedVersion(99).to_string().contains("v99"));
 }
 
@@ -191,6 +191,49 @@ fn write_and_read_a_file() {
     assert_eq!(back.builtin_species_index(), Genome::index_of("prunus_avium"));
     assert_eq!(back.replay().expect("replay").state_hash(), s.state_hash());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A storm asked for by the player is logged with its gust, saved (format
+/// v2) and replayed at the start of its day: the reloaded tree has the same
+/// breaks, the same wind history and the same state hash.
+#[test]
+fn storm_round_trips_through_a_save() {
+    let mut live = Simulation::new(Genome::quercus_robur(), 31);
+    live.advance_days(45 * YEAR + 20); // winter, leafless
+    let before = live.wind_history().len();
+    // A gust a little above the tree's first critical gust today.
+    let az = live.climate_params().wind_towards_deg;
+    let crit = live.mechanics_model().first_critical_speed(&dendro_core::WindLoad { azimuth_deg: az, ..dendro_core::WindLoad::new(0.0) }, 0.25).expect("a critical gust below 80 m/s");
+    let gust = (crit + 2.0).min(80.0);
+    let dmg = live.storm(gust);
+    assert!(!dmg.is_empty(), "a {gust} m/s storm broke nothing (critical {crit} m/s)");
+    assert!(dmg.iter().all(|d| d.storm && d.gust_ms == gust));
+    assert_eq!(live.wind_history().len(), before + dmg.len());
+    assert!(live.prune_log().iter().any(|e| matches!(e.action, dendro_core::Action::Storm(g) if g == gust)));
+    live.advance_days(200);
+    let file = SaveFile::capture(&live, "Après la tempête", 0);
+    let text = file.to_ron();
+    assert!(text.contains("Storm"), "{text}");
+    let back = SaveFile::from_ron(&text).expect("parse").replay().expect("replay");
+    assert_eq!(back.wind_history(), live.wind_history());
+    assert_eq!(back.state_hash(), live.state_hash(), "storm not replayed identically");
+}
+
+/// Version 1 files (before storms) are still read; a storm in a v1 file is
+/// refused.
+#[test]
+fn version_1_files_are_still_read() {
+    let mut s = Simulation::new(Genome::prunus_avium(), 9);
+    s.advance_days(2 * YEAR);
+    s.set_drought(true);
+    s.advance_days(30);
+    let v1 = SaveFile::capture(&s, "ancien", 0).to_ron().replacen(&format!("version: {SAVE_VERSION}"), "version: 1", 1);
+    let back = SaveFile::from_ron(&v1).expect("a v1 file must load");
+    assert_eq!(back.version, 1);
+    assert_eq!(back.replay().expect("replay").state_hash(), s.state_hash());
+    let mut file = SaveFile::from_ron(&v1).expect("v1");
+    file.events.push(dendro_core::save::SavedEvent { day: 800, action: SavedAction::Storm { gust_ms: 30.0 } });
+    assert!(matches!(SaveFile::from_ron(&file.to_ron()), Err(SaveError::Invalid(_))));
 }
 
 /// Load time of a 200-year pruned oak (report figure):

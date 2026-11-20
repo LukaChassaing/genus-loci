@@ -121,7 +121,7 @@ pub struct Simulation {
     pub(crate) day: u64,
     pub(crate) drought: bool,
     drought_in_season: bool,
-    today: Weather,
+    pub(crate) today: Weather,
     water_factor: f32,
     p_year: f32,
     p_summer: f32,
@@ -144,6 +144,10 @@ pub struct Simulation {
     pub(crate) prune: crate::pruning::PruneState,
     /// Carbon status, ageing and death (see `crate::vitality`).
     pub(crate) vit: crate::vitality::Vitality,
+    /// Wind damage and acclimation (see `crate::wind`); the cache is derived
+    /// data and front-end buffers, outside the state hash.
+    pub(crate) wind: crate::wind::WindState,
+    pub(crate) wind_cache: crate::wind::WindCache,
     /// Collar area increment (m2) of this season's earlywood.
     pending_collar: f32,
 }
@@ -209,6 +213,8 @@ impl Simulation {
             repro: Reproduction::new(first_age, seed),
             prune: crate::pruning::PruneState::default(),
             vit: crate::vitality::Vitality::default(),
+            wind: crate::wind::WindState::default(),
+            wind_cache: crate::wind::WindCache::default(),
             pending_collar: 0.0,
             genome,
             seed,
@@ -257,6 +263,7 @@ impl Simulation {
         if doy == 0 && self.day > 0 {
             self.p_prev = (self.p_year / P_YEAR_REF).clamp(0.2, 1.6);
             self.p_year = 0.0;
+            self.wind_new_year();
         }
         let w = self.climate.day(year, doy, self.drought);
         self.today = w;
@@ -290,6 +297,8 @@ impl Simulation {
             PhenoEvent::LeafFallComplete => self.on_leaf_fall(),
             PhenoEvent::None => {}
         }
+        // The day's strongest gust against the tree (crate::wind).
+        self.wind_day();
         let age = self.day as f32 / DAYS_PER_YEAR as f32;
         self.repro.step(&w, doy, age, &self.phen, &self.genome);
         // Shoot extension in 5 visible steps.
@@ -431,7 +440,12 @@ impl Simulation {
         }
         let (mi, mh) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
-        let collar = self.shoots.thicken(&self.genome, factor, w.max_ring_width_mm * 0.001 * share * 1.5);
+        let max_dr = w.max_ring_width_mm * 0.001 * share * 1.5;
+        let wind = self.wind_stress_now();
+        let collar = self.shoots.thicken(&self.genome, factor, max_dr, &wind);
+        // The yearly wind acclimation demand of the new structure
+        // (crate::wind).
+        self.wind_yearly_screen();
         self.pending_early_mm = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.pending_measure = mh;
         self.pending_collar = collar;
@@ -473,7 +487,9 @@ impl Simulation {
         }
         let (mi, _) = self.measure_node();
         let a0 = self.shoots.nodes[mi].area;
-        let collar = self.shoots.thicken(&self.genome, factor, w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5);
+        let max_dr = w.max_ring_width_mm * 0.001 * (1.0 - share) * 1.5;
+        let wind = self.wind_stress_now();
+        let collar = self.shoots.thicken(&self.genome, factor, max_dr, &wind);
         let late = rings::width_mm(a0, self.shoots.nodes[mi].area);
         self.roots.thicken(collar);
         self.shoots.sag(&self.genome);
@@ -571,7 +587,10 @@ impl Simulation {
         if self.shoots.height() <= 1.3 {
             return 0.0;
         }
-        match self.shoots.trunk_node_at(1.3) {
+        // An uprooted trunk lies on the ground: only its stump sprouts can
+        // be measured at breast height.
+        let node = if self.vit.uprooted { self.shoots.living_stem_node_at(1.3) } else { self.shoots.trunk_node_at(1.3) };
+        match node {
             Some(i) => self.shoots.nodes[i].radius() * 200.0,
             None => 0.0,
         }

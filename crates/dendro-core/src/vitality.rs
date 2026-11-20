@@ -58,6 +58,34 @@
 //!    from the seed (`S_MORTALITY`), so a given seed always dies the same
 //!    year.
 //!
+//! 4. **Bark beetle (biotic mortality, hosts only).** A species whose
+//!    genome declares a cambium-feeding bark beetle (`BioticTraits`; Norway
+//!    spruce and *Ips typographus*) draws, every year, a second death with
+//!    the probability [`bark_beetle_hazard`]: `crisis_kill_rate x age
+//!    weight` in a crisis year, 0 otherwise. Sources (docs/sources.md,
+//!    « Scolytes ») : the rate in a crisis year is the standing-dead spruce
+//!    mortality of the Lower Saxony forest condition survey in the bark
+//!    beetle years 2019-2020 (6.1 and 4.6 %/year, against 0-0.5 %/year
+//!    up to 2018; Waldzustandsbericht Niedersachsen 2020, NW-FVA,
+//!    read); the age weights are those of the predisposition index of
+//!    Netherer et al. 2019 (Front For Glob Change 2:39, Table 4, read,
+//!    after Netherer & Nopp-Mayr 2005, not read): < 60 y 0.2, 60-79 y 0.6,
+//!    80-100 y 0.9, > 100 y 1.0 (trees > 70 y attacked more, > 100 y most:
+//!    Becker & Schröter 2000 via Wermelinger 2004, For Ecol Manage
+//!    202:67-82, read). Drought weakens the defences of the individual tree
+//!    (Netherer et al. 2015, New Phytol 205:1128-1141, read: successful
+//!    attacks 16 of 27 on roofed trees, 13 of 36 on controls); the
+//!    survey's mortality rose only in the 2nd-3rd year of the 2018-2020
+//!    drought, so the crisis is read on the multi-year reserves, not on the
+//!    weather of one season. **Model choices** (no source): a crisis year
+//!    is a season that ends with reserves at or below `crisis_reserve`
+//!    (set so that crisis years are about as frequent among adult trees as
+//!    in the survey record, see docs/sources.md); no beetle death outside
+//!    crisis years (the background is the decline draw of 3.); no beetle
+//!    population, no previous-year damage, no neighbours (an isolated
+//!    tree). The draw has its own stream (`S_BARK_BEETLE`), so a tree that
+//!    escapes the beetle keeps exactly the trajectory it had without it.
+//!
 //! A dead trunk is not removed: it stands as a snag ("chandelle"), loses its
 //! twigs within a few years and its limbs over decades (the existing dead
 //! wood rule, `WoodTraits::snag_years_per_m`), then the stem collapses (see
@@ -70,7 +98,8 @@
 
 use crate::fmath::DMath;
 use crate::growth::NONE;
-use crate::rng::{self, S_MORTALITY};
+use crate::genome::BioticTraits;
+use crate::rng::{self, S_BARK_BEETLE, S_MORTALITY};
 use crate::sim::Simulation;
 
 /// Net production share (of an average year's production) that keeps the
@@ -120,6 +149,12 @@ pub enum DeathCause {
     Decline,
     /// Reserves exhausted for several years.
     Starvation,
+    /// The root plate turned over in a gale (« chablis », `crate::wind`):
+    /// the only death the wind causes outright.
+    Uprooted,
+    /// Killed by a cambium-feeding bark beetle in a crisis year (hosts
+    /// only, `BioticTraits`); the trunk stands as a snag.
+    BarkBeetle,
 }
 
 impl DeathCause {
@@ -131,6 +166,8 @@ impl DeathCause {
             DeathCause::None => "",
             DeathCause::Decline => "dépérissement",
             DeathCause::Starvation => "réserves épuisées",
+            DeathCause::Uprooted => "déracinement",
+            DeathCause::BarkBeetle => "scolytes (attaque d'un arbre affaibli)",
         }
     }
 }
@@ -167,6 +204,8 @@ pub(crate) struct Vitality {
     pub collapsed: bool,
     /// The stump / roots resprouted after the trunk died.
     pub resprouted: bool,
+    /// The trunk was uprooted and lies on the ground (not a standing snag).
+    pub uprooted: bool,
 }
 
 impl Default for Vitality {
@@ -188,6 +227,7 @@ impl Default for Vitality {
             collapse_year: NONE,
             collapsed: false,
             resprouted: false,
+            uprooted: false,
         }
     }
 }
@@ -207,6 +247,18 @@ impl Vitality {
 /// with the same seed (same weather) do not share their death draws.
 fn species_key(g: &crate::genome::Genome) -> u64 {
     g.species.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100_0000_01b3)) << 1
+}
+
+/// Yearly probability that a host is killed by its bark beetle at the end of
+/// a season that leaves the tree `age` years old with reserves `reserve`:
+/// `crisis_kill_rate x age weight` when the reserves are at or below
+/// `crisis_reserve` (crisis year), 0 otherwise and for a non-host. See the
+/// module docs (4.) for the sources.
+pub fn bark_beetle_hazard(b: &BioticTraits, age: f32, reserve: f32) -> f32 {
+    if !b.host() || reserve > b.crisis_reserve {
+        return 0.0;
+    }
+    (b.crisis_kill_rate * b.age_weight(age)).clamp(0.0, 1.0)
 }
 
 /// Years a dead stem of collar radius `r` (m) stands before it collapses:
@@ -284,12 +336,23 @@ impl Simulation {
                 self.flower_version += 1;
             }
         }
-        // Death of the trunk.
+        // Death of the trunk. Starvation first; then the bark beetle of a
+        // host in a crisis year (the proximate killer of a weakened tree);
+        // then the decline draw.
         let age = self.age_years();
         let starved = self.vit.starve_years >= STARVE_YEARS;
         let drawn = age >= MORT_MIN_AGE && rng::unit(rng::hash(self.seed, S_MORTALITY, species_key(&self.genome), year as u64)) < self.vit.hazard;
-        if starved || drawn {
-            self.trunk_dies(year, if starved { DeathCause::Starvation } else { DeathCause::Decline });
+        let bb = if age >= MORT_MIN_AGE { bark_beetle_hazard(&self.genome.biotic, age, self.vit.reserve) } else { 0.0 };
+        let beetle = bb > 0.0 && rng::unit(rng::hash(self.seed, S_BARK_BEETLE, species_key(&self.genome), year as u64)) < bb;
+        if starved || beetle || drawn {
+            let cause = if starved {
+                DeathCause::Starvation
+            } else if beetle {
+                DeathCause::BarkBeetle
+            } else {
+                DeathCause::Decline
+            };
+            self.trunk_dies(year, cause);
         }
     }
 
@@ -311,6 +374,33 @@ impl Simulation {
         }
         v.reserve = 0.0;
         v.vigour = 0.0;
+    }
+
+    /// The stem below 1.3 m was cut or broken (coppice cut, wind break near
+    /// the collar): the stems that grow next are new stems, measured from
+    /// scratch, as for a stool resprouting after the trunk died
+    /// (`trunk_dies`). Without this, the collapse of the collar increment
+    /// after the cut read as a loss of vigour (hazard up to ~5 %/year for a
+    /// few years, measured on a coppiced 60-year oak).
+    pub(crate) fn stem_replaced(&mut self) {
+        let v = &mut self.vit;
+        v.bai = [0.0; 5];
+        v.bai_n = 0;
+        v.bai_peak = 0.0;
+    }
+
+    /// The root plate turns over in a gale (`crate::wind`): the trunk dies
+    /// at once (cause [`DeathCause::Uprooted`], whether or not the carbon
+    /// balance is modelled) and lies on the ground towards `azimuth_deg`
+    /// (direction the wind blows towards). The stump may still resprout,
+    /// with the species' probability (drawn as for any trunk death). The
+    /// lying stem decays with the ground-contact rule of
+    /// [`collapse_years`], then disappears.
+    pub(crate) fn uproot(&mut self, year: u32, azimuth_deg: f32) {
+        self.trunk_dies(year, DeathCause::Uprooted);
+        self.vit.uprooted = true;
+        self.shoots.lay_down(azimuth_deg);
+        self.root_version += 1;
     }
 
     /// The stem dies: it becomes a standing snag; the stump may resprout.
@@ -371,6 +461,10 @@ pub struct VitalityInfo {
     /// Vigour index 0..1 and yearly death probability of the last season.
     pub vigour: f32,
     pub death_probability: f32,
+    /// Yearly probability that the bark beetle of a host kills the trunk,
+    /// from the current reserves and age ([`bark_beetle_hazard`]); 0 for a
+    /// non-host, outside crisis years and once the trunk is dead.
+    pub bark_beetle_probability: f32,
     /// Branches killed by carbon-starvation dieback last season.
     pub dieback_branches: u32,
     /// Age (years) at which the first trunk died.
@@ -384,6 +478,8 @@ pub struct VitalityInfo {
     pub collapsed: bool,
     /// The stump or the roots resprouted after the trunk died.
     pub resprouted: bool,
+    /// The trunk was uprooted by the wind and lies on the ground.
+    pub uprooted: bool,
 }
 
 impl Simulation {
@@ -392,7 +488,7 @@ impl Simulation {
         let v = &self.vit;
         let dead = v.death_year != NONE;
         let year = self.year();
-        let standing = v.collapse_year != NONE && !v.collapsed;
+        let standing = v.collapse_year != NONE && !v.collapsed && !v.uprooted;
         VitalityInfo {
             modelled: self.ageing(),
             reserve: v.reserve,
@@ -400,6 +496,11 @@ impl Simulation {
             net_production: v.net,
             vigour: v.vigour,
             death_probability: v.hazard,
+            bark_beetle_probability: if self.ageing() && !dead && self.age_years() >= MORT_MIN_AGE {
+                bark_beetle_hazard(&self.genome.biotic, self.age_years(), v.reserve)
+            } else {
+                0.0
+            },
             dieback_branches: v.dieback,
             // The trunk dies at the end of a season, after laying its ring:
             // dying in calendar year y it has lived y + 1 seasons (rings).
@@ -409,6 +510,7 @@ impl Simulation {
             collapse_in_years: standing.then(|| v.collapse_year.saturating_sub(year)),
             collapsed: v.collapsed,
             resprouted: v.resprouted,
+            uprooted: v.uprooted,
         }
     }
 

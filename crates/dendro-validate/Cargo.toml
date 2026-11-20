@@ -6,9 +6,6 @@ edition.workspace = true
 publish = false
 
 [features]
-# Measurements that need the dynamic-wind API of the `m1-vent-dynamique`
-# branch (daily gusts, natural frequency, damping, wind damage).
-vent = []
 
 [dependencies]
 dendro-core = { path = "../dendro-core" }

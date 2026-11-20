@@ -326,4 +326,26 @@
         // the P. abies parameter set was not read).
         anchorage_nm_per_kg: 178.1,
     ),
+    // Bark beetle (Ips typographus) mortality, crates/dendro-core/src/
+    // vitality.rs (4.), docs/sources.md « Scolytes de l'épicéa ».
+    biotic: (
+        // Mean of the standing-dead spruce mortality of the Lower Saxony
+        // forest condition survey in the bark-beetle years 2019 (6.1 %) and
+        // 2020 (4.6 %), against 0-0.5 %/year up to 2018
+        // [wzb_ni_2020_spruce_mortality_2019] [..._2020]
+        // [..._1984_2018]. A lower bound of the beetle kill: trees removed
+        // by sanitation felling count in the "Ausfallrate" (22.4 % of the
+        // spruces in 2020, storm and insects, not split by cause).
+        crisis_kill_rate: 0.0535,
+        // Model choice: crisis years are seasons ending with reserves
+        // <= 0.2, 3.0 % of the living years from 60 y on (20 seeds x 400 y,
+        // examples/life_dist.rs, before this block), the closest of the
+        // tested levels to the survey's 2 crisis intervals in 29-36
+        // (5.6-6.9 %).
+        crisis_reserve: 0.2,
+        // Predisposition by stand age (Netherer et al. 2019, Table 4,
+        // after Netherer & Nopp-Mayr 2005) [netherer2019_pas_age_*]:
+        // < 60 y 0.2, 60-79 y 0.6, 80-100 y 0.9, > 100 y 1.0.
+        age_weights: [(0.0, 0.2), (60.0, 0.6), (80.0, 0.9), (101.0, 1.0)],
+    ),
 )

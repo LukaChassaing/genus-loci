@@ -35,6 +35,8 @@ var _diam: Label
 var _state: Label   # « État » : vigour, reserves, death of the trunk (dendro_core::vitality)
 var _state_key: int = -1
 var _temp: Label
+var _wind: Label      # today's wind (mean and gust at 10 m)
+var _fallen_lbl: Label  # shown once the tree is uprooted
 var _root_depth: Label
 var _root_spread: Label
 var _legend: PanelContainer
@@ -112,6 +114,15 @@ func _build_info_panel(root: Control) -> void:
 	_state = _row(v)
 	_state.clip_text = true  # its changing width (reserves %) must not resize the panel (camera free area)
 	_temp = _row(v)
+	_wind = _row(v)
+	_wind.tooltip_text = "Vent du jour à 10 m de haut, en terrain dégagé : vitesse moyenne et rafale maximale (climat calé sur Rennes)"
+	_wind.mouse_filter = Control.MOUSE_FILTER_PASS
+	_fallen_lbl = _row(v)
+	_fallen_lbl.text = "Arbre déraciné (chablis) : le tronc est mort, à terre"
+	_fallen_lbl.add_theme_color_override("font_color", Color(0.95, 0.55, 0.35))
+	_fallen_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_fallen_lbl.custom_minimum_size = Vector2(300, 0)
+	_fallen_lbl.visible = false
 	_root_depth = _row(v)
 	_root_spread = _row(v)
 	var wl: Label = Label.new()
@@ -591,6 +602,13 @@ func update_from(sim: TreeSim) -> void:
 	_root_depth.text = "Profondeur des racines : %s m" % ("%.1f" % sim.get_root_depth_m()).replace(".", ",")
 	_root_spread.text = "Étalement des racines : %s m" % ("%.1f" % sim.get_root_spread_m()).replace(".", ",")
 	_temp.text = "Température : %s °C" % ("%.1f" % sim.get_temperature_c()).replace(".", ",")
+	var sb: int = sim.get_last_stem_break_year()
+	if not _fallen_lbl.visible or _fallen_lbl.text.begins_with("Tronc"):
+		_fallen_lbl.visible = sb >= 0
+		if sb >= 0:
+			_fallen_lbl.text = "Tronc cassé l'an %d : chandelle, rejets épicormiques" % sb
+	var w: Vector3 = sim.get_wind_today()
+	_wind.text = "Vent : %s m/s, rafale %s m/s (%d km/h)" % [("%.1f" % w.x).replace(".", ","), ("%.0f" % w.y), roundi(w.y * 3.6)]
 	_water.value = sim.get_soil_water()
 	if year != _last_ring_year:
 		_last_ring_year = year
@@ -602,7 +620,9 @@ func update_from(sim: TreeSim) -> void:
 ## « État » line from `TreeSim.get_vitality()`: vigour class and reserves while the trunk lives; once it is dead,
 ## age and cause of death, the standing dead stem (snag) and its expected collapse, stump sprouts. "" when the
 ## species has no carbon balance (genome without `maintenance_per_m`). The vigour classes are display
-## conventions (thresholds of the vigour index and reserves), not published categories.
+## conventions (thresholds of the vigour index and reserves), not published categories. A host of a bark
+## beetle (spruce) in a crisis year (reserves depleted) also shows its yearly risk of a beetle attack
+## (`bark_beetle_probability`, `dendro_core::vitality`); a beetle death reads « Cause : scolytes … ».
 static func vitality_text(d: Dictionary) -> String:
 	if not bool(d.get("modelled", false)):
 		return ""
@@ -615,7 +635,11 @@ static func vitality_text(d: Dictionary) -> String:
 			cls = "dépérissant"
 		elif v < 0.7 or r < 0.6:
 			cls = "en déclin"
-		return "État : %s — réserves %d %%" % [cls, roundi(100.0 * r)]
+		var txt_alive: String = "État : %s — réserves %d %%" % [cls, roundi(100.0 * r)]
+		var bb: float = float(d.get("bark_beetle_probability", 0.0))
+		if bb > 0.0:
+			txt_alive += "\nRisque de scolytes : %s %% par an (arbre affaibli)" % ("%.1f" % (100.0 * bb)).replace(".", ",")
+		return txt_alive
 	var cause: String = String(d.get("cause", ""))
 	var txt: String = "État : tronc mort à %d ans" % death
 	if cause != "":
@@ -628,6 +652,12 @@ static func vitality_text(d: Dictionary) -> String:
 	if bool(d.get("resprouted", false)):
 		txt += "\nRejets de souche" + (" vivants" if bool(d.get("alive", false)) else " morts")
 	return txt
+
+
+## The tree is down (uprooted): an explicit line under the stats.
+func set_fallen(on: bool) -> void:
+	_fallen_lbl.text = "Arbre déraciné (chablis) : le tronc est mort, à terre ; la souche peut rejeter selon l'essence"
+	_fallen_lbl.visible = on
 
 
 func force_ring_refresh() -> void:

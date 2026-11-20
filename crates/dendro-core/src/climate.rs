@@ -30,9 +30,47 @@
 //! the generated daily mean, the generated diurnal range and latitude.
 //! Full Penman-Monteith would need radiation, humidity and wind that this
 //! generator does not produce honestly.
+//!
+//! # Wind (mechanics, milestone M1)
+//! Each day also gets a daily mean wind and a daily maximum gust at 10 m
+//! over open ground (the anemometer standard of the station), calibrated on
+//! the same Meteo-France fiche (Rennes-St Jacques 35281001, statistics
+//! 1991-2020; records 1981-2026; fiche read): 10-min mean wind 3.9 m/s in
+//! January-February down to 3.2 m/s in August-September (3.6 m/s over the
+//! year); days with a gust >= 16 m/s: 6.2, 5.5, 4.8, 3.8, 2.5, 1.4, 1.4,
+//! 1.2, 1.7, 3.2, 4.0, 6.0 per month (41.7 a year); days with a gust >= 28
+//! m/s: 0.6 a year; highest gust 38 m/s (15 Oct 1987), monthly records 23-38
+//! m/s.
+//! * Daily maximum gust: a Weibull body (shape `gust_weibull_k`, scale
+//!   following a seasonal cosine) spliced above `gust_tail_start_ms` onto an
+//!   exponential (Gumbel-domain) tail of scale `gust_tail_scale_ms`. A pure
+//!   Weibull fitted to the two exceedance counts (k ~ 1.9) makes 38 m/s a
+//!   once-in-300-years gust; the exponential tail gives the station's
+//!   record a return period of ~45 years, as observed. Annual maxima of
+//!   such a tail follow a Gumbel law, the usual extreme-value model of wind
+//!   speeds (e.g. Palutikof et al. 1999, "A review of methods to calculate
+//!   extreme wind speeds", Meteorol Appl 6:119-132; not read). The four
+//!   parameters are a least-squares fit (scratch script, not shipped) to the
+//!   12 monthly counts >= 16 m/s, the yearly count >= 28 m/s and a
+//!   45-year return period for 38 m/s: calibration.
+//! * Daily mean wind: Weibull with shape 2 (the Rayleigh case, the usual
+//!   first guess for wind speed distributions; estimated, no fit to Rennes
+//!   daily data) and a seasonal mean fitted to the monthly normals.
+//! * Both are drawn from one standard normal deviate per day (a Gaussian
+//!   copula, so gust and mean wind of a day are comonotone: a
+//!   simplification), autocorrelated from day to day (AR(1), rho 0.5:
+//!   estimated, storms last one to two days).
+//! * Direction: the wind blows from the west-south-west, the dominant
+//!   sector of strong winds in Brittany (stated without a wind rose:
+//!   estimated), always from that direction by default (a spread can be
+//!   set, `wind_azimuth_sd_deg`). Azimuths are those of
+//!   `mechanics::WindLoad`.
+//!
+//! A separate random stream (`S_WIND`) leaves temperature and rain
+//! unchanged.
 
 use crate::fmath::DMath;
-use crate::rng::{self, S_RAIN, S_RAIN_AMT, S_TEMP, S_YEAR};
+use crate::rng::{self, S_RAIN, S_RAIN_AMT, S_TEMP, S_WIND, S_YEAR};
 use crate::tempgen::{self, TempTables};
 use serde::{Deserialize, Serialize};
 use std::f32::consts::TAU;
@@ -79,7 +117,79 @@ pub struct ClimateParams {
     /// station climate; larger values give a more variable climate).
     #[serde(default = "temp_sd_scale_default")]
     pub temp_sd_scale: f32,
+    /// Wind climate (see the module header). Annual mean of the daily mean
+    /// wind at 10 m (m/s) and half its seasonal swing (windiest around
+    /// `windiest_doy`).
+    #[serde(default = "wind_mean_default")]
+    pub wind_mean_ms: f32,
+    #[serde(default = "wind_amplitude_default")]
+    pub wind_amplitude_ms: f32,
+    /// Day of year (0-based) of the windiest season.
+    #[serde(default = "windiest_doy_default")]
+    pub windiest_doy: f32,
+    /// Daily maximum gust at 10 m: Weibull shape, annual mean scale (m/s),
+    /// relative seasonal swing of the scale, start of the exponential tail
+    /// (m/s) and its scale (m/s).
+    #[serde(default = "gust_k_default")]
+    pub gust_weibull_k: f32,
+    #[serde(default = "gust_scale_default")]
+    pub gust_scale_ms: f32,
+    #[serde(default = "gust_seasonal_default")]
+    pub gust_seasonal_amp: f32,
+    #[serde(default = "gust_tail_start_default")]
+    pub gust_tail_start_ms: f32,
+    #[serde(default = "gust_tail_scale_default")]
+    pub gust_tail_scale_ms: f32,
+    /// Day-to-day autocorrelation of the wind deviate.
+    #[serde(default = "wind_autocorr_default")]
+    pub wind_autocorr: f32,
+    /// Direction the dominant strong winds blow towards (deg, azimuth of
+    /// `mechanics::WindLoad`), and its day-to-day spread (deg).
+    #[serde(default = "wind_azimuth_default")]
+    pub wind_towards_deg: f32,
+    #[serde(default = "wind_azimuth_sd_default")]
+    pub wind_azimuth_sd_deg: f32,
 }
+
+fn wind_mean_default() -> f32 {
+    3.55
+}
+fn wind_amplitude_default() -> f32 {
+    0.35
+}
+fn windiest_doy_default() -> f32 {
+    15.0
+}
+fn gust_k_default() -> f32 {
+    2.6
+}
+fn gust_scale_default() -> f32 {
+    11.75
+}
+fn gust_seasonal_default() -> f32 {
+    0.14
+}
+fn gust_tail_start_default() -> f32 {
+    20.0
+}
+fn gust_tail_scale_default() -> f32 {
+    3.0
+}
+fn wind_autocorr_default() -> f32 {
+    0.5
+}
+fn wind_azimuth_default() -> f32 {
+    // From the west-south-west (247.5 deg on the compass) towards the
+    // east-north-east; the game's +x axis is taken as east (convention).
+    22.5
+}
+fn wind_azimuth_sd_default() -> f32 {
+    // One direction for every wind (simplification): it keeps the
+    // mechanics screen of `crate::wind` exact (a direction-dependent
+    // critical speed would need one screen per direction).
+    0.0
+}
+
 
 /// Meteo-France, fiche climatologique Rennes-St Jacques (35281001),
 /// "Temperature minimale (moyenne en degC)", 1991-2020.
@@ -133,6 +243,17 @@ impl Default for ClimateParams {
             tn_sd_c: tn_sd_default(),
             tx_sd_c: tx_sd_default(),
             temp_sd_scale: temp_sd_scale_default(),
+            wind_mean_ms: wind_mean_default(),
+            wind_amplitude_ms: wind_amplitude_default(),
+            windiest_doy: windiest_doy_default(),
+            gust_weibull_k: gust_k_default(),
+            gust_scale_ms: gust_scale_default(),
+            gust_seasonal_amp: gust_seasonal_default(),
+            gust_tail_start_ms: gust_tail_start_default(),
+            gust_tail_scale_ms: gust_tail_scale_default(),
+            wind_autocorr: wind_autocorr_default(),
+            wind_towards_deg: wind_azimuth_default(),
+            wind_azimuth_sd_deg: wind_azimuth_sd_default(),
         }
     }
 }
@@ -152,6 +273,12 @@ pub struct Weather {
     pub pet_mm: f32,
     /// Day length (h).
     pub photoperiod_h: f32,
+    /// Daily mean wind at 10 m over open ground (m/s).
+    pub wind_mean_ms: f32,
+    /// Daily maximum gust at 10 m over open ground (m/s).
+    pub gust_ms: f32,
+    /// Direction the wind blows towards (deg, `mechanics::WindLoad`).
+    pub wind_azimuth_deg: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -169,6 +296,8 @@ pub struct Climate {
     seed: u64,
     /// Standardised Tmax / Tmin residuals of the previous day.
     chi: [f32; 2],
+    /// AR(1) standard normal deviate of the wind of the previous day.
+    wind_ar: f32,
     tables: TempTables,
     /// Uniform shift of the normal tables to `mean_temp_c` (degC).
     shift_c: f32,
@@ -236,7 +365,7 @@ impl Climate {
         let tables = TempTables::new(&params.tn_normals_c, &params.tx_normals_c, &params.tn_sd_c, &params.tx_sd_c);
         let table_mean = 0.5 * (tempgen::annual_mean(&params.tn_normals_c) + tempgen::annual_mean(&params.tx_normals_c));
         let shift_c = params.mean_temp_c - table_mean;
-        let mut c = Climate { params, seed, chi: [0.0; 2], tables, shift_c, year: u32::MAX, anomaly: YearAnomaly::default() };
+        let mut c = Climate { params, seed, chi: [0.0; 2], wind_ar: 0.0, tables, shift_c, year: u32::MAX, anomaly: YearAnomaly::default() };
         c.set_year(0);
         c
     }
@@ -349,6 +478,13 @@ impl Climate {
             precip = 0.0;
             pet *= 1.4;
         }
+        // Wind (module header): one AR(1) standard normal deviate per day,
+        // mapped on the seasonal gust and mean-wind laws (Gaussian copula).
+        let rho_w = p.wind_autocorr.clamp(0.0, 0.99);
+        let zw = rng::normal(rng::hash(s, S_WIND, year as u64, doy as u64));
+        self.wind_ar = rho_w * self.wind_ar + (1.0 - rho_w * rho_w).sqrt() * zw;
+        let (wind_mean_ms, gust_ms) = wind_of_deviate(p, d, self.wind_ar);
+        let wind_azimuth_deg = p.wind_towards_deg + p.wind_azimuth_sd_deg * rng::normal(rng::hash(s, S_WIND, year as u64, (doy as u64) | 1 << 32));
         Weather {
             temp_c: temp,
             tmin_c: tmin,
@@ -356,9 +492,55 @@ impl Climate {
             precip_mm: precip,
             pet_mm: pet,
             photoperiod_h: photo,
+            wind_mean_ms,
+            gust_ms,
+            wind_azimuth_deg,
         }
     }
 }
+/// Exceedance probability of the daily maximum gust `x` (m/s) on a day
+/// whose Weibull scale is `c` (module header: Weibull body spliced onto an
+/// exponential tail).
+pub fn gust_exceedance(p: &ClimateParams, c: f32, x: f32) -> f64 {
+    let k = p.gust_weibull_k as f64;
+    let c = c.max(0.1) as f64;
+    let xs = p.gust_tail_start_ms as f64;
+    let x = x.max(0.0) as f64;
+    if x <= xs {
+        (-(x / c).dpowf(k)).dexp()
+    } else {
+        (-(xs / c).dpowf(k)).dexp() * (-(x - xs) / (p.gust_tail_scale_ms.max(0.1) as f64)).dexp()
+    }
+}
+
+/// Weibull scale (m/s) of the daily maximum gust on day `doy` (0-based).
+pub fn gust_scale_on(p: &ClimateParams, doy: f32) -> f32 {
+    p.gust_scale_ms * (1.0 + p.gust_seasonal_amp * (TAU * (doy - p.windiest_doy) / 365.0).dcos())
+}
+
+/// Daily (mean wind, maximum gust) in m/s for a standard normal deviate `z`
+/// on day `doy`: inverse of the seasonal laws at the same quantile.
+fn wind_of_deviate(p: &ClimateParams, doy: f32, z: f32) -> (f32, f32) {
+    // Exceedance probability of the quantile, computed directly in the
+    // tail (no 1 - u cancellation): Phi(-z) = erfc(z / sqrt 2) / 2.
+    let q = (0.5 * (z as f64 / std::f64::consts::SQRT_2).derfc()).clamp(1e-300, 1.0 - 1e-16);
+    let c = gust_scale_on(p, doy);
+    let k = p.gust_weibull_k.max(0.5) as f64;
+    let xs = p.gust_tail_start_ms as f64;
+    let qs = gust_exceedance(p, c, p.gust_tail_start_ms);
+    let gust = if q >= qs {
+        c as f64 * (-q.dln()).dpowf(1.0 / k)
+    } else {
+        xs + p.gust_tail_scale_ms as f64 * (qs / q).dln()
+    };
+    // Daily mean wind, Weibull shape 2: scale = mean / Gamma(1.5).
+    const GAMMA_1_5: f64 = 0.886_226_925_452_758;
+    let mean = p.wind_mean_ms + p.wind_amplitude_ms * (TAU * (doy - p.windiest_doy) / 365.0).dcos();
+    let vm = (mean.max(0.1) as f64 / GAMMA_1_5) * (-q.dln()).sqrt();
+    // The day's gust is at least its mean wind.
+    (vm as f32, (gust as f32).max(vm as f32))
+}
+
 
 /// Single-layer soil water bucket (mm of plant-extractable water).
 #[derive(Clone, Debug)]
@@ -501,4 +683,88 @@ mod tests {
         }
     }
 
+    #[test]
+    fn wind_climate_matches_rennes_statistics() {
+        // Targets: Meteo-France fiche 35281001 (module header). 10-min mean
+        // wind 3.9 m/s (Jan) .. 3.2 m/s (Aug), 3.6 m/s over the year; days
+        // with a gust >= 16 m/s 41.7 a year (6.2 in January, 1.2 in August);
+        // >= 28 m/s 0.6 a year; record 38 m/s in 45 years (1981-2026). Over
+        // 1000 simulated years (one seed): the yearly and monthly counts
+        // within +-20 % (monthly +-1 day), the 38 m/s return period between
+        // 20 and 100 years (sampling of a 45-year record), the annual
+        // maximum's median between 24 and 30 m/s (P(max >= 28) = 1 -
+        // exp(-0.6) = 0.45 if gust days are Poisson). Tolerances: ours.
+        let mut c = Climate::new(ClimateParams::default(), 11);
+        let years = 1000u32;
+        let mdays = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let (mut n16, mut n28, mut n38) = ([0.0f64; 12], 0.0f64, 0.0f64);
+        let (mut mean_jan, mut mean_aug, mut mean_all) = (0.0f64, 0.0f64, 0.0f64);
+        let mut annual_max = Vec::new();
+        for y in 0..years {
+            let mut mx = 0.0f32;
+            let (mut m, mut left) = (0usize, mdays[0]);
+            for d in 0..365 {
+                if left == 0 {
+                    m += 1;
+                    left = mdays[m];
+                }
+                left -= 1;
+                let w = c.day(y, d, false);
+                assert!(w.gust_ms >= w.wind_mean_ms && w.wind_mean_ms >= 0.0);
+                mean_all += w.wind_mean_ms as f64;
+                if m == 0 {
+                    mean_jan += w.wind_mean_ms as f64;
+                }
+                if m == 7 {
+                    mean_aug += w.wind_mean_ms as f64;
+                }
+                if w.gust_ms >= 16.0 {
+                    n16[m] += 1.0;
+                }
+                n28 += (w.gust_ms >= 28.0) as u8 as f64;
+                n38 += (w.gust_ms >= 38.0) as u8 as f64;
+                mx = mx.max(w.gust_ms);
+            }
+            annual_max.push(mx);
+        }
+        let yf = years as f64;
+        let obs = [6.2, 5.5, 4.8, 3.8, 2.5, 1.4, 1.4, 1.2, 1.7, 3.2, 4.0, 6.0];
+        let sim: Vec<f64> = n16.iter().map(|n| n / yf).collect();
+        let tot: f64 = sim.iter().sum();
+        annual_max.sort_by(|a, b| a.total_cmp(b));
+        let med = annual_max[annual_max.len() / 2];
+        let ret38 = yf / n38.max(1.0);
+        println!(
+            "mean {:.2} (Jan {:.2}, Aug {:.2}) m/s; >=16: {tot:.1}/yr {sim:.1?}; >=28: {:.2}/yr; 38 m/s every {ret38:.0} yr; annual max median {med:.1} m/s, max {:.1}",
+            mean_all / (yf * 365.0),
+            mean_jan / (yf * 31.0),
+            mean_aug / (yf * 31.0),
+            n28 / yf,
+            annual_max[annual_max.len() - 1]
+        );
+        assert!((3.4..3.8).contains(&(mean_all / (yf * 365.0))));
+        assert!((3.6..4.2).contains(&(mean_jan / (yf * 31.0))) && (2.9..3.5).contains(&(mean_aug / (yf * 31.0))));
+        assert!((33.4..50.0).contains(&tot), ">=16 m/s: {tot} days");
+        for (m, (s, o)) in sim.iter().zip(obs.iter()).enumerate() {
+            assert!((s - o).abs() <= 1.0, "month {m}: {s:.2} days >= 16 m/s vs {o}");
+        }
+        assert!((0.48..0.72).contains(&(n28 / yf)), ">=28 m/s: {}", n28 / yf);
+        assert!((20.0..100.0).contains(&ret38), "38 m/s every {ret38} years");
+        assert!((24.0..30.0).contains(&med), "annual max median {med}");
+    }
+
+    #[test]
+    fn wind_does_not_change_temperature_or_rain() {
+        // The wind draws use their own stream: the rest of the weather is
+        // the same as with the wind switched off (zero mean, no gusts).
+        let calm = ClimateParams { wind_mean_ms: 0.0, wind_amplitude_ms: 0.0, gust_scale_ms: 0.1, ..ClimateParams::default() };
+        let mut a = Climate::new(ClimateParams::default(), 3);
+        let mut b = Climate::new(calm, 3);
+        for y in 0..3 {
+            for d in 0..365 {
+                let (wa, wb) = (a.day(y, d, false), b.day(y, d, false));
+                assert_eq!((wa.temp_c, wa.precip_mm, wa.pet_mm, wa.tmin_c), (wb.temp_c, wb.precip_mm, wb.pet_mm, wb.tmin_c));
+            }
+        }
+    }
 }
