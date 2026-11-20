@@ -41,7 +41,7 @@ fn main() {
                     let sg = &segs[i];
                     let h = sg.start[1];
                     let k = (h / 2.0).floor() as i32;
-                    if line.len() < 4000 && (i == 0 || (h - 2.0 * k as f32) < 0.6) {
+                    if line.len() < 4000 && (i == 0 || (h - 2.0 * k as f32) < 0.6 || std::env::var("FULL").is_ok_and(|v| h > v.parse::<f32>().unwrap_or(0.0))) {
                         line += &format!(" {:.0}m:{:.1}cm/SF{:.1}", h, 200.0 * sg.radius_m, s.segment_safety[i]);
                     }
                 }

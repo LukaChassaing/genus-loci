@@ -1401,7 +1401,7 @@ impl MechanicsModel {
             }
             _ => {
                 let mut th = vec![Vec3::ZERO; self.segs.len()];
-                let (g, _, _) = self.deform_relaxed(p, &first.moments, &mut th, 1.0);
+                let (g, _, _) = self.deform(p, &first.moments, &mut th);
                 (th, g)
             }
         };
@@ -1495,7 +1495,7 @@ impl MechanicsModel {
     pub fn stem_stresses(&self, load: &WindLoad) -> (Vec<f32>, Vec<bool>) {
         let p = self.prepare_with(load, !load.quasi_static);
         let o = self.pass(&p, load.speed_10m_ms.max(0.0), true);
-        let stress = self.segs.iter().zip(&o.detail).map(|(s, d)| if s.ei > 0.0 { d.1 } else { 0.0 }).collect();
+        let stress = self.segs.iter().zip(&o.detail).map(|(s, d)| if s.ei > 0.0 || s.role == SegmentRole::Trunk { d.1 } else { 0.0 }).collect();
         let trunk = self.segs.iter().map(|s| s.role == SegmentRole::Trunk).collect();
         (stress, trunk)
     }
@@ -1549,7 +1549,7 @@ impl MechanicsModel {
     /// failing end of the final bracket, as the plain bisection did.
     fn root_in(f: impl Fn(f32) -> f32, mut lo: f32, f_lo: f32, mut hi: f32, f_hi: f32) -> f32 {
         let tol = CRITICAL_SPEED_TOL_MS;
-        let g = |x: f32| if x.is_finite() { x.max(1e-6).ln() } else { 10.0 };
+        let g = |x: f32| if x.is_finite() { x.max(1e-6).dln() } else { 10.0 };
         let (mut glo, mut ghi) = (g(f_lo), g(f_hi));
         // Consecutive updates of the same end: after two, a bisection step
         // (the safeguard that keeps regula falsi from crawling on one side).
