@@ -348,10 +348,16 @@ fn more_wind_means_less_safety() {
     // moment (150-year hazel: limb safety 2.25 -> 2.54 at 10 m/s; 150-year
     // pear: 6.4 -> 7.5). Decided with the user (2026-11-18); the test used
     // to require a monotonic fall from 0 m/s.
+    // Updated (user decision, 2026-11-20): the monotonic fall is checked on
+    // the quasi-static statics, where it follows from the physics (drag
+    // grows with speed on a fixed geometry). With large deflections a
+    // flexible stem may shed load at high speed (60-year beech: safety 0.79
+    // at 40 m/s, 0.87 at 50 m/s); that is tested on its own below
+    // (`large_deflections_unload_a_flexible_tree_at_high_speed`).
     for (sp, a, sims) in living_trees() {
         let model = sims[0].mechanics_model();
         let worst_at = |u: f32| {
-            let s = model.evaluate(&in_leaf(u));
+            let s = model.evaluate(&WindLoad { quasi_static: true, ..in_leaf(u) });
             if u > 0.0 {
                 assert!(s.drag_n > 0.0);
             }
@@ -367,6 +373,40 @@ fn more_wind_means_less_safety() {
         }
         assert!(last < calm, "species {sp} age {}: safety at 50 m/s {last} not below still air {calm}", AGES[a]);
     }
+}
+
+#[test]
+fn large_deflections_unload_a_flexible_tree_at_high_speed() {
+    // Reconfiguration of flexible bodies: a stem that bends in the wind
+    // turns its crown away and lowers it into slower air, so its load grows
+    // more slowly than on the rigid geometry (Vogel 1989, J Exp Bot
+    // 40:941-948; de Langre 2008, Annu Rev Fluid Mech 40:141-168, both cited
+    // in mechanics.rs). Decision of the user (2026-11-20): this replaces the
+    // monotonic safety of the dynamic model in `more_wind_means_less_safety`.
+    // On every simulated tree at 50 m/s in leaf, the moment at the collar
+    // with large deflections (divided by the dynamic factor, which the
+    // quasi-static case does not apply) is not above the quasi-static one by
+    // more than the P-Delta allowance of `flexible_stem_bows_and_sheds_load`
+    // (6 %; the weight of the displaced crown, P-Delta, can offset the
+    // shorter lever), and the most flexible trees shed a clear share of it
+    // (at least one tree below 0.9). The top displacement alone does not
+    // tell which trees unload: a thin leader may swing several metres
+    // without unloading the collar (150-year oak 5.5 m of 28.9 m, ratio
+    // 1.013; 150-year sycamore 7.7 m, 1.013).
+    let mut flexible = 0;
+    for (sp, a, sims) in living_trees() {
+        let model = sims[0].mechanics_model();
+        let h = sims[0].height_m();
+        let qs = model.evaluate(&WindLoad { quasi_static: true, ..in_leaf(50.0) });
+        let ld = model.evaluate(&in_leaf(50.0));
+        let ratio = ld.base_moment_nm / ld.dynamic_factor / qs.base_moment_nm;
+        println!("{sp} {} y: top deflection {:.2} m of {h:.1} m, collar moment large deflection / quasi-static {ratio:.3}", AGES[a], ld.top_deflection_m);
+        assert!(ratio < 1.06, "species {sp} age {}: {ratio}", AGES[a]);
+        if ratio < 0.9 {
+            flexible += 1;
+        }
+    }
+    assert!(flexible > 0, "no simulated tree sheds 10 % of its collar moment at 50 m/s");
 }
 
 #[test]

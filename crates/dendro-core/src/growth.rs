@@ -1452,14 +1452,18 @@ impl ShootSystem {
             // Wind response, on top of the budget: stems strained like the
             // strongest winds grow more secondary wood, not the same wood
             // elsewhere (Bonnesoeur et al. 2016: at least +80 %, abstract),
-            // up to 80 % of the phase's budget (the same figure). Not a carbon balance (the
+            // up to a share of the phase's budget (below). Not a carbon balance (the
             // extra wood is not paid by height growth or the roots:
             // docs/sources.md, « Écarts connus »). Taking it from the budget
             // instead lowered the DBH and moved three calibrated growth
             // tests out of their bands (oak height at 200 y 34.05 m for
             // 28-34, 11 scaffold limbs for 3-10, cherry rings at 105-115 y).
             let want_w: f32 = extra.iter().map(|&(i, _, dw)| dw * self.nodes[i].length).sum();
-            let cap_w = budget * (WIND_RING_BOOST - 1.0);
+            // Whorled conifer stems (the leader up to its tip, `crate::wind`):
+            // up to the "+80 % at least" of Bonnesoeur et al. 2016; other
+            // trees keep the self-weight share (user decision, 2026-11-20:
+            // the 80 % cap gave the 100-year oak 11 scaffold limbs).
+            let cap_w = if g.architecture.whorled { budget * (WIND_RING_BOOST - 1.0) } else { cap };
             let scale_w = if want_w > cap_w && want_w > 0.0 { cap_w / want_w } else { 1.0 };
             for &(i, da, dw) in &extra {
                 self.nodes[i].area += da * scale + dw * scale_w;
