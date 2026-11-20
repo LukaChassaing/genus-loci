@@ -940,6 +940,12 @@ impl MechanicsModel {
     }
 
     fn prepare(&self, load: &WindLoad) -> Prepared {
+        self.prepare_with(load, true)
+    }
+
+    /// [`Self::prepare`]; without `sway`, the first mode is not estimated
+    /// (quasi-static loads only: frequency 0, dynamic factor 1).
+    fn prepare_with(&self, load: &WindLoad, sway: bool) -> Prepared {
         let n = self.segs.len();
         let f = load.leaf_fraction.unwrap_or(self.site.leaf_fraction).clamp(0.0, 1.0);
         let (sa, ca) = load.azimuth_deg.to_radians().dsin_cos();
@@ -1107,7 +1113,7 @@ impl MechanicsModel {
             p.prof_mid_b.push(if p.wood_bends[i] { kmw } else { 1.0 });
             p.prof_end_b.push(if s.leaf_share > 0.0 { kec } else { 1.0 });
         }
-        let (mid, end, freq, mgen) = self.rayleigh(p.wind, &p.leaf_mass, &p.extra);
+        let (mid, end, freq, mgen) = if sway { self.rayleigh(p.wind, &p.leaf_mass, &p.extra) } else { (vec![0.0; n], vec![0.0; n], 0.0, 0.0) };
         let t = &self.traits;
         p.dynamics = Dynamics { natural_frequency_hz: freq, damping_ratio: t.damping_leafless + f * t.damping_leaves, modal_mass_kg: mgen };
         p.shape_mid = mid;
@@ -1435,11 +1441,12 @@ impl MechanicsModel {
 
     /// Bending stress (Pa) of every bending axis (from
     /// [`FLEX_MIN_DIAMETER_M`]; 0 elsewhere) under `load` (weight + wind,
-    /// with dynamics and large deflections), and whether each segment lies
+    /// with dynamics and large deflections unless `quasi_static`, then
+    /// without estimating the sway mode), and whether each segment lies
     /// on the stem path: the load case of the wind acclimation of growth.rs
     /// (`crate::wind`).
     pub fn stem_stresses(&self, load: &WindLoad) -> (Vec<f32>, Vec<bool>) {
-        let p = self.prepare(load);
+        let p = self.prepare_with(load, !load.quasi_static);
         let o = self.pass(&p, load.speed_10m_ms.max(0.0), true);
         let stress = self.segs.iter().zip(&o.detail).map(|(s, d)| if s.ei > 0.0 { d.1 } else { 0.0 }).collect();
         let trunk = self.segs.iter().map(|s| s.role == SegmentRole::Trunk).collect();

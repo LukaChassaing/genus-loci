@@ -158,6 +158,8 @@ pub(crate) struct WindCache {
     /// Acclimation: (node id, stress / set-point, radius m when computed),
     /// by id.
     accl: Vec<(u32, f32, f32)>,
+    /// Year of the last acclimation demand computed (None: never).
+    accl_year: Option<u32>,
     /// Keep the meshes of broken parts (front end only).
     pub(crate) record_debris: bool,
     pub(crate) debris: Vec<WindDebris>,
@@ -283,7 +285,11 @@ impl Simulation {
         let heights: Vec<f32> = segments.iter().map(|s| s.start[1]).collect();
         let model = crate::mechanics::MechanicsModel::from_segments(&segments, self.genome.mechanics.clone(), site);
         let az = self.climate_params().wind_towards_deg;
-        let case = |leaf: f32, u: f32| WindLoad { speed_10m_ms: u, azimuth_deg: az, leaf_fraction: Some(leaf), ..WindLoad::default() };
+        // Quasi-static loads (cost): the set-point is a stress ratio along
+        // the stem, in which the dynamic factor (one scalar for the whole
+        // tree) cancels; the large deflections matter for slender leaders,
+        // not for the structural stem sections that respond.
+        let case = |leaf: f32, u: f32| WindLoad { speed_10m_ms: u, azimuth_deg: az, leaf_fraction: Some(leaf), quasi_static: true, ..WindLoad::default() };
         // The leafless case keeps the dead leaves of a young marcescent
         // tree and the needles of an evergreen (its winter crown).
         let l = &self.genome.leaf;
@@ -354,9 +360,10 @@ impl Simulation {
         // (`wind_stress_now`).
         let year = self.year();
         let every = 1 + (self.shoots.nodes.len() / BIG_TREE_SEGMENTS) as u32;
-        if every > 1 && !self.wind_cache.accl.is_empty() && !year.is_multiple_of(every) {
+        if self.wind_cache.accl_year.is_some_and(|y| year < y + every) {
             return;
         }
+        self.wind_cache.accl_year = Some(year);
         let demand = self.acclimation_demand();
         let mut accl: Vec<(u32, f32, f32)> = self.shoots.nodes.iter().zip(&demand).filter(|(_, &s)| s > 1.0).map(|(n, &s)| (n.id, s, n.radius())).collect();
         accl.sort_unstable_by_key(|a| a.0);
