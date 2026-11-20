@@ -954,8 +954,8 @@ pseudotsuga_menziesii	cnpf_harvest	height_m	conforme	31.248477935791016	0.300	-0
 pseudotsuga_menziesii	cnpf_mai	mai_m3_ha_yr	non modélisé		0.300	
 pseudotsuga_menziesii	cnpf_index	site_index	non modélisé		0.300	
 picea_abies	atlas_height_max	height_m	hors plage	39.12294578552246	0.900	-0.2887
-picea_abies	atlas_dbh_max	dbh_cm	limite	160.7728271484375	0.900	0.0718
-picea_abies	atlas_longevity_normal	longevity_years	hors plage	350	0.900	0.4000
+picea_abies	atlas_dbh_max	dbh_cm	conforme	144.81909942626953	0.900	-0.0345
+picea_abies	atlas_longevity_normal	longevity_years	conforme	297	0.900	0.1880
 picea_abies	atlas_clonal_age	clonal_age_years	non modélisé		0.900	
 picea_abies	atlas_first_flowering	age_first_flowering_years	conforme	29	0.900	0.1600
 picea_abies	atlas_first_flowering_dense	age_first_flowering_years	non comparable	29	0.900	-0.2750
@@ -968,14 +968,14 @@ picea_abies	atlas_root_arch	root_architecture	conforme		0.900
 picea_abies	atlas_mycorrhiza	mycorrhiza_type	non mesurable		0.900	
 picea_abies	wfr_height	height_m	conforme	39.12294578552246	0.240	0.0433
 picea_abies	wfr_dbh	dbh_cm	limite	160.7728271484375	0.240	0.0718
-picea_abies	wfr_longevity	longevity_years	non mesurable		0.240	
+picea_abies	wfr_longevity	longevity_years	indicatif	297	0.240	-0.4060
 picea_abies	wfr_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0000
 picea_abies	wfr_cone_maturity	fruit_maturity_doy	conforme	264.8664596273292	0.240	-0.0333
 picea_abies	wen_height_record	height_m	conforme	43.332481384277344	0.240	-0.3090
 picea_abies	wen_leader_growth	height_increment_m_yr	conforme	0.6983191967010498	0.240	-0.3017
-picea_abies	wen_oldest_ring_dated	longevity_years	non mesurable		0.240	
+picea_abies	wen_oldest_ring_dated	longevity_years	conforme	297	0.240	-0.4417
 picea_abies	wde_height_typ	height_m	limite	39.12294578552246	0.240	-0.2329
-picea_abies	wde_longevity	longevity_years	non mesurable		0.240	
+picea_abies	wde_longevity	longevity_years	limite	297	0.240	-0.5050
 picea_abies	wde_first_flowering	age_first_flowering_years	limite	29	0.240	-0.1714
 picea_abies	wde_flowering	flowering_doy	conforme	136.41925465838509	0.240	-0.0966
 picea_abies	wde_needle_longevity	needle_longevity_years	conforme	6	0.240	0.0909
@@ -1011,6 +1011,23 @@ picea_abies	fc34_ns_yc20_dbh_60	dbh_cm	indicatif	47.95511436462402	0.800	0.1418
 picea_abies	fc34_ns_yc14_dbh_50	dbh_cm	indicatif	40.011226654052734	0.800	0.7396
 picea_abies	fc34_ns_maxmai_age	rotation_years	non modélisé		0.800	
 picea_abies	fc34_ns_maxmai_dbh	dbh_cm	non comparable	92.87193298339844	0.800	1.4766
+picea_abies	wzb_ni_spruce_mortality_1984_2018	annual_mortality_pct	non mesurable		1.000	
+picea_abies	wzb_ni_spruce_mortality_2019	annual_mortality_pct	non mesurable		1.000	
+picea_abies	wzb_ni_spruce_mortality_2020	annual_mortality_pct	non mesurable		1.000	
+picea_abies	wzb_ni_spruce_removal_2020	annual_removal_pct	non mesurable		1.000	
+picea_abies	wzb_ni_spruce_removal_mean	annual_removal_pct	non mesurable		1.000	
+picea_abies	wzb_ni_crisis_year_share	bark_beetle_crisis_year_fraction	non mesurable		1.000	
+picea_abies	netherer2019_pas_age_lt60	bark_beetle_predisposition_weight	non mesurable		1.000	
+picea_abies	netherer2019_pas_age_60_79	bark_beetle_predisposition_weight	non mesurable		1.000	
+picea_abies	netherer2019_pas_age_80_100	bark_beetle_predisposition_weight	non mesurable		1.000	
+picea_abies	netherer2019_pas_age_gt100	bark_beetle_predisposition_weight	non mesurable		1.000	
+picea_abies	netherer2019_attacked_stands_tdef_lt20	bark_beetle_attacked_stand_pct	non modélisé		1.000	
+picea_abies	netherer2019_attacked_stands_tdef_20_40	bark_beetle_attacked_stand_pct	non modélisé		1.000	
+picea_abies	netherer2019_attacked_stands_tdef_gt40	bark_beetle_attacked_stand_pct	non modélisé		1.000	
+picea_abies	netherer2015_successful_attacks_control	bark_beetle_successful_attack_fraction	non modélisé		1.000	
+picea_abies	netherer2015_successful_attacks_drought	bark_beetle_successful_attack_fraction	non modélisé		1.000	
+picea_abies	wermelinger2004_host_age	bark_beetle_host_age_years	non modélisé		0.900	
+picea_abies	ehrminger2026_qmd_plateau	bark_beetle_risk_qmd_plateau_cm	non modélisé		1.000	
 taxus_baccata	atlas_height	height_m	conforme	17.371044158935547	0.900	-0.1314
 taxus_baccata	atlas_dbh	dbh_cm	limite	99.79573822021484	0.900	-0.7505
 taxus_baccata	atlas_longevity	longevity_years	non mesurable		0.900	
