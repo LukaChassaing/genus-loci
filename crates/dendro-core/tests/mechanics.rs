@@ -400,7 +400,10 @@ fn decay_reduces_safety() {
     let a = sound.evaluate(&storm);
     let weak = a.weakest.expect("structural sections");
     let stem_idx = (0..segs.len())
-        .filter(|&i| a.segment_role[i] == dendro_core::SegmentRole::Trunk && 2.0 * segs[i].radius_m >= 0.2 * site.dbh_m)
+        // Updated (M1 wind): the stem mode now covers every stem section a
+        // storm can break (from 5 cm, `segment_breakable`), no longer only
+        // those of at least 20 % of the DBH; the weakest one is hollowed.
+        .filter(|&i| a.segment_role[i] == dendro_core::SegmentRole::Trunk && a.segment_breakable[i])
         .min_by(|&i, &j| a.segment_safety[i].total_cmp(&a.segment_safety[j]))
         .expect("stem sections");
     let mut hollow = segs.clone();

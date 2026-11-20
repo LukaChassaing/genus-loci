@@ -16,6 +16,9 @@ fn main() {
         sim.set_wind_acclimation_enabled(false);
     }
     sim.advance_years(age);
+    if let Ok(d) = std::env::var("DOY") {
+        sim.advance_days(d.parse().unwrap());
+    }
     let model = sim.mechanics_model();
     let (segs, site) = sim.mechanics_inputs();
     println!("H {:.1} m, DBH {:.1} cm, crown radius {:.1} m, leaf area {:.0} m2, voxel {:.2} m", sim.height_m(), sim.dbh_cm(), sim.crown_radius_m(), site.leaf_area_m2, site.crown_cell_m);

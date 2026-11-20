@@ -311,26 +311,26 @@ Résultats (sol de référence ; arbres sains, acclimatation active ; médianes 
 
 | Espèce | Âge | H m | DBH cm | f₀ feuillé / défeuillé (Hz) | gain hiver | Hors feuilles : tronc / charp. / déracin. | En feuilles : tronc / charp. / déracin. |
 |---|---|---|---|---|---|---|---|
-| Chêne pédonculé | 20 | 9,2 | 15,9 | 0,52 / 0,71 | +37 % | 29,2 / > 80 / > 80 | 29,1 / 59,4 / > 80 |
-| Chêne pédonculé | 60 | 19,6 | 49,8 | 0,76 / 0,86 | +13 % | 77,4 / 51,3 / 49,1 | 60,5 / 34,0 / 37,3 |
-| Chêne pédonculé | 150 | 28,7 | 109,0 | 0,48 / 0,55 | +14 % | > 80 / 45,5 / 42,9 | 74,1 / 34,0 / 32,8 |
-| Merisier | 20 | 11,5 | 19,2 | 0,68 / 0,98 | +44 % | 36,0 / 54,1 / > 80 | 33,3 / 41,8 / > 80 |
-| Merisier | 60 | 20,6 | 50,8 | 0,92 / 1,09 | +19 % | > 80 / 58,5 / 47,1 | 65,5 / 38,4 / 35,9 |
-| Merisier | 150 | 17,8 | 59,2 | 0,79 / 0,93 | +18 % | 68,7 / 57,9 / 40,6 | 54,6 / 44,5 / 32,5 |
-| Hêtre | 20 | 8,3 | 11,4 | 0,71 / 0,81 | +14 % | 39,2 / > 80 / > 80 | 41,6 / > 80 / > 80 |
-| Hêtre | 60 | 20,5 | 37,3 | 0,71 / 0,75 | +6 % | 73,3 / > 80 / 58,6 | 40,2 / 68,3 / 45,3 |
-| Hêtre | 150 | 29,0 | 88,0 | 0,77 / 0,81 | +5 % | > 80 / > 80 / 63,2 | > 80 / 54,8 / 48,1 |
-| Épicéa | 20 | 12,6 | 17,9 | 0,59 / 0,90 | (fictif) | 31,3 / — / > 80 | **12,8** / — / > 80 |
-| Épicéa | 60 | 29,6 | 44,4 | 0,34 / 0,65 | (fictif) | 68,3 / — / 50,9 | 39,8 / — / 34,7 |
-| Épicéa | 150 | 39,1 | 88,9 | 0,28 / 0,75 | (fictif) | > 80 / — / 66,3 | > 80 / — / 53,4 |
-| Pin sylvestre | 20 | 11,1 | 18,9 | 0,56 / 1,12 | (fictif) | 29,2 / — / > 80 | **15,1** / — / > 80 |
-| Pin sylvestre | 60 | 22,0 | 48,4 | 0,55 / 1,04 | (fictif) | > 80 / 63,1 / 56,0 | 57,8 / 35,9 / 39,7 |
-| Pin sylvestre | 150 | 25,4 | 89,8 | 0,76 / 1,02 | (fictif) | > 80 / 63,0 / 52,1 | 73,1 / 41,2 / 40,6 |
+| Chêne pédonculé | 20 | 9,2 | 15,9 | 0,57 / 0,78 | +38 % | 28,8 / > 80 / > 80 | 28,1 / 61,0 / > 80 |
+| Chêne pédonculé | 60 | 19,6 | 49,4 | 0,76 / 0,86 | +14 % | 77,4 / 50,3 / 49,1 | 59,5 / 32,0 / 37,2 |
+| Chêne pédonculé | 150 | 28,9 | 109,0 | 0,48 / 0,55 | +14 % | 70,0 / 49,7 / 42,8 | 46,7 / 34,0 / 32,7 |
+| Merisier | 20 | 11,5 | 19,2 | 0,69 / 0,97 | +41 % | 37,7 / 54,1 / > 80 | 33,0 / 41,8 / > 80 |
+| Merisier | 60 | 20,6 | 50,8 | 0,92 / 1,09 | +18 % | 59,8 / 58,5 / 47,2 | 37,9 / 38,4 / 35,9 |
+| Merisier | 150 | 17,8 | 59,2 | 0,79 / 0,93 | +18 % | 63,0 / 57,9 / 40,6 | 49,4 / 44,5 / 32,5 |
+| Hêtre | 20 | 8,3 | 11,4 | 0,74 / 0,84 | +14 % | 44,9 / > 80 / > 80 | 46,9 / > 80 / > 80 |
+| Hêtre | 60 | 20,5 | 37,3 | 0,70 / 0,74 | +5 % | 68,4 / > 80 / 58,7 | 31,0 / 68,1 / 45,3 |
+| Hêtre | 150 | 29,0 | 88,0 | 0,77 / 0,81 | +5 % | 77,6 / > 80 / 63,2 | 41,9 / 54,8 / 48,1 |
+| Épicéa | 20 | 12,6 | 17,9 | 0,60 / 0,91 | (fictif) | 31,3 / — / > 80 | **12,9** / — / > 80 |
+| Épicéa | 60 | 29,6 | 44,4 | 0,36 / 0,63 | (fictif) | 42,3 / — / 51,1 | **5,7** / — / 35,1 |
+| Épicéa | 150 | 39,1 | 88,9 | 0,29 / 0,74 | (fictif) | 57,0 / — / 66,5 | **5,9** / — / 53,8 |
+| Pin sylvestre | 20 | 11,1 | 18,9 | 0,57 / 1,13 | (fictif) | 30,1 / — / > 80 | **16,4** / — / > 80 |
+| Pin sylvestre | 60 | 22,0 | 48,4 | 0,55 / 1,03 | (fictif) | 50,9 / 63,1 / 56,1 | **15,6** / 35,9 / 39,9 |
+| Pin sylvestre | 150 | 25,4 | 89,8 | 0,75 / 1,02 | (fictif) | 66,5 / 63,0 / 52,0 | 36,5 / 41,2 / 40,5 |
 | Pommier | 20 | 5,8 | 8,4 | 0,97 / 1,19 | +23 % | 56,3 / — / > 80 | 55,0 / — / > 80 |
-| Pommier | 60 | 7,9 | 32,6 | 1,70 / 2,05 | +21 % | > 80 / 68,8 / 63,4 | > 80 / 55,1 / 56,4 |
+| Pommier | 60 | 7,9 | 32,6 | 1,70 / 2,05 | +21 % | > 80 / 68,8 / 63,6 | > 80 / 55,1 / 56,5 |
 | Pommier | 150 | — | — | mort avant 150 ans (longévité publiée 80-100 ans) | | | |
 
-(« — » : pas de charpentière structurale ; déracinement non testé sous 20 cm de DBH.) Le gain hiver des feuillus adultes (60-150 ans : +5 à +19 %) encadre les +18-19 % de Jackson et al. 2019 ; les jeunes arbres restent au-dessus (+14 à +44 % à 20 ans).
+(« — » : pas de charpentière structurale ; déracinement non testé sous 20 cm de DBH. Le mode « tronc » couvre toutes les sections de la tige qu'une tempête peut casser, dès 5 cm, et plus seulement celles d'au moins 20 % du DBH : sinon la vitesse critique affichée ne correspondait pas à la casse — épicéa de 60 ans, graine 42, cime cassée par une tempête de 14 m/s en juillet pour une rupture du tronc annoncée à 31,6 m/s. D'où les valeurs très basses des résineux en feuilles.) Le gain hiver des feuillus adultes (60-150 ans : +5 à +19 %) encadre les +18-19 % de Jackson et al. 2019 ; les jeunes arbres restent au-dessus (+14 à +44 % à 20 ans).
 
 Effet de l'acclimatation (même commande avec `--no-accl`, 60 ans, en feuilles, rupture de la tige ; mesuré avant la dernière retouche du mode propre) : chêne 50,8 → 60,5 m/s, épicéa 26,3 → 39,6 m/s, pin sylvestre 27,5 → 58,3 m/s ; DBH inchangé à 0,7 cm près. À 20 ans, aucun effet (sections de la flèche sous le seuil structural).
 
@@ -390,7 +390,7 @@ Recalibrations liées au générateur de température WGEN (même méthode : ret
   Conséquences mesurées : fleurs de merisier gelées 0 % → 2,1 % des années fleuries (banc, 150 ans × 5 graines ; 2,9 % sur 5 graines × 40 ans, perte moyenne 0,66 les années touchées), années avec gel des jeunes feuilles (Tn sous `frost_c` pendant le débourrement) 0,5 % → 3,8 % (merisier, −2 °C) et 0 → 0,2 % (chêne, −3 °C ; 10 graines × 40 ans). Ces taux sont probablement surestimés au printemps (mars : 0,19 jour Tn ≤ −5 °C contre 0,1). Croissance : moyennes sur 20 graines inchangées (DBH du chêne à 100 ans 80,0 → 79,6 cm ; rapport des cernes juvéniles merisier/chêne 1,144 → 1,145 ; houppier du merisier à 40 ans, L/H 0,455 → 0,448), mais chaque arbre suit une autre météo : quatre tests calés sur une seule graine (`open_grown_oak_dbh_follows_white_1998`, `cherry_architecture`, `cherry_rings`, `severe_topping_reduces_vigour_and_lifespan`) sortaient de leur bande alors que, sur 20 graines, la proportion de graines hors bande était la même avant et après (DBH à 100 ans sous la règle de Mitchell, L/H du houppier à 40 ans, rapport des cernes juvéniles > 1,1, réserve minimale < 0,99 après étêtage : 3 → 2, 3 → 3, 5 → 5, 0 → 1 graines sur 20). Ces tests portent désormais sur la médiane de 5 graines fixées d'avance (42, 1, 1234, 7, 99), bandes inchangées ; ils passent tous avec l'ancien générateur. Avec le nouveau, **`cherry_architecture` échoue** : L/H médiane du houppier du merisier à 40 ans 0,419 pour un minimum de 0,42 (ancien générateur 0,470 ; médiane sur 20 graines 0,454 → 0,451). Ce minimum de 0,42 n'avait pas de source ; à la demande de l'utilisateur (2026-11-18), il est remplacé par la régression de Pryor 1988 (Bulletin 75, Fig. 1 / Table 1 : diamètre du houppier Dk = 1,19 + 0,158 × DBH, sur arbres de peuplement et libres) : le houppier médian d'un merisier isolé de 40 ans ne doit pas être plus étroit (marge mesurée +0,61 m). La borne haute W/H < 0,6 et le contrôle à 70 ans sont conservés ; le génome n'est pas retouché. Les arbres des anciennes sauvegardes, rechargées par rejeu, changent.
 - **Vent dynamique (M1, deuxième étape) : écarts laissés visibles.**
   - *Casse limitée aux tempêtes demandées* (décision de l'utilisateur, 2026-11-19). Mesures qui l'ont motivée, avec un test quotidien sous le climat calé (10 graines × 100 ans) : 10 épicéas sur 10 cassés avant 25 ans et morts (pas de rejets) ; chênes debout 4/10 sans acclimatation (6 déracinés), 6/10 avec la tige seule (4 déracinés), 1/10 avec tous les axes ; merisiers 5/10 ; hêtres 9-10/10. Références : 5 % d'arbres chêne/hêtre endommagés par Lothar contre 15 % d'épicéas (`schmidt_lothar_*`), temps de retour des dégâts 357-408 ans (hêtre) et 86-113 ans (épicéa) (`schutz_return`), arbres de peuplement.
-  - *Épicéa trop élancé, flèche qui casse vers 12-16 m/s en feuilles (toute l'année)* entre 12 et 25 ans (médiane de 3 graines : 24 / 19 / 16 / 15 m/s à 9 / 12 / 16 / 25 ans ; 11,9-12,8 m/s à 20 ans au tableau ci-dessus) : section la plus faible juste au-dessus du seuil de casse de 5 cm vers 70 % de la hauteur ; l'épicéa simulé fait 6,2 m pour 7,8 cm de DBH à 10 ans (H/D 80). Non corrigé ; visible au banc (section « Vent »). Une tempête demandée le casse.
+  - *Épicéa trop élancé, flèche qui casse en feuilles (toute l'année) à 12,9 m/s à 20 ans et à 5,7-5,9 m/s à 60 et 150 ans* (médianes de 3 graines ; pin sylvestre 16,4 et 15,6 m/s à 20 et 60 ans) : section la plus faible de la flèche juste au-dessus du seuil de casse de 5 cm, vers 70 % de la hauteur ; l'acclimatation (tige structurale seulement, ≥ 20 % du DBH) ne la renforce pas et laisse une marche de diamètre au seuil (épicéa de 60 ans, graine 42 : 18,4 cm à 19 m, 12,3 cm à 20 m) ; l'épicéa simulé fait 6,2 m pour 7,8 cm de DBH à 10 ans (H/D 80). Non corrigé ; visible au banc (section « Vent »). Une tempête demandée le casse.
   - *Ancrage d'épicéa de Sitka (178,1 N·m/kg) sur des feuillus isolés* : déracinement du chêne de 60 ans vers 37 m/s en feuilles, du merisier de 25-60 ans vers 32-35 m/s ; avec une rafale de 38 m/s tous les ~34 ans dans le générateur, ces arbres seraient presque tous déracinés en un siècle si le vent quotidien cassait. Gardé (décision de l'utilisateur) faute de meilleure source.
   - *Acclimatation* : bois ajouté au budget de croissance, pas pris sur la hauteur ni les racines (pas de bilan carboné) ; consigne relative (contrainte à 1,3 m) qui ne peut pas renforcer la base ni les jeunes flèches ; tige structurale seulement.
   - *Dynamique* : un seul mode (Rayleigh, axes non structuraux et motte rigides : fréquence surestimée) ; rapport hiver/été encore au-dessus de Jackson et al. 2019 pour les jeunes arbres (+24 à +34 % à 20 ans) ; facteur dynamique de l'Eurocode (écrit pour des constructions, cité de mémoire) ; amortissement aérodynamique estimé ; c_s non appliqué. Une seule direction de vent ; branches du houppier (< 20 % du DBH) jamais cassées ; déracinement testé à partir de 20 cm de DBH.

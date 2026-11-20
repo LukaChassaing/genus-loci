@@ -789,7 +789,6 @@ impl MechanicsModel {
             } else {
                 SegmentRole::Branch
             };
-            let structural = !s.dead && s.leaf_weight <= 0.0 && d >= structural_d;
             let flexible = !s.dead && s.leaf_weight <= 0.0 && d >= FLEX_MIN_DIAMETER_M && len > 0.0;
             wood_mass += mass;
             if on_trunk[i] {
@@ -816,7 +815,12 @@ impl MechanicsModel {
                 mass,
                 leaf_share,
                 role,
-                stem_mode: on_trunk[i] && structural,
+                // The stem mode covers every stem section the storms can break
+                // (from STEM_BREAK_MIN_DIAMETER_M), so that the critical speeds
+                // are those at which a storm breaks the stem: with the 20 %-of-DBH
+                // threshold of the limbs, the thin leader of a 60-year spruce
+                // (seed 42) broke at 14 m/s while its critical stem gust read 31.6.
+                stem_mode: on_trunk[i] && !s.dead && s.leaf_weight <= 0.0 && d >= STEM_BREAK_MIN_DIAMETER_M,
                 limb_mode: role == SegmentRole::Limb,
                 breakable: (on_trunk[i] && !s.dead && s.leaf_weight <= 0.0 && d >= STEM_BREAK_MIN_DIAMETER_M) || role == SegmentRole::Limb,
             });

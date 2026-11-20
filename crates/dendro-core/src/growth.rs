@@ -1835,6 +1835,13 @@ impl ShootSystem {
         // coppice stool. Before, the walk stopped at the stump and returned
         // None (DBH 0) or ran up a thin sprout flagged terminal (DBH 1.4 cm
         // on a 16 m coppice shoot).
+        self.living_stem_node_at(y)
+    }
+
+    /// The node at height `y` on the path of the thickest living shoots
+    /// from the collar (the stem of a coppice stool or of the sprouts of a
+    /// windthrown stump); None when no living shoot reaches `y`.
+    pub fn living_stem_node_at(&self, y: f32) -> Option<usize> {
         let n = self.nodes.len();
         let mut thickest = vec![NONE; n];
         for i in 1..n {

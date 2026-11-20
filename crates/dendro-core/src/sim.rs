@@ -587,7 +587,10 @@ impl Simulation {
         if self.shoots.height() <= 1.3 {
             return 0.0;
         }
-        match self.shoots.trunk_node_at(1.3) {
+        // An uprooted trunk lies on the ground: only its stump sprouts can
+        // be measured at breast height.
+        let node = if self.vit.uprooted { self.shoots.living_stem_node_at(1.3) } else { self.shoots.trunk_node_at(1.3) };
+        match node {
             Some(i) => self.shoots.nodes[i].radius() * 200.0,
             None => 0.0,
         }
