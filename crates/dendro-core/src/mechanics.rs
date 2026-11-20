@@ -182,7 +182,16 @@ pub const STEM_BREAK_MIN_DIAMETER_M: f32 = LIMB_MIN_DIAMETER_M;
 /// unknown in western Europe.
 pub const MAX_SEARCH_SPEED_MS: f32 = 80.0;
 const SCAN_STEP_MS: f32 = 2.0;
-const BISECT_STEPS: u32 = 14;
+/// Precision of the critical speeds (m/s): a hundredth of the 0.1 m/s
+/// shown, far below the uncertainty of the loads (it was ~1e-4 m/s, 14
+/// bisections of a 2 m/s bracket; values unchanged at the 0.1 m/s shown).
+const CRITICAL_SPEED_TOL_MS: f32 = 0.01;
+/// Slack of the scan's skip-ahead (`MechanicsModel::critical_speeds`):
+/// from a speed where the lowest safety is s, the scan jumps to `u sqrt(s /
+/// SCAN_SLACK)`. Estimated (the former wind screen used 1.05 for the same
+/// bound); checked against the plain 2 m/s scan on 24 cases (oak, cherry,
+/// spruce, Scots pine at 20, 60 and 150 years, both foliage states).
+const SCAN_SLACK: f32 = 1.15;
 /// Reported safety factors are capped (an unloaded segment has infinite
 /// safety).
 pub const SAFETY_CAP: f32 = 999.0;
@@ -204,8 +213,15 @@ pub const FLEX_MIN_DIAMETER_M: f32 = 0.025;
 /// only when the axes turn by more than `LARGE_DEFLECTION_MIN_RAD`; stop
 /// when no rotation changes by more than `LARGE_DEFLECTION_TOL_RAD`;
 /// under-relaxation factor; cap on one segment's own rotation (numerical
-/// guards, not physics).
-const LARGE_DEFLECTION_ITERATIONS: usize = 4;
+/// guards, not physics). The cap was 4: the iterations then stopped before
+/// convergence on slender leaders bent by several metres (150-year oak in
+/// leaf, critical stem gust 64.9 m/s with 4 iterations, 58.9 converged;
+/// 130-year cherry 49.4 -> 51.6). Speed searches start each pass from the
+/// rotations of the previous one (`Prepared::warm`); their critical speeds
+/// then differ from cold evaluations by up to 0.4 m/s (24 cases: oak,
+/// cherry, spruce, Scots pine at 20, 60 and 150 years, both foliage
+/// states), the effect of the convergence tolerance.
+const LARGE_DEFLECTION_ITERATIONS: usize = 16;
 pub const LARGE_DEFLECTION_MIN_RAD: f32 = 0.15;
 const LARGE_DEFLECTION_TOL_RAD: f32 = 0.005;
 const LARGE_DEFLECTION_RELAX: f32 = 0.6;
@@ -516,6 +532,9 @@ struct Prepared {
     m0: Vec<Vec3>,
     quasi_static: bool,
     table: ProfileTable,
+    /// Rotations of the last large-deflection pass (speed, per segment):
+    /// the warm start of the next one (see `MechanicsModel::pass`).
+    warm: std::cell::RefCell<Option<(f32, Vec<Vec3>)>>,
 }
 
 /// First sway mode of the tree (Rayleigh estimate, see
@@ -1074,6 +1093,7 @@ impl MechanicsModel {
             m0: Vec::new(),
             quasi_static: load.quasi_static,
             table: ProfileTable::new(if load.quasi_static { 0.0 } else { self.height }, self.traits.vogel_exponent),
+            warm: std::cell::RefCell::new(None),
         };
         for (i, s) in self.segs.iter().enumerate() {
             let c = s.dir.dot(wind);
@@ -1290,13 +1310,19 @@ impl MechanicsModel {
     /// geometry, the largest change of rotation (rad) and the largest
     /// accumulated rotation (rad).
     fn deform(&self, p: &Prepared, moments: &[Vec3], theta: &mut [Vec3]) -> (Geom, f32, f32) {
+        self.deform_relaxed(p, moments, theta, LARGE_DEFLECTION_RELAX)
+    }
+
+    /// [`Self::deform`] with the under-relaxation factor `relax` (0: the
+    /// geometry of the rotations `theta` as they are, `moments` unused).
+    fn deform_relaxed(&self, p: &Prepared, moments: &[Vec3], theta: &mut [Vec3], relax: f32) -> (Geom, f32, f32) {
         let n = self.segs.len();
         let mut g = Geom { start: Vec::with_capacity(n), end: Vec::with_capacity(n), dir: Vec::with_capacity(n), sail: Vec::with_capacity(n) };
         let mut rot = vec![Quat::IDENTITY; n];
         let (mut change, mut total) = (0.0f32, 0.0f32);
         for (i, s) in self.segs.iter().enumerate() {
             let mut th = Vec3::ZERO;
-            if s.bows {
+            if s.bows && relax > 0.0 {
                 let dm = moments[i] - p.m0[i];
                 let mb = dm - s.dir * dm.dot(s.dir);
                 th = mb * (s.len / s.ei);
@@ -1305,7 +1331,7 @@ impl MechanicsModel {
                     th = th * (LARGE_DEFLECTION_MAX_SEG_RAD / l);
                 }
             }
-            let new = theta[i] * (1.0 - LARGE_DEFLECTION_RELAX) + th * LARGE_DEFLECTION_RELAX;
+            let new = theta[i] * (1.0 - relax) + th * relax;
             change = change.max((new - theta[i]).length());
             theta[i] = new;
             let (rp, sp_new, sp_old) = if s.parent == NO_PARENT { (Quat::IDENTITY, s.start, s.start) } else { (rot[s.parent], g.start[s.parent], self.segs[s.parent].start) };
@@ -1361,8 +1387,24 @@ impl MechanicsModel {
             out.top_deflection = (disp.x * disp.x + disp.z * disp.z).sqrt();
             return out;
         }
-        let mut theta = vec![Vec3::ZERO; self.segs.len()];
-        let (mut g, _, _) = self.deform(p, &first.moments, &mut theta);
+        // Warm start: the rotations of the last large-deflection pass of
+        // this load case (a speed search evaluates nearby speeds one after
+        // the other), scaled by (u / u_last)^2, the growth of the wind's
+        // moment; the iterations then start near their fixed point.
+        let warm = p.warm.borrow().clone();
+        let (mut theta, mut g) = match warm {
+            Some((u_last, th)) if th.len() == self.segs.len() && u_last > 0.0 => {
+                let k = ((u / u_last) * (u / u_last)).min(4.0);
+                let mut th: Vec<Vec3> = th.into_iter().map(|t| t * k).collect();
+                let (g, _, _) = self.deform_relaxed(p, &first.moments, &mut th, 0.0);
+                (th, g)
+            }
+            _ => {
+                let mut th = vec![Vec3::ZERO; self.segs.len()];
+                let (g, _, _) = self.deform_relaxed(p, &first.moments, &mut th, 1.0);
+                (th, g)
+            }
+        };
         let mut out = first;
         for _ in 0..LARGE_DEFLECTION_ITERATIONS {
             out = self.pass_on(p, u, Some(&g), detail);
@@ -1372,6 +1414,7 @@ impl MechanicsModel {
                 break;
             }
         }
+        *p.warm.borrow_mut() = Some((u, theta));
         out
     }
 
@@ -1497,13 +1540,56 @@ impl MechanicsModel {
         None
     }
 
+    /// Lowest speed in `[lo, hi]` where the safety `f(u)` drops below 1,
+    /// given `f(lo) >= 1 > f(hi)`, to `CRITICAL_SPEED_TOL_MS`: regula falsi
+    /// on ln f with
+    /// the Illinois modification (safety varies smoothly, roughly as a
+    /// power of the speed), falling back to a bisection step whenever the
+    /// interpolated point is not well inside the bracket. Returns the
+    /// failing end of the final bracket, as the plain bisection did.
+    fn root_in(f: impl Fn(f32) -> f32, mut lo: f32, f_lo: f32, mut hi: f32, f_hi: f32) -> f32 {
+        let tol = CRITICAL_SPEED_TOL_MS;
+        let g = |x: f32| if x.is_finite() { x.max(1e-6).ln() } else { 10.0 };
+        let (mut glo, mut ghi) = (g(f_lo), g(f_hi));
+        // Consecutive updates of the same end: after two, a bisection step
+        // (the safeguard that keeps regula falsi from crawling on one side).
+        let (mut side, mut same) = (0i8, 0u32);
+        for _ in 0..60 {
+            if hi - lo <= tol {
+                break;
+            }
+            let w = hi - lo;
+            let falsi = if glo > ghi { lo + w * glo / (glo - ghi) } else { lo + 0.5 * w };
+            let mut x = if same >= 2 || !(falsi > lo && falsi < hi) { lo + 0.5 * w } else { falsi };
+            // Never closer to an end than a fraction of the tolerance.
+            x = x.clamp(lo + 0.1 * tol.min(w), hi - 0.1 * tol.min(w));
+            let gx = g(f(x));
+            let s = if gx < 0.0 { -1 } else { 1 };
+            same = if s == side { same + 1 } else { 0 };
+            side = s;
+            if gx < 0.0 {
+                hi = x;
+                ghi = gx;
+            } else {
+                lo = x;
+                glo = gx;
+            }
+        }
+        hi
+    }
+
     /// Critical 10 m gust speed of each failure mode for the direction,
     /// foliage and extra masses of `load` (its speed is ignored).
     pub fn critical_speeds(&self, load: &WindLoad) -> CriticalSpeeds {
         let p = self.prepare(load);
+        // Every evaluation is kept: the search of one mode narrows the
+        // brackets of the others.
+        let memo: std::cell::RefCell<Vec<(f32, [f32; 3])>> = std::cell::RefCell::new(Vec::new());
         let eval = |u: f32| {
             let o = self.pass(&p, u, false);
-            [o.stem, o.limb, o.anchorage]
+            let r = [o.stem, o.limb, o.anchorage];
+            memo.borrow_mut().push((u, r));
+            r
         };
         let mut found: [Option<f32>; 3] = [None; 3];
         let first = eval(0.0);
@@ -1512,25 +1598,37 @@ impl MechanicsModel {
                 found[k] = Some(0.0);
             }
         }
+        // Scan upwards, by steps of SCAN_STEP_MS or more: from a speed u
+        // where every mode still to find has safety >= s, no mode can fail
+        // below `u sqrt(s / SCAN_SLACK)` (the wind's moment grows at most as
+        // U^2, the Vogel exponents being <= 0, the weight's moment does not
+        // grow; SCAN_SLACK covers the growth of the dynamic factor and the
+        // P-Delta moment of the large deflections with speed). Then a
+        // bisection in the bracket of each mode.
         let mut u0 = 0.0f32;
+        let mut s0 = first;
         while u0 < MAX_SEARCH_SPEED_MS && found.iter().any(|f| f.is_none()) {
-            let u1 = (u0 + SCAN_STEP_MS).min(MAX_SEARCH_SPEED_MS);
+            let s_min = (0..3).filter(|&k| found[k].is_none()).map(|k| s0[k]).fold(f32::INFINITY, f32::min);
+            let jump = if u0 > 0.0 && s_min.is_finite() && s_min > SCAN_SLACK { u0 * (s_min / SCAN_SLACK).sqrt() } else { 0.0 };
+            let u1 = (u0 + SCAN_STEP_MS).max(jump).min(MAX_SEARCH_SPEED_MS);
             let cur = eval(u1);
             for k in 0..3 {
                 if found[k].is_none() && cur[k] < 1.0 {
-                    let (mut lo, mut hi) = (u0, u1);
-                    for _ in 0..BISECT_STEPS {
-                        let mid = 0.5 * (lo + hi);
-                        if eval(mid)[k] < 1.0 {
-                            hi = mid;
-                        } else {
-                            lo = mid;
+                    let (mut lo, mut flo, mut hi, mut fhi) = (u0, s0[k], u1, cur[k]);
+                    for &(u, r) in memo.borrow().iter() {
+                        if u > lo && u < hi {
+                            if r[k] >= 1.0 {
+                                (lo, flo) = (u, r[k]);
+                            } else {
+                                (hi, fhi) = (u, r[k]);
+                            }
                         }
                     }
-                    found[k] = Some(hi);
+                    found[k] = Some(Self::root_in(|u| eval(u)[k], lo, flo, hi, fhi));
                 }
             }
             u0 = u1;
+            s0 = cur;
         }
         CriticalSpeeds { stem_break: found[0], limb_break: found[1], uprooting: found[2] }
     }
