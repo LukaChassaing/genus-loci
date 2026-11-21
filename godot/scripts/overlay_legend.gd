@@ -1,9 +1,12 @@
 class_name OverlayLegend
 extends PanelContainer
 ## Bandeau de légende d'un calque (overlay D3) : un titre, puis des paires forme + couleur + nom (LegendGlyph).
-## Une seule ligne, posée au-dessus de la barre du bas. Sans lien avec la simulation (réutilisable).
+## Posé au-dessus de la barre du bas ; passe à la ligne quand la zone 3D est étroite (grande échelle d'interface,
+## mode Expert et panneau ouverts). Sans lien avec la simulation (réutilisable).
 
-var _row: HBoxContainer
+const SEP: int = 8
+
+var _row: HFlowContainer
 var legend_title: String = ""
 var item_count: int = 0
 
@@ -11,9 +14,19 @@ var item_count: int = 0
 func _init() -> void:
 	theme_type_variation = "LegendPanel"
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_row = HBoxContainer.new()
-	_row.add_theme_constant_override("separation", 6)
+	_row = HFlowContainer.new()
+	_row.add_theme_constant_override("h_separation", SEP)
+	_row.add_theme_constant_override("v_separation", 2)
 	add_child(_row)
+
+
+## Largeur sur une seule ligne (le conteneur à retour ne donne que la largeur de son plus large élément).
+func line_width() -> float:
+	var w: float = 0.0
+	for c: Node in _row.get_children():
+		w += (c as Control).get_combined_minimum_size().x + SEP
+	var sb: StyleBox = get_theme_stylebox("panel")
+	return w - SEP + (sb.get_minimum_size().x if sb != null else 0.0)
 
 
 ## `items` : tableaux [forme, couleur, nom, info-bulle facultative].

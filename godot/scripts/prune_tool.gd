@@ -158,7 +158,7 @@ func _build_ui() -> void:
 	# Panneau latéral : options de l'outil, sauts dans le temps, comparaison avec le témoin, journal. Il vit dans
 	# l'emplacement unique des panneaux du Hud (un seul panneau ouvert à la fois).
 	panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(300, 0)
+	panel.custom_minimum_size = Vector2(290, 0)
 	root.add_child(panel)
 	hud.register_panel("taille", panel, "Taille")
 	var v: VBoxContainer = VBoxContainer.new()
@@ -217,7 +217,7 @@ func _build_ui() -> void:
 	_compare.bbcode_enabled = true
 	_compare.fit_content = true
 	_compare.scroll_active = false
-	_compare.custom_minimum_size = Vector2(300, 0)
+	_compare.custom_minimum_size = Vector2(290, 0)
 	_compare.add_theme_font_size_override("normal_font_size", 13)
 	_compare.add_theme_font_size_override("bold_font_size", 13)
 	body.add_child(_compare)
@@ -226,7 +226,7 @@ func _build_ui() -> void:
 	_journal.bbcode_enabled = true
 	_journal.fit_content = true
 	_journal.scroll_active = false
-	_journal.custom_minimum_size = Vector2(300, 0)
+	_journal.custom_minimum_size = Vector2(290, 0)
 	_journal.add_theme_font_size_override("normal_font_size", 13)
 	_journal.add_theme_font_size_override("bold_font_size", 13)
 	body.add_child(_journal)
@@ -241,7 +241,7 @@ func _build_ui() -> void:
 	_tip_text.fit_content = true
 	_tip_text.scroll_active = false
 	_tip_text.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_tip_text.custom_minimum_size = Vector2(300, 0)
+	_tip_text.custom_minimum_size = Vector2(290, 0)
 	_tip_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_text.add_theme_font_size_override("normal_font_size", 14)
 	_tip_text.add_theme_font_size_override("bold_font_size", 15)

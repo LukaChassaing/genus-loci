@@ -104,7 +104,7 @@ static func run(host: Node, check: Callable) -> void:
 	var rects: Array[Rect2] = hud.side_panel_rects()
 	check.call("panneau ouvert : à droite, entre les barres, hors de la zone 3D", rects.size() == 1 and fr.end.x <= rects[0].position.x
 		and rects[0].position.y >= hud._info_panel.get_global_rect().end.y and rects[0].end.y <= hud._bottom_panel.get_global_rect().position.y + 0.5
-		and absf(rects[0].size.x - PanelSlot.WIDTH) < 0.5, "%s free %s" % [str(rects), str(fr)])
+		and rects[0].size.x >= PanelSlot.WIDTH - 0.5 and rects[0].size.x <= PanelSlot.WIDTH + 24.0, "%s free %s" % [str(rects), str(fr)])
 	hud.open_panel("")
 
 	# --- Mode Expert : bouton, touche I, réglage des options ; la colonne pousse la zone 3D.

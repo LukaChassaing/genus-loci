@@ -132,9 +132,16 @@ func refresh(sim: TreeSim, soil_name: String, delta: float) -> void:
 		g.color = SoilBlock.KIND_COLORS[k]
 		g.queue_redraw()
 		var nm: Label = _grid.get_child(i * 4 + 1) as Label
-		nm.text = SoilBlock.KIND_NAMES[k]
+		nm.text = SoilBlock.KIND_NAMES[k].replace(" (horizon ", " (")  # forme courte ; la longue en info-bulle
 		nm.tooltip_text = SoilBlock.KIND_NAMES[k]
 		var last: bool = i == n - 1
-		(_grid.get_child(i * 4 + 2) as Label).text = ("%s–%s" % [_depth(top, bottoms[i]), _depth(bottoms[i], bottoms[i])]) if not last else ("> " + _depth(top, top))
+		var rng: String = ""
+		if last:
+			rng = "> " + _depth(top, top)
+		elif bottoms[i] < 1.0:
+			rng = "%d–%d cm" % [roundi(top * 100.0), roundi(bottoms[i] * 100.0)]
+		else:
+			rng = "%s–%s m" % [UiStyle.num(top, 1), UiStyle.num(bottoms[i], 1)]
+		(_grid.get_child(i * 4 + 2) as Label).text = rng
 		(_grid.get_child(i * 4 + 3) as BulletGraph).set_value(waters[i])
 		top = bottoms[i]

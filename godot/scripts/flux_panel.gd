@@ -91,7 +91,7 @@ func _ready() -> void:
 		grid.add_child(val)
 	_foot = UiStyle.label("", "SmallLabel")
 	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_foot.custom_minimum_size = Vector2(300, 0)
+	_foot.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_foot)
 	_apply_collapse()
 

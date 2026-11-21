@@ -76,14 +76,14 @@ func _ready() -> void:
 	slider.max_value = MAX_WIND
 	slider.step = 0.5
 	slider.value = wind
-	slider.custom_minimum_size = Vector2(300, 0)
+	slider.custom_minimum_size = Vector2(290, 0)
 	slider.tooltip_text = "Rafale à 10 m de haut, appliquée comme une charge constante"
 	slider.value_changed.connect(func(v: float) -> void: set_wind(v))
 	col.add_child(slider)
 	_summary = Label.new()
 	_summary.add_theme_font_size_override("font_size", 13)
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary.custom_minimum_size = Vector2(300, 0)
+	_summary.custom_minimum_size = Vector2(290, 0)
 	col.add_child(_summary)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 3)
@@ -134,19 +134,19 @@ func _ready() -> void:
 	_foot.add_theme_font_size_override("font_size", 12)
 	_foot.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
 	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_foot.custom_minimum_size = Vector2(300, 0)
+	_foot.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_foot)
 	# Real wind: today's, the sway, a storm on demand, the history of damage.
 	_body.add_child(HSeparator.new())
 	_wind_day = Label.new()
 	_wind_day.add_theme_font_size_override("font_size", 13)
 	_wind_day.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_wind_day.custom_minimum_size = Vector2(300, 0)
+	_wind_day.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_wind_day)
 	_sway_l = Label.new()
 	_sway_l.add_theme_font_size_override("font_size", 13)
 	_sway_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_sway_l.custom_minimum_size = Vector2(300, 0)
+	_sway_l.custom_minimum_size = Vector2(290, 0)
 	_sway_l.tooltip_text = "Premier mode de balancement : fréquence propre (méthode de Rayleigh sur l'arbre simulé) et amortissement en air calme"
 	_sway_l.mouse_filter = Control.MOUSE_FILTER_PASS
 	_body.add_child(_sway_l)
@@ -179,7 +179,7 @@ func _ready() -> void:
 	_hist = Label.new()
 	_hist.add_theme_font_size_override("font_size", 12)
 	_hist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hist.custom_minimum_size = Vector2(300, 0)
+	_hist.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_hist)
 	_update_storm_label()
 	_update_wind_label()
@@ -318,7 +318,7 @@ func _show_wind() -> void:
 	if _wind_day == null:
 		return
 	var w: Vector3 = sim.get_wind_today()
-	_wind_day.text = "Vent du jour : moyen %s m/s, rafale %s m/s (%d km/h)" % [num(w.x), num(w.y), roundi(w.y * 3.6)]
+	_wind_day.text = "Vent du jour : moyen %s m/s, rafale %s m/s (%d km/⁠h)" % [num(w.x), num(w.y), roundi(w.y * 3.6)]
 	var f: float = float(values.get("natural_frequency_hz", 0.0))
 	_sway_l.text = "Balancement : f₀ = %s Hz (période %s s), amortissement %s %%" % [num(f, 2), num(1.0 / maxf(f, 0.01), 1),
 		num(100.0 * float(values.get("damping_ratio", 0.0)), 0)]

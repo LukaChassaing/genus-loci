@@ -42,9 +42,14 @@ func _init() -> void:
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(_scroll)
+	# Marge à droite : la barre de défilement (grande échelle d'interface) ne recouvre pas le texte.
+	var pad: MarginContainer = MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pad.add_theme_constant_override("margin_right", 10)
+	_scroll.add_child(pad)
 	_holder = VBoxContainer.new()
 	_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.add_child(_holder)
+	pad.add_child(_holder)
 
 
 ## Enregistre un panneau (reparenté dans l'emplacement, caché tant qu'il n'est pas ouvert). Un PanelContainer perd

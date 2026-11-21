@@ -838,7 +838,7 @@ func free_rect(view: Vector2) -> Rect2:
 	if _expert_col.visible:
 		left = EDGE + EXPERT_W + GAP
 	var right: float = layout_side_panels(view, top, bar_y - GAP)
-	var bottom: float = _layout_legends(view, left, bar_y) - GAP
+	var bottom: float = _layout_legends(left, right, bar_y) - GAP
 	return Rect2(left, top, maxf(right - left, 200.0), maxf(bottom - top, 200.0))
 
 
@@ -860,12 +860,20 @@ func layout_side_panels(view: Vector2, top: float, bottom: float) -> float:
 
 
 ## Légendes au-dessus de la barre du bas, alignées sur la zone 3D. Renvoie le haut du bloc (ou bar_y sans légende).
-func _layout_legends(view: Vector2, left: float, bar_y: float) -> float:
+func _layout_legends(left: float, right: float, bar_y: float) -> float:
 	var any: bool = overlay_legend.visible or _legend.visible
 	_legends.visible = any
 	if not any:
 		return bar_y
-	var sz: Vector2 = _legends.get_combined_minimum_size()
+	# Largeur bornée par la zone 3D : les légendes passent à la ligne plutôt que de glisser sous le panneau
+	# (la hauteur du retour à la ligne est connue après le tri du conteneur, à la mise à jour suivante).
+	var line: float = 0.0
+	for l: OverlayLegend in [overlay_legend, _legend]:
+		if l.visible:
+			line = maxf(line, l.line_width())
+	var w: float = minf(line, maxf(right - left, 200.0))
+	_legends.size = Vector2(w, 0.0)
+	var sz: Vector2 = Vector2(w, _legends.get_combined_minimum_size().y)
 	_legends.size = sz
 	_legends.position = Vector2(left, bar_y - GAP - sz.y)
 	return _legends.position.y
