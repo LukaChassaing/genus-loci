@@ -310,6 +310,13 @@ Variante hybride **[mon avis, non sourcé]** : D1 comme squelette (HUD + panneau
 
 ---
 
+## Décisions de l'utilisateur (2026-11-21)
+
+- **Direction : hybride.** Le squelette suit D1 : arbre à environ 80 % de l'écran, une barre fine en haut et une en bas, un seul panneau à la demande à la fois. On y ajoute deux ou trois overlays D3 (Eau et Flux au moins, avec une légende qui combine forme et couleur) et, à l'intérieur des panneaux, les cartes à sparklines et *bullet graphs* de D2.
+- **Statut : base de Seed Master.** L'interface est conçue pour être reprise dans le jeu : overlays, déblocages possibles plus tard.
+- **Steam Deck et manette : non**, pas dans cette refonte (souris et clavier).
+- **Premier contact : bac à sable et mode Expert.** On arrive directement dans la simulation avec le HUD minimal ; le mode Expert affiche en permanence les cartes de valeurs.
+
 ## F. Bibliographie
 
 ### Lues en texte intégral (TI)
