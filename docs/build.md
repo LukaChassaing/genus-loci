@@ -22,7 +22,7 @@ Tests : `cargo test -p dendro-core --release` ; performance (ignorés par défau
 Auto-test de l'interface, sans fenêtre (code de sortie 1 s'il échoue, message `ALL PASSED` sinon) :
 
 ```bash
-godot --headless --path godot --import          # une fois, pour créer .godot/
+godot --headless --path godot --import          # pour créer .godot/, et après chaque pull qui ajoute des scripts à class_name (sinon « Could not resolve external class member »)
 DENDRO_SELFTEST=1 godot --headless --path godot
 ```
 
