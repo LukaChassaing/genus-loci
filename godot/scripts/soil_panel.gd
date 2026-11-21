@@ -77,6 +77,13 @@ static func _m(v: float) -> String:
 	return UiStyle.num(v, 2 if v < 1.0 else 1) + " m"
 
 
+## Profondeur lisible : en centimètres dans le premier mètre (litière de quelques cm), sinon en mètres.
+static func _depth(v: float, scale_ref: float) -> String:
+	if scale_ref < 1.0:
+		return "%d cm" % roundi(v * 100.0)
+	return UiStyle.num(v, 1) + " m"
+
+
 func refresh(sim: TreeSim, soil_name: String, delta: float) -> void:
 	_age += delta
 	if _age < 0.25 or not is_visible_in_tree():
@@ -128,6 +135,6 @@ func refresh(sim: TreeSim, soil_name: String, delta: float) -> void:
 		nm.text = SoilBlock.KIND_NAMES[k]
 		nm.tooltip_text = SoilBlock.KIND_NAMES[k]
 		var last: bool = i == n - 1
-		(_grid.get_child(i * 4 + 2) as Label).text = ("%s–%s m" % [UiStyle.num(top, 1), UiStyle.num(bottoms[i], 1)]) if not last else ("> %s m" % UiStyle.num(top, 1))
+		(_grid.get_child(i * 4 + 2) as Label).text = ("%s–%s" % [_depth(top, bottoms[i]), _depth(bottoms[i], bottoms[i])]) if not last else ("> " + _depth(top, top))
 		(_grid.get_child(i * 4 + 3) as BulletGraph).set_value(waters[i])
 		top = bottoms[i]

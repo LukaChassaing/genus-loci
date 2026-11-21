@@ -171,7 +171,7 @@ func _ready() -> void:
 	hud.load_requested.connect(save_flow.quick_load)
 	mech_panel = MechPanel.new(sim)
 	mech_panel.host = self
-	hud.register_panel("meca", mech_panel, "Mécanique · vent et tempêtes")
+	hud.register_panel("meca", mech_panel, "Mécanique")
 	hud.mech_toggled.connect(func(on: bool) -> void:
 		if on:
 			mech_panel.refresh())

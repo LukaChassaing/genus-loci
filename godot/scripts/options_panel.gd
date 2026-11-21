@@ -36,7 +36,7 @@ func _ready() -> void:
 	for u: float in Game.UI_SCALES:
 		scale_labels.append("%d %%" % roundi(u * 100.0))
 	_scale = _row("Échelle de l'interface", Segmented.new().setup(scale_labels, Game.UI_SCALES.find(float(s["ui_scale"])), 4), "ui_scale")
-	_expert = _row("Mode Expert (colonne des valeurs en jeu)", Segmented.new().setup(["Non", "Oui"], 1 if bool(s.get("expert", false)) else 0, 2), "expert")
+	_expert = _row("Mode Expert", Segmented.new().setup(["Non", "Oui"], 1 if bool(s.get("expert", false)) else 0, 2), "expert")
 	var sp: Control = Control.new()
 	sp.custom_minimum_size = Vector2(0, 8)
 	add_child(sp)
