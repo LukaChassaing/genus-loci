@@ -254,6 +254,23 @@ fn spruce_lifetime_dbh_stays_below_the_record() {
     assert!(dbh <= 150.0, "spruce median lifetime DBH {dbh:.1} cm, record 150 cm");
 }
 
+/// Norway spruce: normal longevity 200-300 years [atlas_longevity_normal],
+/// on the 20 seeds of `SPRUCE_SEEDS`. The median of an even sample is the
+/// mean of the two central values, as the bench computes it (decision of the
+/// user, 2026-11-21). Seeds still alive at 350 years are right-censored:
+/// they rank above every death, which leaves the order statistics valid as
+/// long as both central values are deaths.
+#[test]
+fn spruce_dies_within_its_published_longevity() {
+    let mut ages: Vec<f32> = spruce().iter().map(|(d, _)| d.map_or(f32::INFINITY, |a| a as f32)).collect();
+    ages.sort_by(|a, b| a.total_cmp(b));
+    let n = ages.len();
+    let (lo, hi) = (ages[n / 2 - 1], ages[n / 2]);
+    assert!(hi.is_finite(), "spruce: more than half of the seeds alive at 350 years ({ages:?})");
+    let age = 0.5 * (lo + hi);
+    assert!((200.0..=300.0).contains(&age), "spruce median death age {age} y, published 200-300 ({ages:?})");
+}
+
 /// Bark-beetle hazard (`vitality::bark_beetle_hazard`, traits of
 /// `data/species/picea_abies.ron`): none outside a crisis year (reserves
 /// above `crisis_reserve`) nor for a non-host; in a crisis year the
