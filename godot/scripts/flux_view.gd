@@ -27,6 +27,14 @@ const COLORS: Dictionary = {
 	"vapour": Color(0.97, 0.98, 1.00),
 	"myco": Color(0.84, 0.66, 1.00),
 }
+## Forme de chaque sorte de flux, dans la scène comme dans la légende (LegendGlyph) : la couleur n'est jamais
+## seule à distinguer deux flux (WCAG 2.2, SC 1.4.1).
+const SHAPES: Dictionary = {
+	"water": "dash", "minerals": "dot", "sugar": "rail", "o2": "disc", "co2": "ring", "vapour": "puff", "myco": "short",
+}
+## Numéro de forme des rubans (uniforms shape_a / shape_b du shader) : 0 tiret long, 1 point, 2 double trait,
+## 3 tirets courts fins.
+const RIBBON_SHAPE: Dictionary = {"dash": 0.0, "dot": 1.0, "rail": 2.0, "short": 3.0}
 ## Rates read as "full" display level, per m2 of crown projection and per day (calibration of the view).
 const FULL_WATER_MM: float = 3.0
 const FULL_N_G_M2: float = 0.05
@@ -50,6 +58,8 @@ uniform vec3 col_a : source_color = vec3(0.36, 0.82, 1.0);
 uniform vec3 col_b : source_color = vec3(1.0, 0.78, 0.3);
 uniform float on_a = 1.0;
 uniform float on_b = 1.0;
+uniform float shape_a = 0.0;
+uniform float shape_b = 0.0;
 uniform float base_line = 0.0;
 uniform float alpha_scale = 1.0;
 uniform float ghost = 0.0;
@@ -125,8 +135,24 @@ void fragment() {
 	float lit = step(fhash(vec2(cell, v_key * 131.0)), clamp(lvl * carry * 1.5, 0.0, 0.85)) * on;
 	float d = abs(f - 0.5);
 	float a = abs(v_side);
-	float core = (1.0 - smoothstep(0.13, 0.23, d)) * (1.0 - smoothstep(0.22, 0.48, a));
-	float halo = (1.0 - smoothstep(0.19, 0.36, d)) * (1.0 - smoothstep(0.35, 1.0, a));
+	// Forme du trait (SHAPES) : 0 tiret long, 1 point, 2 double trait, 3 tirets courts fins.
+	float shp = mix(shape_a, shape_b, isb);
+	float core;
+	float halo;
+	if (shp < 0.5) {
+		core = (1.0 - smoothstep(0.13, 0.23, d)) * (1.0 - smoothstep(0.22, 0.48, a));
+		halo = (1.0 - smoothstep(0.19, 0.36, d)) * (1.0 - smoothstep(0.35, 1.0, a));
+	} else if (shp < 1.5) {
+		core = (1.0 - smoothstep(0.035, 0.065, d)) * (1.0 - smoothstep(0.30, 0.55, a));
+		halo = (1.0 - smoothstep(0.06, 0.11, d)) * (1.0 - smoothstep(0.45, 1.0, a));
+	} else if (shp < 2.5) {
+		float rail = 1.0 - smoothstep(0.07, 0.15, abs(a - 0.55));
+		core = (1.0 - smoothstep(0.20, 0.30, d)) * rail;
+		halo = (1.0 - smoothstep(0.26, 0.40, d)) * (1.0 - smoothstep(0.75, 1.0, a));
+	} else {
+		core = (1.0 - smoothstep(0.06, 0.10, d)) * (1.0 - smoothstep(0.12, 0.30, a));
+		halo = (1.0 - smoothstep(0.09, 0.16, d)) * (1.0 - smoothstep(0.25, 0.7, a));
+	}
 	vec3 col = mix(col_a, col_b, isb);
 	float line = base_line * (1.0 - smoothstep(0.1, 0.6, a)) * on_a;
 	float alpha = max(max(halo * 0.55, core) * lit, line);
@@ -152,6 +178,7 @@ varying float glow;
 varying vec3 v_col;
 varying vec3 v_wpos;
 varying float v_soft;
+varying float v_ring;
 float fhash(vec2 p) {
 	vec3 q = fract(vec3(p.xyx) * 0.1031);
 	q += dot(q, q.yzx + 33.33);
@@ -185,6 +212,7 @@ void vertex() {
 	glow = alive * sin(3.14159 * t);
 	v_col = colors[k];
 	v_soft = k == 2 ? 1.0 : 0.0;
+	v_ring = (k == 0 || k == 3 || k == 5) ? 1.0 : 0.0;  // CO₂ : anneau creux ; O₂ : disque plein
 	v_wpos = p;
 	vec3 right = INV_VIEW_MATRIX[0].xyz;
 	vec3 up = INV_VIEW_MATRIX[1].xyz;
@@ -200,6 +228,10 @@ void fragment() {
 	float r = length(UV - 0.5) * 2.0;
 	float core = 1.0 - smoothstep(v_soft > 0.5 ? 0.0 : 0.25, v_soft > 0.5 ? 1.0 : 0.55, r);
 	float halo = 1.0 - smoothstep(0.5, 1.0, r);
+	if (v_ring > 0.5) {
+		core = 1.0 - smoothstep(0.10, 0.20, abs(r - 0.55));
+		halo = 1.0 - smoothstep(0.22, 0.40, abs(r - 0.55));
+	}
 	float a = v_soft > 0.5 ? core * 0.35 : max(core, halo * 0.5);
 	ALBEDO = mix(v_col * 0.18, v_col * 1.15, v_soft > 0.5 ? 1.0 : core);
 	ALPHA = clamp(a * glow, 0.0, 1.0);
@@ -209,6 +241,8 @@ void fragment() {
 var enabled: bool = true
 ## Per-kind toggles (KINDS order).
 var kind_on: Dictionary = {}
+## Filtre d'un calque (Hud) : si non vide, seules ces sortes sont montrées (en plus des cases du panneau).
+var only: PackedStringArray = PackedStringArray()
 ## Last values from TreeSim.get_flux (real units), for the panel.
 var values: Dictionary = {}
 var levels: Dictionary = {}
@@ -242,10 +276,14 @@ func _ready() -> void:
 	for name: String in ["xylem", "xylem_x"]:
 		_mats[name].set_shader_parameter("col_a", COLORS["water"])
 		_mats[name].set_shader_parameter("col_b", COLORS["minerals"])
+		_mats[name].set_shader_parameter("shape_a", RIBBON_SHAPE[SHAPES["water"]])
+		_mats[name].set_shader_parameter("shape_b", RIBBON_SHAPE[SHAPES["minerals"]])
 		_mats[name].set_shader_parameter("lift", 1.04)
 	for name: String in ["phloem", "phloem_x"]:
 		_mats[name].set_shader_parameter("col_a", COLORS["sugar"])
 		_mats[name].set_shader_parameter("col_b", COLORS["sugar"])
+		_mats[name].set_shader_parameter("shape_a", RIBBON_SHAPE[SHAPES["sugar"]])
+		_mats[name].set_shader_parameter("shape_b", RIBBON_SHAPE[SHAPES["sugar"]])
 		_mats[name].set_shader_parameter("lift", 1.16)
 		_mats[name].set_shader_parameter("lateral", 0.55)
 	for name: String in ["xylem_x", "phloem_x"]:
@@ -259,6 +297,9 @@ func _ready() -> void:
 	hm.set_shader_parameter("col_b", Color(0.97, 0.94, 1.0))
 	hm.set_shader_parameter("lift", 0.0)
 	hm.set_shader_parameter("base_line", 0.22)
+	for m: ShaderMaterial in [hm, _mats["hypha_in"]]:
+		m.set_shader_parameter("shape_a", RIBBON_SHAPE[SHAPES["myco"]])
+		m.set_shader_parameter("shape_b", RIBBON_SHAPE[SHAPES["myco"]])
 	var hin: ShaderMaterial = _mats["hypha_in"]
 	hin.set_shader_parameter("col_a", Color(0.97, 0.94, 1.0))
 	hin.set_shader_parameter("col_b", Color(0.97, 0.94, 1.0))
@@ -316,6 +357,11 @@ func set_kinds_from_string(s: String) -> void:
 func set_kind(kind: String, on: bool) -> void:
 	if kind_on.has(kind):
 		kind_on[kind] = on
+
+
+## La sorte `kind` est-elle montrée (case du panneau et filtre du calque) ?
+func is_shown(kind: String) -> bool:
+	return bool(kind_on.get(kind, true)) and (only.is_empty() or only.has(kind))
 
 
 func set_enabled(on: bool) -> void:
@@ -436,9 +482,9 @@ func _read_values(sim: TreeSim, snap_now: bool) -> void:
 func _push(view_dist: float) -> void:
 	var spacing: float = pow(2.0, roundf(log(clampf(view_dist * 0.02, 0.05, 2.4)) / log(2.0)))
 	var width: float = clampf(view_dist * 0.003, 0.005, 0.12)
-	var on_w: float = 1.0 if kind_on["water"] else 0.0
-	var on_m: float = 1.0 if kind_on["minerals"] else 0.0
-	var on_s: float = 1.0 if kind_on["sugar"] else 0.0
+	var on_w: float = 1.0 if is_shown("water") else 0.0
+	var on_m: float = 1.0 if is_shown("minerals") else 0.0
+	var on_s: float = 1.0 if is_shown("sugar") else 0.0
 	for name: String in ["xylem", "xylem_x"]:
 		var m: ShaderMaterial = _mats[name]
 		m.set_shader_parameter("spacing", spacing)
@@ -461,7 +507,7 @@ func _push(view_dist: float) -> void:
 		m.set_shader_parameter("on_a", on_s)
 		m.set_shader_parameter("on_b", on_s)
 	var hm: ShaderMaterial = _mats["hypha"]
-	var on_y: float = 1.0 if kind_on["myco"] else 0.0
+	var on_y: float = 1.0 if is_shown("myco") else 0.0
 	var act: float = float(values.get("myco_activity", 0.0))
 	hm.set_shader_parameter("spacing", spacing * 0.35)
 	hm.set_shader_parameter("width", width * 0.6)
@@ -488,7 +534,7 @@ func _push(view_dist: float) -> void:
 		levels["resp_root"] * (1.0 - float(values.get("root_hypoxia", 0.0))), levels["resp_root"]])
 	var ons: PackedFloat32Array = PackedFloat32Array()
 	for kk: String in ["co2", "o2", "vapour", "co2", "o2", "co2"]:
-		ons.append(1.0 if kind_on[kk] else 0.0)
+		ons.append(1.0 if is_shown(kk) else 0.0)
 	_gas_mat.set_shader_parameter("rate", rates)
 	_gas_mat.set_shader_parameter("on", ons)
 	_gas_mat.set_shader_parameter("phase", phases["gas"])

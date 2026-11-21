@@ -234,7 +234,7 @@ func update(sim: TreeSim, delta: float, playing: bool, view_dist: float) -> void
 		_refresh_motes()
 	view.update(sim, delta, playing, view_dist)
 	# Fine-root dashes and soil motes are the water uptake itself: they follow the "water" kind toggle.
-	var water_on: bool = view.kind_on.get("water", true)
+	var water_on: bool = view.is_shown("water")
 	_motes.visible = enabled and water_on
 	if fine_root_mat != null:
 		fine_root_mat.set_shader_parameter("surface_dashes", 1.0 if water_on else 0.0)

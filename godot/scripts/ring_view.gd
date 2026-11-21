@@ -36,7 +36,7 @@ var _drag_moved: bool = false
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(360, 420)
+	custom_minimum_size = Vector2(318, 360)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
 
@@ -206,7 +206,7 @@ func _draw_rings() -> void:
 	if _radii.size() == 0:
 		draw_circle(c0, 6.0, LATE_HEART)
 		draw_string(font, Vector2(0, size.y - 14), "Aucun cerne complet (moins d'un an)",
-			HORIZONTAL_ALIGNMENT_CENTER, size.x, 16, UiStyle.TEXT)
+			HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, UiStyle.TEXT)
 		return
 	var g: Dictionary = _geometry()
 	var c: Vector2 = g["c"]
@@ -324,7 +324,7 @@ func _draw_decade_labels(c: Vector2, s: float, font: Font, n: int) -> void:
 	while k < n:
 		var p: Vector2 = c + Vector2(_radii[k] * s + 3.0, -3.0)
 		if p.x > 0.0 and p.x < size.x - 14.0 and p.y > 8.0 and p.y < size.y - TEXT_H:
-			draw_string(font, p, str(k + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.75))
+			draw_string(font, p, str(k + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.85))
 		k += step
 
 

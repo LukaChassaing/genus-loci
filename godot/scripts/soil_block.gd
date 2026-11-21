@@ -58,6 +58,10 @@ const KIND_C: int = 3
 const KIND_ROCK: int = 4
 const KIND_NAMES: Array[String] = ["Litière", "Terre arable (horizon A)", "Sous-sol (horizon B)",
 	"Roche mère altérée (horizon C)", "Roche"]
+## Couleurs du calque Eau (mêmes valeurs que le shader : c_water_dry / moist / wet), pour la légende.
+const WATER_DRY: Color = Color(0.93, 0.80, 0.55)
+const WATER_MOIST: Color = Color(0.35, 0.62, 0.85)
+const WATER_WET: Color = Color(0.12, 0.27, 0.62)
 const KIND_COLORS: Array[Color] = [Color(0.20, 0.13, 0.08), Color(0.30, 0.20, 0.12),
 	Color(0.50, 0.36, 0.21), Color(0.46, 0.38, 0.25), Color(0.29, 0.30, 0.33)]
 
@@ -151,6 +155,11 @@ uniform float layer_bottom[8];
 uniform float layer_kind[8];
 uniform float layer_water[8];
 uniform float dry_front = 0.0;
+// Calque Eau (Hud) : 0 = sol naturel, 1 = sol peint selon l'eau de chaque couche.
+uniform float water_view = 0.0;
+uniform vec3 c_water_dry : source_color = vec3(0.93, 0.80, 0.55);
+uniform vec3 c_water_moist : source_color = vec3(0.35, 0.62, 0.85);
+uniform vec3 c_water_wet : source_color = vec3(0.12, 0.27, 0.62);
 uniform vec4 c_litter : source_color = vec4(0.20, 0.13, 0.08, 1.0);
 uniform vec4 c_a : source_color = vec4(0.30, 0.20, 0.12, 1.0);
 uniform vec4 c_b : source_color = vec4(0.50, 0.36, 0.21, 1.0);
@@ -264,8 +273,28 @@ void fragment() {
 	float fres = pow(1.0 - abs(dot(fn, VIEW)), 3.0);
 	float see = 1.0 - opacity;
 	col = mix(col, col * 0.85, see);  // fades toward the dark background, not toward a milky veil
+	// Calque Eau : trois classes en couleur ET en motif (WCAG 1.4.1) ; motif en pixels d'écran (taille constante,
+	// sans moiré quelle que soit la distance) : sec = hachures, humide = aplat, saturé = pois.
+	vec3 wem = vec3(0.0);
+	if (water_view > 0.5) {
+		float ww = clamp(wet, 0.0, 1.0);
+		vec2 fc = FRAGCOORD.xy;
+		if (ww < 0.25) {
+			float hatch = step(fract((fc.x + fc.y) / 7.0), 0.30);
+			col = mix(c_water_dry, c_water_dry * 0.35, hatch);
+		} else if (ww < 0.75) {
+			col = c_water_moist;
+		} else {
+			vec2 cell = fract(fc / 6.0) - 0.5;
+			float dotm = 1.0 - smoothstep(0.16, 0.26, length(cell));
+			col = mix(c_water_wet, vec3(0.92, 0.96, 1.0), dotm);
+		}
+		col *= mix(1.0, 0.85, face_kind);
+		wem = col * 0.30;
+	}
 	SCREEN_DOOR(opacity + see * (0.85 * fres + 0.45 * ring * (1.0 - face_kind)));
 	ALBEDO = col;
+	EMISSION = wem;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }
@@ -642,6 +671,17 @@ func set_layers(bottom_m: PackedFloat32Array, kind: PackedInt32Array, water: Pac
 		m.set_shader_parameter("layer_bottom", b)
 		m.set_shader_parameter("layer_kind", kf)
 		m.set_shader_parameter("layer_water", w)
+
+
+## Calque Eau (Hud) : le corps du sol est peint selon l'eau de chaque couche (sur toutes les variantes du matériau,
+## opaque, tramée et alpha-to-coverage, pour qu'il reste visible en sol transparent). Un paramètre, pas une passe.
+var water_view: bool = false
+
+
+func set_water_view(on: bool) -> void:
+	water_view = on
+	for m: ShaderMaterial in [_soil_mat, _soil_dither_mat, _soil_a2c_mat]:
+		m.set_shader_parameter("water_view", 1.0 if on else 0.0)
 
 
 ## Depth (m) down to which the soil is visibly dry from the top (0 = no drying front).

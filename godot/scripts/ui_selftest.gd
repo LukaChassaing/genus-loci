@@ -1,6 +1,7 @@
 class_name UiSelftest
 extends RefCounted
-## Self-test of the shell screens (title, arboretum setup, plates, options, pause, settings round-trip, HUD fit).
+## Self-test of the shell screens (title, arboretum setup, plates, options, pause, settings round-trip, HUD fit),
+## then of the redesigned in-game interface (HudSelftest).
 ## Called from main.gd's self-test with its `_check(name, ok, detail)`; builds nodes only, never reads pixels
 ## (the headless renderer is a dummy).
 
@@ -153,7 +154,8 @@ static func run(host: Node, check: Callable) -> void:
 	check.call("flux panel: number format", FluxPanel.num(2705.4) == "2705" and FluxPanel.num(3.27) == "3.3"
 		and FluxPanel.num(0.042) == "0.04" and FluxPanel.num(31400.0) == "31.4 k")
 
-	# Side panels: rings + pruning + flux open together dock in one column without overlapping or covering the bar.
+	# Panneaux latéraux : un seul à la fois dans l'emplacement unique (HudSelftest vérifie tous les chemins). Ici :
+	# la Taille ouverte remplace Cernes, le panneau reste dans la vue au-dessus de la barre, la zone 3D s'arrête avant.
 	if pt != null and fp != null:
 		var view: Vector2 = host.get_viewport().get_visible_rect().size
 		hud_node.rings_button.button_pressed = true
@@ -164,44 +166,21 @@ static func run(host: Node, check: Callable) -> void:
 		var fr: Rect2 = hud_node.free_rect(view)
 		var rects: Array[Rect2] = hud_node.side_panel_rects()
 		var bar_y: float = hud_node._bottom_panel.global_position.y
-		var overlap: bool = false
-		var out_of_view: bool = false
-		for i: int in rects.size():
-			out_of_view = out_of_view or rects[i].position.x < 0.0 or rects[i].end.x > view.x or rects[i].position.y < 0.0 or rects[i].end.y > bar_y
-			for j: int in range(i + 1, rects.size()):
-				overlap = overlap or rects[i].grow(-0.5).intersects(rects[j].grow(-0.5))
-		check.call("side panels: rings + taille + flux all docked (3 rects)", rects.size() == 3, str(rects))
-		check.call("side panels: no overlap between panels", not overlap, str(rects))
-		check.call("side panels: inside the view and above the control bar", not out_of_view, "%s bar_y=%.0f" % [str(rects), bar_y])
-		var left_most: float = view.x
-		for r: Rect2 in rects:
-			left_most = minf(left_most, r.position.x)
-		check.call("side panels: free area stops before the column", fr.end.x <= left_most, "%.0f <= %.0f" % [fr.end.x, left_most])
-		check.call("flux panel folds when there is no room", fp.is_collapsed() or rects[2].end.y <= bar_y)
+		check.call("side panel: Taille replaces Cernes (one rect, rings closed)", rects.size() == 1 and not hud_node.is_rings_visible()
+			and hud_node.current_panel() == "taille", str(rects))
+		check.call("side panel: inside the view and above the control bar", rects.size() == 1 and rects[0].position.x >= 0.0
+			and rects[0].end.x <= view.x and rects[0].end.y <= bar_y + 0.5, "%s bar_y=%.0f" % [str(rects), bar_y])
+		check.call("side panel: free area stops before it", rects.size() == 1 and fr.end.x <= rects[0].position.x, "%.0f" % fr.end.x)
 		fp.set_user_collapsed(true)
 		await tree.process_frame
 		check.call("flux panel: click header folds it to a strip", fp.is_collapsed() and not fp._body.visible and fp._strip.visible)
 		fp.set_user_collapsed(false)
-		# The mechanics panel joins the column: still no overlap, nothing over the bar (it folds or leaves).
 		var mp: MechPanel = host.get("mech_panel") as MechPanel
 		if mp != null:
-			hud_node.mech_button.button_pressed = true
-			await tree.process_frame
-			await tree.process_frame
-			hud_node.free_rect(view)
-			var rects4: Array[Rect2] = hud_node.side_panel_rects()
-			var bad: bool = false
-			for i: int in rects4.size():
-				bad = bad or rects4[i].end.y > bar_y + 0.5 or rects4[i].position.x < 0.0
-				for j: int in range(i + 1, rects4.size()):
-					bad = bad or rects4[i].grow(-0.5).intersects(rects4[j].grow(-0.5))
-			check.call("side panels: + mechanics, still docked without overlap above the bar", not bad and (rects4.size() == 4 or mp.docked_out),
-				"%s bar_y=%.0f" % [str(rects4), bar_y])
 			mp.set_user_collapsed(true)
 			await tree.process_frame
 			check.call("mechanics panel: header folds it to slider + summary", mp.is_collapsed() and not mp._body.visible and mp._summary.visible)
 			mp.set_user_collapsed(false)
-			hud_node.mech_button.button_pressed = false
 
 		# Ghost framing: with the control tree shown, both trees are inside the free area; hidden, framing returns.
 		var cam_node: OrbitCamera = host.get("cam") as OrbitCamera
@@ -234,6 +213,8 @@ static func run(host: Node, check: Callable) -> void:
 		pt.set_active(false)
 		hud_node.rings_button.button_pressed = false
 		await tree.process_frame
+
+	await HudSelftest.run(host, check)  # interface refondue : panneaux, Expert, calques, contrastes, polices
 
 
 static func _leaf_ok() -> bool:
