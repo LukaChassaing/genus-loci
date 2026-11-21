@@ -75,7 +75,12 @@ Elles court-circuitent l'écran titre (le jeu démarre directement sur la simula
 | `DENDRO_XRAY`, `DENDRO_SOIL_OPACITY`, `DENDRO_GUIDES` | Sol transparent, opacité du sol, repères |
 | `DENDRO_FLUX`, `DENDRO_FLUX_KINDS`, `DENDRO_FLUX_T` | Flux : affichage, types montrés, phase pour les images fixes |
 | `DENDRO_MECA=32`, `DENDRO_MECA_TINT=0` | Panneau « Mécanique » ouvert à cette rafale (m/s), bois coloré (ou non) |
-| `DENDRO_RINGS`, `DENDRO_RINGZOOM` | Panneau des cernes (1 par défaut dans les captures), zoom |
+| `DENDRO_RINGS`, `DENDRO_RINGZOOM` | Panneau des cernes (fermé par défaut ; `1` l'ouvre), zoom |
+| `DENDRO_PANEL=cernes\|flux\|sol\|meca\|taille` | Panneau latéral ouvert dans la capture (un seul à la fois) |
+| `DENDRO_OVERLAY=eau\|flux\|none` | Calque actif (Flux par défaut) |
+| `DENDRO_EXPERT=1` | Mode Expert (colonne de cartes) ; en automatisation, le réglage mémorisé est ignoré |
+| `DENDRO_MENU=1`, `DENDRO_HELP=1` | Menu ≡ ouvert, aide des raccourcis ouverte |
+| `DENDRO_HOVER=tronc\|racines`, `DENDRO_URGENT="texte"` | Étiquette de survol imposée, bandeau urgent |
 | `DENDRO_DROUGHT_YEARS` | Sécheresse forcée pendant les n dernières années |
 | `DENDRO_TAILLE=1`, `DENDRO_GHOST=1` | Outil de taille actif, arbre témoin visible |
 | `DENDRO_PRUNE="an:jour:op:arg;..."` | Coupes scriptées, par exemple `20:30:top:0.45` |

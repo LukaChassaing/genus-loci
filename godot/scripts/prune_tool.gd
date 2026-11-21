@@ -147,30 +147,28 @@ func _build_ui() -> void:
 
 	_toast = Label.new()
 	_toast.add_theme_font_size_override("font_size", 17)
-	_toast.add_theme_color_override("font_color", UiStyle.ACCENT)
+	_toast.add_theme_color_override("font_color", UiStyle.TEXT)
+	_toast.add_theme_color_override("font_outline_color", Color(0.05, 0.07, 0.03, 0.9))
+	_toast.add_theme_constant_override("outline_size", 4)
 	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_toast.position = Vector2(0, 18)
 	_toast.visible = false
 	root.add_child(_toast)
 
-	# Side panel (right): tool options, time jumps, comparison with the control tree, journal.
+	# Panneau latéral : options de l'outil, sauts dans le temps, comparaison avec le témoin, journal. Il vit dans
+	# l'emplacement unique des panneaux du Hud (un seul panneau ouvert à la fois).
 	panel = PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	panel.offset_top = 14
-	panel.offset_right = -14
-	panel.custom_minimum_size = Vector2(330, 0)
-	panel.visible = false
+	panel.custom_minimum_size = Vector2(290, 0)
 	root.add_child(panel)
-	hud.side_panels.append(panel)
+	hud.register_panel("taille", panel, "Taille")
 	var v: VBoxContainer = VBoxContainer.new()
 	v.add_theme_constant_override("separation", 5)
 	panel.add_child(v)
-	v.add_child(UiStyle.caps_label("Taille", 14))
 	var hint: Label = UiStyle.serif_label("Survoler une branche, clic : couper. Maj : coupe rase.", 13, UiStyle.TEXT_DIM)
 	v.add_child(hint)
-	var r1: HBoxContainer = HBoxContainer.new()
-	r1.add_theme_constant_override("separation", 4)
+	var r1: HFlowContainer = HFlowContainer.new()  # passe à la ligne dans le panneau de 340 px
+	r1.add_theme_constant_override("h_separation", 4)
+	r1.add_theme_constant_override("v_separation", 4)
 	v.add_child(r1)
 	_flush_btn = _btn(r1, "Coupe rase", "Couper au ras du tronc (déconseillé) au lieu du col")
 	_flush_btn.toggle_mode = true
@@ -182,16 +180,18 @@ func _build_ui() -> void:
 	_ghost_btn = _btn(r1, "Témoin", "Silhouette de l'arbre jamais taillé (même graine)")
 	_ghost_btn.toggle_mode = true
 	_ghost_btn.toggled.connect(set_ghost)
-	var r2: HBoxContainer = HBoxContainer.new()
-	r2.add_theme_constant_override("separation", 4)
+	var r2: HFlowContainer = HFlowContainer.new()  # passe à la ligne dans le panneau de 340 px
+	r2.add_theme_constant_override("h_separation", 4)
+	r2.add_theme_constant_override("v_separation", 4)
 	v.add_child(r2)
 	var jl: Label = UiStyle.serif_label("Avancer :", 14, UiStyle.TEXT_DIM)
 	r2.add_child(jl)
 	for y: int in [1, 10, 50]:
 		var b: Button = _btn(r2, "+%d an%s" % [y, "s" if y > 1 else ""], "Simuler %d an%s d'un coup" % [y, "s" if y > 1 else ""])
 		b.pressed.connect(func() -> void: jump_years(y))
-	var r3: HBoxContainer = HBoxContainer.new()
-	r3.add_theme_constant_override("separation", 4)
+	var r3: HFlowContainer = HFlowContainer.new()  # passe à la ligne dans le panneau de 340 px
+	r3.add_theme_constant_override("h_separation", 4)
+	r3.add_theme_constant_override("v_separation", 4)
 	v.add_child(r3)
 	var ops: Array = [["Élaguer 3 m", "raise", 3.0, "Supprimer les branches basses du tronc jusqu'à 3 m (coupes au col)"],
 		["Éclaircir", "thin", 0.25, "Retirer environ un quart des rameaux secondaires"],
@@ -217,7 +217,7 @@ func _build_ui() -> void:
 	_compare.bbcode_enabled = true
 	_compare.fit_content = true
 	_compare.scroll_active = false
-	_compare.custom_minimum_size = Vector2(320, 0)
+	_compare.custom_minimum_size = Vector2(290, 0)
 	_compare.add_theme_font_size_override("normal_font_size", 13)
 	_compare.add_theme_font_size_override("bold_font_size", 13)
 	body.add_child(_compare)
@@ -226,7 +226,7 @@ func _build_ui() -> void:
 	_journal.bbcode_enabled = true
 	_journal.fit_content = true
 	_journal.scroll_active = false
-	_journal.custom_minimum_size = Vector2(320, 0)
+	_journal.custom_minimum_size = Vector2(290, 0)
 	_journal.add_theme_font_size_override("normal_font_size", 13)
 	_journal.add_theme_font_size_override("bold_font_size", 13)
 	body.add_child(_journal)
@@ -241,7 +241,7 @@ func _build_ui() -> void:
 	_tip_text.fit_content = true
 	_tip_text.scroll_active = false
 	_tip_text.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_tip_text.custom_minimum_size = Vector2(300, 0)
+	_tip_text.custom_minimum_size = Vector2(290, 0)
 	_tip_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_text.add_theme_font_size_override("normal_font_size", 14)
 	_tip_text.add_theme_font_size_override("bold_font_size", 15)
@@ -268,7 +268,11 @@ func _btn(parent: Control, text: String, tip: String) -> Button:
 
 func set_active(on: bool) -> void:
 	active = on
-	panel.visible = on
+	# Le panneau suit l'emplacement unique du Hud (il ferme le panneau ouvert, ou se ferme).
+	if on and hud.current_panel() != "taille":
+		hud.open_panel("taille")
+	elif not on and hud.current_panel() == "taille":
+		hud.open_panel("")
 	if hud.prune_button.button_pressed != on:
 		hud.prune_button.set_pressed_no_signal(on)
 	if not on:
@@ -602,10 +606,7 @@ func _process_tool(delta: float) -> void:
 
 
 func _over_ui(p: Vector2) -> bool:
-	for c: Control in [panel, hud.get("_bottom_panel"), hud.get("_info_panel")]:
-		if c != null and c.visible and c.get_global_rect().has_point(p):
-			return true
-	return false
+	return hud.covers(p)
 
 
 func _row(name: String, a: float, b: float, dec: int, unit: String, has_b: bool) -> String:

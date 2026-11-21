@@ -1,18 +1,19 @@
 class_name FluxPanel
 extends PanelContainer
-## Flux legend and controls (shown while the "Flux" master switch is on): one toggle per flux kind with
-## its colour, and the day's value in real units (TreeSim.get_flux, read through TreeFluxView.values).
-## A dockable side panel: Hud.layout_side_panels stacks it under the ring and pruning panels. It collapses to
-## a one-line legend strip (click the header) and does so by itself when the column has no room for it.
+## Panneau « Flux » (touche L) : la légende des flux en forme + couleur (LegendGlyph, mêmes formes que dans la
+## scène), une case par sorte de flux pour l'afficher ou la masquer, et la valeur du jour en unités réelles
+## (TreeSim.get_flux, lue par TreeFluxView.values). Ouvert dans l'emplacement unique des panneaux (Hud) ; l'ouvrir
+## active le calque Flux. Repliable en une ligne de légende (en-tête), comme avant.
 
+## [sorte, nom, info-bulle, nom court de légende]
 const ROWS: Array = [
-	["water", "Sève brute (xylème)", "Eau puisée par les racines, tirée jusqu'aux feuilles"],
-	["minerals", "Sels minéraux", "Azote, phosphore, potassium portés par la sève brute"],
-	["sugar", "Sève élaborée (phloème)", "Sucres des feuilles vers le tronc, les racines, les réserves ; au printemps, des réserves vers les bourgeons"],
-	["o2", "Dioxygène O₂", "Rejeté par la photosynthèse ; absorbé par la respiration (bois, racines, feuilles)"],
-	["co2", "Dioxyde de carbone CO₂", "Absorbé par les feuilles éclairées ; rejeté par la respiration"],
-	["vapour", "Vapeur d'eau", "Transpiration par les stomates des feuilles"],
-	["myco", "Mycorhizes", "Champignons associés aux racines : sucres donnés, phosphore, azote et eau reçus"],
+	["water", "Sève brute (xylème)", "Eau puisée par les racines, tirée jusqu'aux feuilles", "sève brute"],
+	["minerals", "Sels minéraux", "Azote, phosphore, potassium portés par la sève brute", "sels minéraux"],
+	["sugar", "Sève élaborée (phloème)", "Sucres des feuilles vers le tronc, les racines, les réserves ; au printemps, des réserves vers les bourgeons", "sève élaborée"],
+	["o2", "Dioxygène O₂", "Rejeté par la photosynthèse ; absorbé par la respiration (bois, racines, feuilles)", "O₂"],
+	["co2", "Dioxyde de carbone CO₂", "Absorbé par les feuilles éclairées ; rejeté par la respiration", "CO₂"],
+	["vapour", "Vapeur d'eau", "Transpiration par les stomates des feuilles", "vapeur d'eau"],
+	["myco", "Mycorhizes", "Champignons associés aux racines : sucres donnés, phosphore, azote et eau reçus", "mycorhizes"],
 ]
 
 var view: TreeFluxView
@@ -21,12 +22,12 @@ var _vals: Dictionary = {}
 var _foot: Label
 var _age: float = 10.0
 var _body: VBoxContainer
-var _strip: HBoxContainer      # collapsed legend: one colour dash per flux kind
+var _strip: HBoxContainer      # légende repliée : une forme colorée par sorte de flux
 var _head: Button
 var user_collapsed: bool = false
 var auto_collapsed: bool = false
-var docked_out: bool = false   # no room left in the column even folded: parked off screen by the dock
-var full_height: float = 0.0   # height when expanded, measured the last time it was (for the dock's budget)
+var docked_out: bool = false   # (compatibilité de l'ancienne colonne ; toujours faux)
+var full_height: float = 0.0
 
 
 func _init(v: TreeFluxView) -> void:
@@ -34,76 +35,63 @@ func _init(v: TreeFluxView) -> void:
 
 
 func _ready() -> void:
-	theme = UiStyle.make_theme(14, 6.0, 2.0)
-	add_theme_stylebox_override("panel", UiStyle.panel_box(0.84))
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var m: MarginContainer = MarginContainer.new()
-	for side: String in ["left", "right", "top", "bottom"]:
-		m.add_theme_constant_override("margin_" + side, 8)
-	add_child(m)
 	var col: VBoxContainer = VBoxContainer.new()
-	col.add_theme_constant_override("separation", 2)
-	m.add_child(col)
+	col.add_theme_constant_override("separation", 3)
+	add_child(col)
 	_head = Button.new()
-	_head.flat = true
+	_head.theme_type_variation = "FlatButton"
 	_head.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_head.focus_mode = Control.FOCUS_NONE
 	_head.add_theme_font_size_override("font_size", 12)
-	_head.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
-	_head.tooltip_text = "Replier / déplier le panneau des flux"
+	_head.tooltip_text = "Replier / déplier le détail des flux"
 	_head.pressed.connect(func() -> void: set_user_collapsed(not user_collapsed))
 	col.add_child(_head)
 	_strip = HBoxContainer.new()
-	_strip.add_theme_constant_override("separation", 5)
+	_strip.add_theme_constant_override("separation", 2)
 	for r: Array in ROWS:
-		var d: ColorRect = ColorRect.new()
-		d.color = TreeFluxView.COLORS[r[0]]
-		d.custom_minimum_size = Vector2(22, 5)
-		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		d.tooltip_text = r[1]
-		_strip.add_child(d)
+		var g: LegendGlyph = LegendGlyph.new(TreeFluxView.SHAPES[r[0]], TreeFluxView.COLORS[r[0]])
+		g.tooltip_text = r[1]
+		g.mouse_filter = Control.MOUSE_FILTER_PASS
+		_strip.add_child(g)
 	col.add_child(_strip)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 2)
 	col.add_child(_body)
 	var grid: GridContainer = GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 1)
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 2)
 	_body.add_child(grid)
 	for r: Array in ROWS:
 		var kind: String = r[0]
 		var cb: CheckBox = CheckBox.new()
 		cb.focus_mode = Control.FOCUS_NONE
 		cb.button_pressed = view.kind_on.get(kind, true)
-		cb.tooltip_text = r[2]
+		cb.tooltip_text = "Afficher / masquer : " + r[2]
 		cb.toggled.connect(func(on: bool) -> void: view.set_kind(kind, on))
 		_checks[kind] = cb
-		var sw: ColorRect = ColorRect.new()
-		sw.color = TreeFluxView.COLORS[kind]
-		sw.custom_minimum_size = Vector2(16, 4)
-		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var lab: HBoxContainer = HBoxContainer.new()
-		lab.add_theme_constant_override("separation", 6)
-		lab.add_child(sw)
-		var name_l: Label = Label.new()
-		name_l.text = r[1]
-		name_l.add_theme_font_size_override("font_size", 14)
+		lab.add_theme_constant_override("separation", 4)
+		lab.add_child(LegendGlyph.new(TreeFluxView.SHAPES[kind], TreeFluxView.COLORS[kind]))
+		var name_l: Label = UiStyle.label(r[1], "")
+		name_l.add_theme_font_size_override("font_size", 13)
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_l.clip_text = true
 		lab.add_child(name_l)
 		lab.tooltip_text = r[2]
 		lab.mouse_filter = Control.MOUSE_FILTER_PASS
-		var val: Label = Label.new()
+		lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var val: Label = UiStyle.label("", "SmallLabel")
 		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		val.custom_minimum_size = Vector2(118, 0)
-		val.add_theme_font_size_override("font_size", 13)
-		val.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
+		val.custom_minimum_size = Vector2(100, 0)
 		_vals[kind] = val
 		grid.add_child(cb)
 		grid.add_child(lab)
 		grid.add_child(val)
-	_foot = Label.new()
-	_foot.add_theme_font_size_override("font_size", 12)
-	_foot.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
+	_foot = UiStyle.label("", "SmallLabel")
+	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_foot.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_foot)
 	_apply_collapse()
 
@@ -127,10 +115,10 @@ func _apply_collapse() -> void:
 	var c: bool = is_collapsed()
 	_body.visible = not c
 	_strip.visible = c
-	_head.text = ("▸ " if c else "▾ ") + "FLUX DE L'ARBRE" + ("" if c else " · AUJOURD'HUI")
+	_head.text = ("▸ " if c else "▾ ") + ("DÉPLIER LE DÉTAIL" if c else "AUJOURD'HUI, EN UNITÉS RÉELLES")
 
 
-## Syncs the checkboxes with the view (env hooks, tests) without emitting.
+## Aligne les cases sur la vue (accroches, tests) sans émettre.
 func sync_checks() -> void:
 	for k: String in _checks:
 		(_checks[k] as CheckBox).set_pressed_no_signal(view.kind_on[k])
@@ -161,7 +149,7 @@ func _process(delta: float) -> void:
 
 func _process_panel(delta: float) -> void:
 	_age += delta
-	if _age < 0.25 or not visible:
+	if _age < 0.25 or not is_visible_in_tree():
 		return
 	_age = 0.0
 	var f: Dictionary = view.values

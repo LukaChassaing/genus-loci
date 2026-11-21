@@ -153,11 +153,13 @@ func _ready() -> void:
 	hud.species_selected.connect(_on_species_selected)
 	_apply_species_look()
 	hud.soil_opacity_changed.connect(func(v: float) -> void: soil.set_opacity(v))
-	hud.flux_toggled.connect(func(on: bool) -> void: flux.set_enabled(on))
+	hud.overlay_changed.connect(_apply_overlay)
 	flux_panel = FluxPanel.new(flux.view)
-	hud.add_child(flux_panel)
-	hud.flux_toggled.connect(func(on: bool) -> void: flux_panel.visible = on)
+	hud.register_panel("flux", flux_panel, "Flux de l'arbre")
 	hud.guides_toggled.connect(func(on: bool) -> void: guides.set_shown(on))
+	hud.storm_requested.connect(_on_storm_button)
+	hud.root_view_requested.connect(func() -> void: cam.toggle_root_view())
+	hud.pause_requested.connect(func() -> void: _open_pause_menu(true))
 	prune_tool = PruneTool.new()
 	add_child(prune_tool)
 	prune_tool.setup(self)
@@ -165,16 +167,17 @@ func _ready() -> void:
 	save_flow.name = "SaveFlow"
 	add_child(save_flow)
 	save_flow.setup(self, load_path, load_error)
-	hud.side_panels.append(flux_panel)  # docked under the pruning panel (Hud.layout_side_panels)
+	hud.save_requested.connect(save_flow.quick_save)
+	hud.load_requested.connect(save_flow.quick_load)
 	mech_panel = MechPanel.new(sim)
 	mech_panel.host = self
-	mech_panel.visible = false
-	hud.add_child(mech_panel)
+	hud.register_panel("meca", mech_panel, "Mécanique")
 	hud.mech_toggled.connect(func(on: bool) -> void:
-		mech_panel.visible = on
 		if on:
 			mech_panel.refresh())
-	hud.side_panels.append(mech_panel)  # docked last (Hud.layout_side_panels)
+	hud.hover.cam = cam.get_camera()
+	hud.hover.sim = sim
+	_apply_overlay(hud.overlay)
 	guides.soil = soil
 	guides.cam = cam
 	cam.wedge_dir = soil.wedge_dir
@@ -219,6 +222,7 @@ func on_tree_loaded() -> void:
 	_apply_species_look()
 	hud.set_seed_text(seed_value)
 	hud.force_ring_refresh()
+	hud.reset_history()
 	hud.drought_button.set_pressed_no_signal(sim.get_drought())
 	accumulator = 0.0
 	soil.reset()
@@ -337,6 +341,7 @@ func _apply_seed(new_seed: int) -> void:
 	_apply_species_look()
 	hud.set_seed_text(seed_value)
 	hud.force_ring_refresh()
+	hud.reset_history()
 	hud.reset_drought_button()
 	accumulator = 0.0
 	_last_water_q = -1
@@ -730,9 +735,29 @@ func _update_fallen() -> void:
 	hud.set_fallen(fallen)
 
 
+## Calque du Hud (un seul à la fois) : recolore l'existant, sans passe de rendu supplémentaire. Eau : le sol peint
+## selon l'eau de ses couches (paramètre du shader du sol) et, des flux, seulement l'eau puisée et la transpiration ;
+## Flux : tous les flux ; aucun : ni l'un ni l'autre.
+func _apply_overlay(id: String) -> void:
+	flux.view.only = PackedStringArray(["water", "vapour"]) if id == "eau" else PackedStringArray()
+	flux.set_enabled(id != "")
+	soil.set_water_view(id == "eau")
+
+
+## « Tempête » de la barre du bas : ouvre le panneau Mécanique (où se lisent les dégâts) et souffle la rafale réglée.
+func _on_storm_button() -> void:
+	hud.open_panel("meca")
+	mech_panel.blow_storm()
+
+
 ## A storm now (« Tempête » of the mechanics panel): the gust tests the tree, what fails breaks (logged, replayed).
 func storm(gust_ms: float) -> int:
 	var n: int = sim.storm(gust_ms)
+	if hud != null:
+		if sim.get_uprooted().x >= 0.0:
+			hud.show_urgent("Tempête à %s m/s : l'arbre est déraciné" % MechPanel.num(gust_ms, 0))
+		elif n > 0:
+			hud.show_urgent("Tempête à %s m/s : %d rupture%s (voir Mécanique)" % [MechPanel.num(gust_ms, 0), n, "s" if n > 1 else ""])
 	_storm_show = gust_ms
 	mesh_dirty = true
 	_wood_ver = -1
@@ -838,7 +863,7 @@ func _process(delta: float) -> void:
 	_update_mech_overlay(delta)
 	Prof.add("gd.mech_overlay", t)
 	t = Time.get_ticks_usec()
-	hud.update_from(sim)
+	hud.update_from(sim, delta)
 	Prof.add("gd.hud_update", t)
 	t = Time.get_ticks_usec()
 	guides.update_from(tree_h)
@@ -1012,6 +1037,8 @@ func _simulate() -> void:
 			hud.set_playing(false)
 			var d: Dictionary = sim.get_vitality()
 			print("[dendro] trunk died at %d years (%s)" % [int(d.get("death_age", -1)), String(d.get("cause", ""))])
+			hud.show_urgent("Le tronc est mort à %d ans%s. Lecture pour continuer." % [int(d.get("death_age", -1)),
+				(" : " + String(d.get("cause", ""))) if String(d.get("cause", "")) != "" else ""], 8.0)
 			break
 		if float(Time.get_ticks_usec() - t0) / 1000.0 > FRAME_BUDGET_MS:
 			break
@@ -1038,7 +1065,11 @@ func _simulate() -> void:
 #   DENDRO_DROUGHT_YEARS=n  forced drought during the last n years before the shot
 #   DENDRO_STATIC=1       with DENDRO_BENCH: no time-lapse, the camera orbits (tree at DENDRO_YEARS)
 #   DENDRO_CAMDIST=1.5    distance for the "leaves" preset
-#   DENDRO_RINGS=0|1      ring panel visibility in the shot (default 1)
+#   DENDRO_RINGS=0|1      ring panel visibility in the shot (default 0 : panneau fermé)
+#   DENDRO_PANEL=cernes|flux|sol|meca|taille   panneau latéral ouvert (un seul à la fois)
+#   DENDRO_OVERLAY=eau|flux|none   calque actif (Flux par défaut) ; DENDRO_EXPERT=1 mode Expert (lu par le Hud)
+#   DENDRO_MENU=1, DENDRO_HELP=1   menu ≡ ou aide ouverts ; DENDRO_HOVER=tronc|racines étiquette de survol
+#   DENDRO_URGENT="texte"  bandeau urgent (capture)
 #   DENDRO_RINGZOOM=6     ring-view zoom factor in the shot
 #   DENDRO_SIZE=1920x1080 window size
 #   DENDRO_MSAA=0|2|4, DENDRO_FXAA=1   anti-aliasing overrides
@@ -1090,12 +1121,14 @@ func _advance_days_direct(days: float) -> void:
 		_stats_dirty = true
 		sim.advance_days(c)
 		days -= c
+		if hud != null:
+			hud.sample_history(sim)
 
 
 func _screenshot_and_quit(path: String) -> void:
 	playing = false
 	hud.set_playing(false)
-	hud.set_rings_visible(OS.get_environment("DENDRO_RINGS") != "0")
+	hud.set_rings_visible(OS.get_environment("DENDRO_RINGS") == "1")
 	var years_env: String = OS.get_environment("DENDRO_YEARS")
 	var years: float = float(years_env) if years_env != "" else 40.0
 	var doy_env: String = OS.get_environment("DENDRO_DOY")
@@ -1142,6 +1175,7 @@ func _screenshot_and_quit(path: String) -> void:
 	if rz != "":
 		var rv: RingView = hud.get_ring_view()
 		rv._zoom_at(Vector2(rv.size.x * 0.5 + 40.0, (rv.size.y - RingView.TEXT_H) * 0.5 - 10.0), float(rz))
+	_apply_ui_env()
 	if OS.get_environment("DENDRO_SCREEN").begins_with("pause"):  # pause, pause_save, pause_load
 		_open_pause_menu(false)
 	for i: int in 12:
@@ -1166,6 +1200,9 @@ func _apply_view_env() -> void:
 	var fx: String = OS.get_environment("DENDRO_FLUX")
 	if fx != "":
 		hud.flux_button.button_pressed = fx != "0"
+	var ov: String = OS.get_environment("DENDRO_OVERLAY")  # eau | flux | none
+	if ov != "":
+		hud.set_overlay("" if ov == "none" else ov)
 	var ft: String = OS.get_environment("DENDRO_FLUX_T")
 	if ft != "":
 		flux.phase += float(ft)
@@ -1190,6 +1227,34 @@ func _apply_view_env() -> void:
 		print("[dendro] mechanics at %.1f m/s: min safety %.2f (%s), first failure %s at %.1f m/s, mass %.0f kg" % [
 			mech_panel.wind, float(d.get("min_safety", -1.0)), String(d.get("expected_label", "")),
 			String(d.get("first_label", "")), float(d.get("first_speed", -1.0)), float(d.get("mass_kg", 0.0))])
+
+
+## Accroches de l'interface pour les captures : DENDRO_PANEL=cernes|flux|sol|meca|taille (panneau ouvert),
+## DENDRO_MENU=1 (menu ≡ ouvert), DENDRO_HELP=1 (aide), DENDRO_HOVER=tronc|racines (étiquette de survol),
+## DENDRO_URGENT="texte" (bandeau urgent). DENDRO_EXPERT=1 est lu par le Hud au démarrage.
+func _apply_ui_env() -> void:
+	var pn: String = OS.get_environment("DENDRO_PANEL")
+	if pn != "":
+		if pn == "taille":
+			prune_tool.set_active(true)
+		else:
+			hud.open_panel(pn)
+	if OS.get_environment("DENDRO_MENU") == "1":
+		hud.open_menu(true)
+	if OS.get_environment("DENDRO_HELP") == "1":
+		hud.toggle_help()
+	var ur: String = OS.get_environment("DENDRO_URGENT")
+	if ur != "":
+		hud.show_urgent(ur, 30.0)
+	var hv: String = OS.get_environment("DENDRO_HOVER")
+	if hv != "":
+		var camera: Camera3D = cam.get_camera()
+		var p3: Vector3 = Vector3(0.0, 1.3, 0.0) if hv == "tronc" else Vector3(0.0, -0.5 * sim.get_root_depth_m(), 0.0)
+		hud.hover.force_point = camera.unproject_position(p3)
+	for i: int in 2:
+		await get_tree().process_frame
+	_frame_camera(0.0)
+	cam.snap()
 
 
 ## Close-up on an outer cluster of blossoms (or of fruit once the bloom is over), seen from outside the crown.
@@ -1276,7 +1341,10 @@ func _run_bench(seconds: float, shot: String) -> void:
 		var dps: float = (float(sp) if sp != "" else 10.0) * 365.0
 		hud.speed_slider.value = log(dps) / log(Hud.MAX_SPEED_DAYS)
 		hud.set_playing(true)
-	hud.set_rings_visible(OS.get_environment("DENDRO_RINGS") != "0")
+	hud.set_rings_visible(OS.get_environment("DENDRO_RINGS") == "1")
+	var bp: String = OS.get_environment("DENDRO_PANEL")
+	if bp != "":
+		hud.open_panel(bp)
 	var vp_rid: RID = get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(vp_rid, true)
 	for i: int in 30:
@@ -1837,14 +1905,17 @@ func _run_selftest() -> void:
 	var paths: Array = sim.build_flux_geometry()
 	_check("flux: path ribbons and gas sites built", (paths[0] as ArrayMesh).get_surface_count() == 1
 		and (paths[1] as ArrayMesh).get_surface_count() == 1 and (paths[3] as PackedVector3Array).size() > 0)
-	_check("flux panel shown with Flux", flux_panel.visible)
+	hud.flux_button.button_pressed = false
+	hud.open_panel("flux")
+	await get_tree().process_frame
+	_check("flux panel opens (L) and turns the Flux overlay on", flux_panel.visible and hud.overlay == "flux" and flux.enabled)
 	flux_panel.toggle_for("sugar").button_pressed = false
 	await get_tree().process_frame
 	_check("flux panel: sugar toggle hides phloem dashes", not flux.view.kind_on["sugar"])
 	flux_panel.toggle_for("sugar").button_pressed = true
-	hud.flux_button.button_pressed = false
+	hud.open_panel("")
 	await get_tree().process_frame
-	_check("flux panel hidden with Flux off", not flux_panel.visible)
+	_check("flux panel closed with its slot", not flux_panel.visible)
 	hud.flux_button.button_pressed = true
 	_press_key(KEY_G)
 	await get_tree().process_frame

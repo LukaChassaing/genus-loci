@@ -10,6 +10,9 @@ const UI_SCALES: Array[float] = [0.85, 1.0, 1.15, 1.3]
 const AUTOMATION_VARS: Array[String] = ["DENDRO_SHOT", "DENDRO_SELFTEST", "DENDRO_BENCH", "DENDRO_YEARS", "DENDRO_SAVE", "DENDRO_LOAD"]
 const SHELL_SCREENS: Array[String] = ["title", "setup", "plate0", "plate1", "options", "load", "load_confirm"]
 
+## Émis quand un réglage change (panneau Options) : le Hud suit le mode Expert.
+signal settings_changed
+
 var settings: Dictionary = default_settings()
 ## Choice made on the setup screen, consumed once by main.gd. Empty = nothing chosen (env vars / defaults).
 var pending: Dictionary = {}
@@ -17,7 +20,7 @@ var _art_cache: Dictionary = {}
 
 
 static func default_settings() -> Dictionary:
-	return {"fullscreen": false, "resolution": 0, "msaa": 4, "fxaa": true, "vsync": true, "ui_scale": 1.0}
+	return {"fullscreen": false, "resolution": 0, "msaa": 4, "fxaa": true, "vsync": true, "ui_scale": 1.0, "expert": false}
 
 
 func _ready() -> void:

@@ -55,23 +55,16 @@ func _init(s: TreeSim) -> void:
 
 
 func _ready() -> void:
-	theme = UiStyle.make_theme(14, 6.0, 2.0)
-	add_theme_stylebox_override("panel", UiStyle.panel_box(0.84))
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var m: MarginContainer = MarginContainer.new()
-	for side: String in ["left", "right", "top", "bottom"]:
-		m.add_theme_constant_override("margin_" + side, 8)
-	add_child(m)
 	var col: VBoxContainer = VBoxContainer.new()
 	col.add_theme_constant_override("separation", 3)
-	m.add_child(col)
+	add_child(col)
 	_head = Button.new()
-	_head.flat = true
+	_head.theme_type_variation = "FlatButton"
 	_head.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_head.focus_mode = Control.FOCUS_NONE
 	_head.add_theme_font_size_override("font_size", 12)
-	_head.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
-	_head.tooltip_text = "Replier / déplier le panneau de mécanique"
+	_head.tooltip_text = "Replier / déplier le détail (curseur et résumé restent visibles)"
 	_head.pressed.connect(func() -> void: set_user_collapsed(not user_collapsed))
 	col.add_child(_head)
 	_wind_l = Label.new()
@@ -83,14 +76,14 @@ func _ready() -> void:
 	slider.max_value = MAX_WIND
 	slider.step = 0.5
 	slider.value = wind
-	slider.custom_minimum_size = Vector2(300, 0)
+	slider.custom_minimum_size = Vector2(290, 0)
 	slider.tooltip_text = "Rafale à 10 m de haut, appliquée comme une charge constante"
 	slider.value_changed.connect(func(v: float) -> void: set_wind(v))
 	col.add_child(slider)
 	_summary = Label.new()
 	_summary.add_theme_font_size_override("font_size", 13)
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary.custom_minimum_size = Vector2(300, 0)
+	_summary.custom_minimum_size = Vector2(290, 0)
 	col.add_child(_summary)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 3)
@@ -129,10 +122,8 @@ func _ready() -> void:
 		tint_changed.emit(on))
 	legend.add_child(tint_check)
 	for c: Array in [[1.0, "1"], [1.5, "1,5"], [2.0, "2"], [4.0, "4+"]]:
-		var sw: ColorRect = ColorRect.new()
-		sw.color = safety_color(c[0])
-		sw.custom_minimum_size = Vector2(14, 8)
-		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var sw: LegendGlyph = LegendGlyph.new("swatch", safety_color(c[0]))
+		sw.custom_minimum_size = Vector2(18, 14)
 		legend.add_child(sw)
 		var l: Label = Label.new()
 		l.text = c[1]
@@ -140,22 +131,22 @@ func _ready() -> void:
 		legend.add_child(l)
 	_body.add_child(legend)
 	_foot = Label.new()
-	_foot.add_theme_font_size_override("font_size", 11)
+	_foot.add_theme_font_size_override("font_size", 12)
 	_foot.add_theme_color_override("font_color", UiStyle.TEXT_DIM)
 	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_foot.custom_minimum_size = Vector2(300, 0)
+	_foot.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_foot)
 	# Real wind: today's, the sway, a storm on demand, the history of damage.
 	_body.add_child(HSeparator.new())
 	_wind_day = Label.new()
 	_wind_day.add_theme_font_size_override("font_size", 13)
 	_wind_day.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_wind_day.custom_minimum_size = Vector2(300, 0)
+	_wind_day.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_wind_day)
 	_sway_l = Label.new()
 	_sway_l.add_theme_font_size_override("font_size", 13)
 	_sway_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_sway_l.custom_minimum_size = Vector2(300, 0)
+	_sway_l.custom_minimum_size = Vector2(290, 0)
 	_sway_l.tooltip_text = "Premier mode de balancement : fréquence propre (méthode de Rayleigh sur l'arbre simulé) et amortissement en air calme"
 	_sway_l.mouse_filter = Control.MOUSE_FILTER_PASS
 	_body.add_child(_sway_l)
@@ -188,7 +179,7 @@ func _ready() -> void:
 	_hist = Label.new()
 	_hist.add_theme_font_size_override("font_size", 12)
 	_hist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hist.custom_minimum_size = Vector2(300, 0)
+	_hist.custom_minimum_size = Vector2(290, 0)
 	_body.add_child(_hist)
 	_update_storm_label()
 	_update_wind_label()
@@ -231,7 +222,7 @@ func _apply_collapse() -> void:
 	var c: bool = is_collapsed()
 	_body.visible = not c
 	_summary.visible = c
-	_head.text = ("▸ " if c else "▾ ") + "MÉCANIQUE · VENT ET TEMPÊTES"
+	_head.text = ("▸ " if c else "▾ ") + ("DÉPLIER LE DÉTAIL" if c else "CHARGE STATIQUE D'UNE RAFALE")
 
 
 ## Display colour of a safety factor (same stops as dendro_core::mechanics::safety_color).
@@ -245,6 +236,12 @@ static func safety_color(sf: float) -> Color:
 			var t: float = (sf - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0])
 			return (stops[i - 1][1] as Color).lerp(stops[i][1], t)
 	return stops[3][1]
+
+
+## Couleur de TEXTE d'un facteur de sécurité : la teinte de safety_color éclaircie pour tenir 4,5:1 sur le panneau
+## (le rouge pur des pastilles n'atteint que 1,6:1 en texte).
+static func safety_text_color(sf: float) -> Color:
+	return safety_color(sf).lerp(Color(1.0, 1.0, 1.0), 0.5)
 
 
 static func beaufort(ms: float) -> int:
@@ -321,7 +318,7 @@ func _show_wind() -> void:
 	if _wind_day == null:
 		return
 	var w: Vector3 = sim.get_wind_today()
-	_wind_day.text = "Vent du jour : moyen %s m/s, rafale %s m/s (%d km/h)" % [num(w.x), num(w.y), roundi(w.y * 3.6)]
+	_wind_day.text = "Vent du jour : moyen %s m/s, rafale %s m/s (%d km/⁠h)" % [num(w.x), num(w.y), roundi(w.y * 3.6)]
 	var f: float = float(values.get("natural_frequency_hz", 0.0))
 	_sway_l.text = "Balancement : f₀ = %s Hz (période %s s), amortissement %s %%" % [num(f, 2), num(1.0 / maxf(f, 0.01), 1),
 		num(100.0 * float(values.get("damping_ratio", 0.0)), 0)]
@@ -351,13 +348,13 @@ func _show(d: Dictionary) -> void:
 			(_rows[k] as Label).add_theme_color_override("font_color", UiStyle.TEXT_DIM)
 		var day: int = int(sim.get_uprooted().x)
 		_summary.text = "Arbre déraciné (chablis) l'an %d : le tronc est à terre et mort, plus de facteur de sécurité." % (day / 365)
-		_summary.add_theme_color_override("font_color", Color(0.95, 0.55, 0.35))
+		_summary.add_theme_color_override("font_color", UiStyle.URGENT)
 		_foot.text = "Le moment au collet a dépassé l'ancrage de la motte. La simulation continue ; la souche peut rejeter selon l'essence."
 		return
 	var g: Callable = func(k: String) -> float: return float(d.get(k, -1.0))
 	var sf: float = g.call("min_safety")
 	_rows["safety"].text = ("≥ 999" if sf >= 999.0 else num(sf, 2)) + ("  — rupture !" if sf < 1.0 else "")
-	_rows["safety"].add_theme_color_override("font_color", safety_color(sf))
+	_rows["safety"].add_theme_color_override("font_color", safety_text_color(sf))
 	if d.has("weak_role"):
 		var role: String = ROLE_LABELS[clampi(int(d["weak_role"]), 0, 2)]
 		_rows["weak"].text = "%s à %s m, Ø %s cm%s" % [role, num(g.call("weak_height_m")), num(g.call("weak_diameter_cm"), 0),
@@ -371,9 +368,12 @@ func _show(d: Dictionary) -> void:
 	var first: String = String(d.get("first_label", ""))
 	for k: String in ["c_stem", "c_limb", "c_uproot"]:
 		(_rows[k] as Label).add_theme_color_override("font_color", UiStyle.TEXT)
+		(_rows[k] as Label).remove_theme_font_override("font")
 	var first_key: String = ["c_stem", "c_limb", "c_uproot"][clampi(int(d.get("first_mode", 0)), 0, 2)]
 	if first != "":
-		(_rows[first_key] as Label).add_theme_color_override("font_color", UiStyle.ACCENT)
+		# Premier mode de ruine : couleur d'avertissement ET gras (pas la couleur seule).
+		(_rows[first_key] as Label).add_theme_color_override("font_color", UiStyle.WARN)
+		(_rows[first_key] as Label).add_theme_font_override("font", UiStyle.font(700))
 	var t: float = g.call("mass_kg") / 1000.0
 	_rows["mass"].text = ("%s t" % num(t, 2)) if t < 10.0 else ("%s t" % num(t, 1))
 	_rows["moment"].text = "%s / %s kN·m" % [num(g.call("base_moment_knm"), 0), num(g.call("critical_moment_knm"), 0)]
@@ -386,7 +386,7 @@ func _show(d: Dictionary) -> void:
 	var first_v: float = g.call("first_speed")
 	_summary.text = "Sécurité %s · 1re ruine : %s" % ["≥ 999" if sf >= 999.0 else num(sf, 2),
 		(first + " à " + speed_text(first_v)) if first != "" else "aucune sous 80 m/s"]
-	_summary.add_theme_color_override("font_color", safety_color(sf))
+	_summary.add_theme_color_override("font_color", safety_text_color(sf))
 	var leaf: int = roundi(g.call("leaf_fraction") * 100.0)
 	_foot.text = ("Valeurs de l'arbre à la dernière pause (recalculées à l'arrêt). " if _stale_note else "") + ("Feuillage %d %% · rafale à 10 m avec facteur dynamique du balancement et grandes flèches du tronc ; " % leaf
 		+ "le moment au collet est comparé à l'ancrage de la motte. Premier mode : %s." % (first if first != "" else "aucun sous 80 m/s"))

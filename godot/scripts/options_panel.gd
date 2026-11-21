@@ -1,6 +1,6 @@
 class_name OptionsPanel
 extends VBoxContainer
-## Display options (window mode, resolution, MSAA, FXAA, VSync, UI scale). Changes apply immediately and are
+## Display options (window mode, resolution, MSAA, FXAA, VSync, UI scale) and the Expert mode (in-game value column). Changes apply immediately and are
 ## saved to user://settings.cfg. Used in the title column and in the pause overlay.
 
 signal closed
@@ -11,6 +11,7 @@ var _msaa: Segmented
 var _fxaa: Segmented
 var _vsync: Segmented
 var _scale: Segmented
+var _expert: Segmented
 var _back: Button
 ## Settings path override (tests); empty = the real user://settings.cfg.
 var save_path: String = ""
@@ -35,6 +36,7 @@ func _ready() -> void:
 	for u: float in Game.UI_SCALES:
 		scale_labels.append("%d %%" % roundi(u * 100.0))
 	_scale = _row("Échelle de l'interface", Segmented.new().setup(scale_labels, Game.UI_SCALES.find(float(s["ui_scale"])), 4), "ui_scale")
+	_expert = _row("Mode Expert", Segmented.new().setup(["Non", "Oui"], 1 if bool(s.get("expert", false)) else 0, 2), "expert")
 	var sp: Control = Control.new()
 	sp.custom_minimum_size = Vector2(0, 8)
 	add_child(sp)
@@ -75,9 +77,12 @@ func apply_choice(key: String, i: int) -> void:
 			Game.settings["vsync"] = i == 1
 		"ui_scale":
 			Game.settings["ui_scale"] = Game.UI_SCALES[i]
+		"expert":
+			Game.settings["expert"] = i == 1
 	if apply_live:
 		Game.apply_window()
 	Game.save_settings(save_path if save_path != "" else Game.SETTINGS_PATH)
+	Game.settings_changed.emit()
 	_refresh_enabled()
 
 
